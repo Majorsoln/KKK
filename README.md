@@ -21,14 +21,21 @@
 ## MUUNDO
 ```
 engine/
-├── docs/RISK_COST_ENGINE.md   spec kamili (bajeti · gharama · lots · gate)
-├── config/risk.yaml           vigezo VYOTE (PD anahariri, hakuna code)
-├── src/rce/                   budget · cost · sizing · gate
-├── src/opm/                   (baadaye) open-position management
+├── docs/RISK_COST_ENGINE.md       spec kamili (bajeti · gharama · lots · gate)
+├── docs/KAIROS_1_STANDARD.md      standard ya Idara 3 (models)
+├── docs/DATA_FEATURE_STANDARD.md  mkataba wa data/features/labels (utafiti → uzalishaji)
+├── docs/RESEARCH_PLAN_R0.md       awamu R0–R8: kupima kila eneo, kuanzia data
+├── config/risk.yaml               vigezo VYOTE vya risk/cost (PD anahariri, hakuna code)
+├── config/data.yaml               vigezo VYOTE vya data/features/utafiti
+├── src/rce/                       budget · cost · sizing · gate
+├── src/opm/                       (baadaye) open-position management
 └── tests/
 ```
 
 ## CONFIG
 `engine/config/risk.yaml` ndicho **chanzo cha ukweli** cha vigezo vya risk/cost vya engine.
+`engine/config/data.yaml` ndicho **chanzo cha ukweli** cha vigezo vya data/features/labels vya
+utafiti. Datasets, notebooks na runs **zinabaki nje ya folda hii** — kinachorudi ni models +
+namba zilizothibitishwa (attestation yenye `dataset_id`).
 `config/ftmo_config.yaml` (ya zamani) inahudumia njia ya `live_brain` hadi uhamiaji ukamilike —
 kisha itastaafishwa. **Vigezo visiwe sehemu mbili baada ya uhamiaji.**

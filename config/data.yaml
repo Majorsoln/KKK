@@ -1,0 +1,99 @@
+# ============================================================
+#  data.yaml — DATA & FEATURE STANDARD (spec: docs/DATA_FEATURE_STANDARD.md)
+#                                       mpango: docs/RESEARCH_PLAN_R0.md
+#  PD anabadilisha HAPA — HAKUNA code inayohitajika.
+#  Kubadilisha kigezo chochote hapa = dataset_id MPYA (config_hash inabadilika).
+# ============================================================
+
+# ---------- MUDA ----------
+timezone:
+  storage_tz:        "UTC"              # kila kitu kinahifadhiwa UTC
+  broker_server_tz:  "Europe/Berlin"    # KUTHIBITISHWA kwa broker, si kudhaniwa
+  day_reset_tz:      "Europe/Berlin"    # inalingana na risk.yaml
+
+# ---------- L0: CHANZO ----------
+source:
+  base_granularity:  "M1"               # bars zote 7 zinajengwa kutoka hapa
+  require_bid_ask:   true               # mid pekee HAIRUHUSIWI (spread ni malighafi ya RCE)
+  min_years:         5
+  symbols:           [EURUSD, GBPUSD, USDJPY, USDCHF, USDCAD, AUDUSD, XAUUSD]
+  immutable:         true               # append-only + SHA256 kwa kila partition
+
+# ---------- L1: MALANGO YA UBORA (spec §3) ----------
+quality:
+  min_coverage:        0.995            # bars zilizopo / zinazotarajiwa (kalenda ya session)
+  max_gap_bars:        3                # gap ndani ya session, bars za M1
+  max_flat_bars:       10               # mfululizo wa high==low -> stale feed
+  max_plausible_spread_pips:            # kikomo cha akili timamu, si cha trading
+    default:   50.0
+    XAUUSD:   200.0
+  fail_action:         "exclude"        # partition iliyofeli HAIINGII L2
+
+# ---------- L2: BARS ----------
+bars:
+  timeframes:        [D1, H4, H2, H1, M30, M15, M5]
+  build_from_m1:     true               # SI kupakua kutoka broker (mipaka ilingane)
+  per_bar_stats:     [spread_mean, spread_p50, spread_p95, spread_max, n_ticks, n_m1_bars]
+  decision_tf:       "H1"               # as-of anchor (spec §4.1)
+  leakage_sentinel:  true               # test ya lazima kwa kila build
+
+# ---------- L3: FEATURES ----------
+features:
+  normalization:       "rolling"        # rolling/expanding TU — global mean/std ni uvujaji
+  norm_window:         500              # bars za TF husika
+  labels_per_feature:  50               # bajeti: labels / features >= hii (spec §0.1)
+  min_coverage:        0.95             # decision points zenye thamani halali
+  nan_policy:          "invalidate"     # hakuna imputation ya kubuni
+  families:            [F1, F2, F3, F4, F5, F6, F7]
+  training_mode:       "pooled"         # symbols zote pamoja; per-symbol ni calibration pekee
+
+# ---------- L4: LABELS (spec §5) ----------
+labels:
+  horizon_bars:        24               # bars za H1
+  resolve_on:          "M1"             # touch order HAIWEZI kujulikana kwa OHLC ya H1
+  gap_honest:          true             # stop = touch, si close
+  quantile:
+    quantiles:         [0.10, 0.50, 0.90]
+    units:             "atr"            # SI pips (hoja ya S3)
+  barrier:
+    sl_atr:            [0.5, 0.75, 1.0, 1.5, 2.0]   # GRID = input ya model, si derived (anti-S1)
+    tp_atr:            [0.5, 1.0, 1.5, 2.0, 3.0]
+    timeout_class:     true             # darasa la tatu, halitupwi kimya
+    max_timeout_frac:  0.35
+    min_labels_per_cell: 200
+  fill:
+    order_types:       [market, stop, limit]
+    cap_source:        "config/risk.yaml:slippage_cap_pips"   # chanzo KIMOJA
+  quality_buckets:                       # L-D kwa XGBoost, R_net
+    a_plus:  1.5
+    a:       0.8
+    b:       0.2                         # chini ya hii -> reject
+
+# ---------- L5: SPLITS (spec §7) ----------
+splits:
+  scheme:            "purged_kfold"
+  folds:             5
+  embargo_mult:      1.5                # embargo = horizon_bars x hii
+  holdout_frac:      0.2                # ya mwisho kwa mfuatano wa wakati
+  holdout_opens:     "once"             # R8 PEKEE
+  random_split:      false              # kamwe
+
+# ---------- VIZINGITI VYA UTAFITI (RESEARCH_PLAN_R0) ----------
+research:
+  screening:                            # R2
+    ic_min:             0.02
+    ic_sign_stability:  0.60
+    permutation_test:   true            # feature isiyoshinda toleo lake la bahati -> LESSON
+  redundancy:                           # R3
+    corr_cluster:       0.80
+    method:             "hierarchical"
+  calibration:                          # R5
+    ece_max:            0.05
+    brier_skill_min:    0.0             # dhidi ya base rate
+    method:             "isotonic"      # inajifunza kwenye validation fold PEKEE
+  ev:                                   # R6
+    cost_stress_mult:   1.5             # EV_R lazima ibaki chanya kwa cost x hii
+    fill_rate_min:      0.60            # inalingana na config/risk.yaml
+  holdout:                              # R8
+    degradation_max:    0.25            # (EV_R_val - EV_R_holdout) / EV_R_val
+  pre_registration:     true            # vigezo vinaandikwa KABLA ya kuona namba
