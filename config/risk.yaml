@@ -1,0 +1,53 @@
+# ============================================================
+#  risk.yaml — RISK & COST ENGINE (spec: engine/docs/RISK_COST_ENGINE.md)
+#  PD anabadilisha HAPA wakati wowote — HAKUNA code inayohitajika.
+#  Kila kigezo kina maana kwenye spec; usiongeze kigezo kisichokuwa kwenye spec.
+# ============================================================
+
+# ---------- BAJETI YA SIKU ----------
+base_balance:          10000      # salio la AWALI (rejea isiyobadilika, si salio la sasa)
+base_percentage:       0.04       # 4% -> base = 400
+penalty_factor:        0.50       # 50% ya DD ya jumla inakuwa adhabu
+win_factor:            0.50       # +50% ya faida ya leo
+loss_factor:           1.00       # -100% ya hasara ya leo
+day_reset_tz:          "Europe/Berlin"    # 00:00 CE(S)T
+
+# ---------- MALANGO (viability gate) ----------
+max_open_trades:       7
+max_correlated:        3
+daily_loss_stop_frac:  0.75       # hasara ya leo >= 3/4 ya base NA positions wazi -> acha
+max_total_dd:          1000       # kikomo kigumu cha DD ya jumla
+trade_news:            true       # swichi ya news on/off
+spread_model:                     # MSETO (spec §3.1): base H1 + spike-guard M5
+  base_tf:        "H1"
+  base_window:    100             # bars za H1 kwa wastani
+  spike_tf:       "M5"            # M5 = kazi yake ni intrabar analytics (spec §0)
+  spike_window:   288             # bars za M5 (~siku 1)
+  spike_quantile: 0.95
+  combine:        "max"           # spread_effective = max(base, spike)
+max_spread:                       # pips, per symbol
+  USDCHF:   2.0
+  USDJPY:   2.0
+  EURUSD:   2.0
+  GBPUSD:   2.5
+  XAUUSD:  30.0
+
+correlation_groups:
+  USD_group:      [EURUSD, GBPUSD, AUDUSD, NZDUSD]
+  USD_strength:   [USDJPY, USDCAD, USDCHF]
+  EUR_group:      [EURUSD, EURJPY, EURGBP]
+  AUD_NZD_group:  [AUDUSD, NZDUSD]
+
+# ---------- GHARAMA ----------
+# SLIPPAGE = CAP, si utabiri (spec §3.2). Cap = dhana ILE ILE ya backtest ->
+# slippage ya live HAIWEZI kuvuka iliyothibitishwa. Order isiyoweza kujaza ndani ya cap HAIJAZI.
+slippage_cap_pips:                # KIKOMO CHA JUU — cap inaweza KUBANA (M5 vol), HAIWEZI KULEGEA
+  market:  0.1                    # = SLIP_MARKET ya episodes()
+  stop:    0.3                    # = SLIP_STOP ya episodes()
+slippage_cap_dynamic:  true       # cap = min(dynamic(M5_vol), thamani hapo juu)
+fill_rate_min:         0.60       # chini ya hii -> ONYO: cap ngumu, strategy inatofautiana na utafiti
+commission_side:   "round_turn"   # thamani ya broker_costs.yaml ni ya pande MBILI
+swap:
+  enabled:        true
+  triple_day:     "WED"           # Jumatano -> Alhamisi = swap x3
+  server_rollover_hour: 0         # 00:00 server time
