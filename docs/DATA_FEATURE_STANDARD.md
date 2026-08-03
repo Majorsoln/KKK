@@ -218,6 +218,11 @@ bucket:  A+ / A / B / reject   (mipaka kwenye config)
 | **F6** | Cost / Micro | M5 | `spread_base_h1` · `spread_p95_m5` · `spread_effective` · `spread_vol` · `tick_intensity` |
 | **F7** | Cross-asset | D1 · H1 | `corr_group_n` · `rel_strength_vs_basket` · `usd_proxy_ret` |
 
+**Kadi kamili kwa kila familia zinakaa `docs/features/<ID>_<JINA>.md`.** Zilizoandikwa:
+`F1_REGIME.md` (mfano rasmi — features 34, kadi 12).
+
+**Kuhesabu kwa TF:** fomula moja kwenye TF tatu = **features TATU** kwenye bajeti ya §0.1.
+
 **F6 ni ya kusoma tu.** RCE ndiyo **mamlaka** ya `cost_pips` (§4.2 ya KAIROS-1). Model inapokea
 namba za RCE kama muktadha; **haihesabu** zake. Hakuna gharama mbili kwenye mfumo.
 

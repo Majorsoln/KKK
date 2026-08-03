@@ -46,6 +46,25 @@ features:
   nan_policy:          "invalidate"     # hakuna imputation ya kubuni
   families:            [F1, F2, F3, F4, F5, F6, F7]
   training_mode:       "pooled"         # symbols zote pamoja; per-symbol ni calibration pekee
+  atr_period:          14               # CHANZO KIMOJA cha ATR — F1 na F4 zinashirikiana
+
+  # ----- F1 REGIME (kadi: docs/features/F1_REGIME.md) -----
+  f1:
+    tfs:               [D1, H4, H2]
+    ret_z_n:           [5, 20]
+    trend_n:           20               # F1.02 slope + F1.03 r2
+    efficiency_n:      20               # F1.04
+    vol_ratio_windows: [20, 100]        # F1.05
+    vol_rank_window:   250              # F1.06 — ⚠ warm-up ndefu zaidi (D1 ≈ miezi 13)
+    range_pos_n:       20               # F1.07
+    dd_n:              50               # F1.08
+    hmm:
+      tfs:             [D1, H4]         # H2 imeachwa: gharama vs faida
+      n_states:        3
+      posterior_mode:  "filtering"      # ⚠ SI "smoothing" — smoothing = uvujaji
+      drop_last_state: true             # posteriors zinajumlisha 1 -> moja ni ya ziada
+      fit_scope:       "train_fold"     # KAMWE dataset nzima
+    optional:          [hurst_dfa, ret_skew]   # kipaumbele cha chini — za kwanza kuondoka
 
 # ---------- L4: LABELS (spec §5) ----------
 labels:
