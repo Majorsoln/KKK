@@ -97,17 +97,12 @@ kamwe si kwa tarehe. Mfuatano ndio mgumu; kasi inafuata ubora, si kinyume.
 ### T0 — MSINGI ▶ `TAYARI KUANZA`
 **PROMPT:**
 ```
-Tekeleza TERM T0 (docs/IMPLEMENTATION_PLAN.md §2, rejista DF-01..DF-04, DF-16):
-1. Jenga recorder wa tick feed ya broker (MT5) kama COMPONENT INAYOWEZA KUPELEKWA KWA
-   TENANT YEYOTE (broker-agnostic): bid/ask/volumes kila siku ya trading, partitions za
-   L0 zenye tag `provenance: broker` + `tenant_id` + SHA256 (spec §2.2–2.3).
-2. Tekeleza sera za data planes (spec §2.3 + config §data_planes): HUB — append-only,
-   hakuna delete path kabisa; TENANT — append-only + SHA256 wakati zipo, prune ya umri
-   (miezi 6) pekee, telemetry inasafirishwa HUB kabla ya prune, HAKUNA njia ya training
-   kwenye tenant runtime.
-3. Andika normalization ya Toleo A/B -> schema moja (spec §2.1); L0 haibadilishwi.
-4. Hash partitions ZOTE za L0 zilizopo (SHA256 kwa kila partition) + rekodi manifest.
-5. Simamisha muundo wa research repo (§9 ya DATA_FEATURE_STANDARD).
+Tekeleza TERM T0 (docs/IMPLEMENTATION_PLAN.md §2, rejista DF-01..DF-04):
+1. Jenga recorder wa tick feed ya broker (MT5): bid/ask/volumes kila siku ya trading,
+   partitions za L0 zenye tag `provenance: broker` + SHA256 (spec §2.2 ya DATA_FEATURE_STANDARD).
+2. Andika normalization ya Toleo A/B -> schema moja (spec §2.1); L0 haibadilishwi.
+3. Hash partitions ZOTE za L0 zilizopo (SHA256 kwa kila partition) + rekodi manifest.
+4. Simamisha muundo wa research repo (§9 ya DATA_FEATURE_STANDARD).
 USIGUSE RCE. Mwisho: sasisha rejista (hadhi + ushahidi) na toa ripoti ya T0.
 ```
 **WEWE (PD):**
@@ -337,7 +332,6 @@ za vigezo vya kustaafu (data.yaml §monitoring). Ripoti ya shadow -> PD kwa uamu
 | DF-13 | §6.2 | F6 ni ya kusoma tu — cost ya RCE; news kwa muda pekee | AUD | T3 |
 | DF-14 | §7 + SPLIT_PLAN | splits kwa tarehe za config; purge + embargo bars 36; pooled kwa wakati; random split MARUFUKU | UT + **CI** (splitter anasoma config pekee) | T1+ |
 | DF-15 | §8 | kila dataset ina manifest + dataset_id; namba bila dataset_id haiingii engine | **CI**: ripoti bila dataset_id inakataliwa | T1+ |
-| DF-16 | §2.3 | data planes: HUB haifuti kamwe (mafunzo hub_only); TENANT — append-only+SHA256 wakati zipo, retention miezi 6 kwa umri tu, `local_training: false`, telemetry inasafirishwa HUB kabla ya kufuta | UT (prune policy + immutability) + **CI** (hakuna njia ya training kwenye tenant runtime) + AUD | T0/T7 |
 
 ### 3.4 UTAFITI — `RESEARCH_PLAN_R0.md` + `DATA_SPLIT_PLAN.md`
 | ID | Spec | Logic | Uthibitisho | Term |
@@ -357,7 +351,7 @@ za vigezo vya kustaafu (data.yaml §monitoring). Ripoti ya shadow -> PD kwa uamu
 | RS-13 | §3 | LESSON inaandikwa kwa undani sawa na PASS | PROC | zote |
 | RS-14 | SPLIT §3 | RESERVE (2026-05+) haionwi kabisa hadi mzunguko ujao | **CI** (access guard ile ile) | zote |
 
-**Jumla: vipengele 57.** `100% = 57/57 VERIFIED` (au LESSON iliyoandikwa pale eneo lilipofeli
+**Jumla: vipengele 56.** `100% = 56/56 VERIFIED` (au LESSON iliyoandikwa pale eneo lilipofeli
 kwa vigezo — LESSON ni jibu halali; kificho ni pale tu eneo linaruka bila kupimwa).
 
 ---
