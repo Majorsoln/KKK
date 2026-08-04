@@ -11,12 +11,20 @@ timezone:
   broker_server_tz:  "Europe/Berlin"    # KUTHIBITISHWA kwa broker, si kudhaniwa
   day_reset_tz:      "Europe/Berlin"    # inalingana na risk.yaml
 
-# ---------- L0: CHANZO ----------
+# ---------- L0: CHANZO (imesahihishwa kwa data halisi — PD 2026-08-04) ----------
 source:
-  base_granularity:  "M1"               # bars zote 7 zinajengwa kutoka hapa
+  base_granularity:  "tick"             # ticks bid+ask; bars zote 7 zinajengwa kutoka hapa
   require_bid_ask:   true               # mid pekee HAIRUHUSIWI (spread ni malighafi ya RCE)
-  min_years:         5
-  symbols:           [EURUSD, GBPUSD, USDJPY, USDCHF, USDCAD, AUDUSD, XAUUSD]
+  min_years:         10                 # data halisi: 2016-01 -> 2026-04
+  symbols:           [EURUSD, GBPUSD, USDJPY, USDCHF, USDCAD, AUDUSD, NZDUSD,
+                      EURGBP, EURJPY, EURCHF, GBPJPY, XAUUSD]   # zote 12 kwa UTAFITI/pooling;
+                                        # symbols za TRADING ni uamuzi wa RCE (risk.yaml)
+  schema_variants:                      # spec §2.1 — L1 inanormalize kuwa schema MOJA
+    A: {cols: [timestamp, bid, ask, bid_vol, ask_vol], precision: us}
+    B: {cols: [ts, bid, ask, bid_volume, ask_volume], precision: ms,
+        symbols: [EURCHF, GBPJPY, XAUUSD]}
+  provenance:        "aggregator"       # spec §2.2 — attestation ya gharama inahitaji broker feed
+  record_broker_feed: true              # ANZA SASA; partitions mpya zina provenance: broker
   immutable:         true               # append-only + SHA256 kwa kila partition
 
 # ---------- L1: MALANGO YA UBORA (spec §3) ----------
@@ -32,7 +40,7 @@ quality:
 # ---------- L2: BARS ----------
 bars:
   timeframes:        [D1, H4, H2, H1, M30, M15, M5]
-  build_from_m1:     true               # SI kupakua kutoka broker (mipaka ilingane)
+  build_from:        "tick"             # ticks -> M1 ya ndani -> TF 7; SI kupakua kutoka broker
   per_bar_stats:     [spread_mean, spread_p50, spread_p95, spread_max, n_ticks, n_m1_bars]
   decision_tf:       "H1"               # as-of anchor (spec §4.1)
   leakage_sentinel:  true               # test ya lazima kwa kila build
@@ -50,7 +58,8 @@ features:
 # ---------- L4: LABELS (spec §5) ----------
 labels:
   horizon_bars:        24               # bars za H1
-  resolve_on:          "M1"             # touch order HAIWEZI kujulikana kwa OHLC ya H1
+  resolve_on:          "tick"           # touch order inatatuliwa kwa TICKS (spec §5) — si OHLC
+  touch_side:          "trade_price"    # BUY: SL/TP kwa bid · SELL: kwa ask (spread imo ndani)
   gap_honest:          true             # stop = touch, si close
   quantile:
     quantiles:         [0.10, 0.50, 0.90]
@@ -59,6 +68,7 @@ labels:
     sl_atr:            [0.5, 0.75, 1.0, 1.5, 2.0]   # GRID = input ya model, si derived (anti-S1)
     tp_atr:            [0.5, 1.0, 1.5, 2.0, 3.0]
     timeout_class:     true             # darasa la tatu, halitupwi kimya
+    timeout_record_return: true         # terminal return ya timeout -> E[R|timeout] (EV madarasa 3)
     max_timeout_frac:  0.35
     min_labels_per_cell: 200
   fill:
@@ -93,9 +103,11 @@ splits:
 # ---------- VIZINGITI VYA UTAFITI (RESEARCH_PLAN_R0) ----------
 research:
   screening:                            # R2
-    ic_min:             0.02
+    ic_min:             0.02            # pooled pekee (~38k labels, SE~0.005); per-symbol = kelele
     ic_sign_stability:  0.60
     permutation_test:   true            # feature isiyoshinda toleo lake la bahati -> LESSON
+    fdr_method:         "benjamini_hochberg"   # multiple testing kwa candidates ~770
+    fdr_q:              0.10
   redundancy:                           # R3
     corr_cluster:       0.80
     method:             "hierarchical"
@@ -103,9 +115,28 @@ research:
     ece_max:            0.05
     brier_skill_min:    0.0             # dhidi ya base rate
     method:             "isotonic"      # inajifunza kwenye validation fold PEKEE
-  ev:                                   # R6
+  ev:                                   # R6 — EV ya MADARASA 3 (§2.1 ya KAIROS-1)
+    classes:            3               # p_tp / p_sl / p_timeout
+    timeout_ev_source:  "empirical_per_cell"   # kutoka timeout labels; SI quantile head (anti-S1)
     cost_stress_mult:   1.5             # EV_R lazima ibaki chanya kwa cost x hii
     fill_rate_min:      0.60            # inalingana na config/risk.yaml
   holdout:                              # R8
     degradation_max:    0.25            # (EV_R_val - EV_R_holdout) / EV_R_val
   pre_registration:     true            # vigezo vinaandikwa KABLA ya kuona namba
+
+# ---------- PRETRAINING (KAIROS-1 §5A) ----------
+pretraining:
+  enabled:            true
+  corpus_end:         "2024-03-31"      # = trainval_end; kupretrain kwenye HOLDOUT = uvujaji
+  objectives:         [next_bar_direction, masked_bar, contrastive_regime]
+  fine_tune:          "heads_only"      # encoder ganda/nusu-ganda; heads kwenye trade labels
+  gate:               "R4_baseline"     # model iliyopretrainiwa inashindana kama kila mtu
+
+# ---------- R9: LIVE MONITORING (vigezo vya kustaafu — pre-registered) ----------
+monitoring:
+  min_live_trades:      100             # kabla ya hukumu yoyote ya live
+  live_ece_mult_max:    2.0             # rolling ECE ya live > 2x ya validation -> simamisha
+  live_ev_frac_min:     0.50            # EV_R ya live < nusu ya attestation -> simamisha
+  psi_max:              0.25            # drift ya features (PSI) kwa kudumu -> simamisha
+  reattest_cadence:     "quarterly"     # au trigger yoyote hapo juu — kipi kitangulie
+  shadow_required:      true            # demo/paper kabla ya pesa halisi

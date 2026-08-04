@@ -34,24 +34,29 @@ DATA  →  LABELS  →  FEATURES  →  MODELS
 5. **Kipimo kabla ya ujenzi.** Eneo lolote (data, label, feature family, model) linaingia **TU**
    likishinda kizingiti kilichoandikwa **kabla** ya kuona namba. Lisiposhinda → **LESSON**.
 
-### 0.1 Bajeti ya labels — hesabu halisi
+### 0.1 Bajeti ya labels — hesabu halisi (imesahihishwa kwa data halisi, PD 2026-08-04)
 ```
 H1 bars kwa mwaka  ≈ 24 × 5 × 52          = 6,240
-Miaka 5, symbol 1                          = 31,200 bars
-Setups zinazostahili (≈5% ya bars)         ≈ 1,560 labels
-Bajeti ya features @ 50 labels/feature     ≈ 31 features        ← symbol MOJA
-Pooled, symbols 7                          ≈ 10,900 labels → ≈ 218 features
+Miaka 10.3 (2016-01 → 2026-04), symbol 1   ≈ 64,000 bars
+Setups zinazostahili (≈5% ya bars)         ≈ 3,200 labels
+Pooled, symbols 12                         ≈ 38,000 labels → ≈ 770 features (bajeti @50)
+  kati yake TRAIN+VAL (80%)                ≈ 30,800  ·  HOLDOUT ≈ 7,800
+Barrier grid ×25                           ≈ 960,000 rows (zinahusiana — si sample huru)
 ```
 **Matokeo ya hesabu hii (uamuzi wa design):** training ni **pooled** (symbols zote pamoja, features
 zilizo scale-free + symbol embedding), si model kwa kila symbol. Model kwa kila symbol inagawanya
-data mara saba bila kuongeza taarifa. Per-symbol inabaki kwa **calibration** pekee.
+data mara 12 bila kuongeza taarifa. Per-symbol inabaki kwa **calibration** pekee.
+
+**Bajeti hii inabana TRADE labels pekee.** Labels za kila-bar (direction ya bar ijayo, regime,
+malengo ya pretraining §5A ya KAIROS-1) hazibanwi na bajeti hii — bars za H1 ni ~770,000 pooled na
+ticks ni ~bilioni 3.4. Hii ndiyo njia halali ya kulisha deep models bila kuvunja kanuni ya 1.
 
 ---
 
 ## 1. TABAKA ZA DATA (L0 → L5)
 
 ```
-L0  RAW        ticks / M1 bid+ask kutoka broker      immutable · append-only · hashed
+L0  RAW        TICKS bid+ask (µs/ms)                 immutable · append-only · hashed
  │
 L1  CLEAN      UTC · gaps · duplicates · sanity      ripoti ya ubora + PASS/FAIL
  │
@@ -59,7 +64,7 @@ L2  BARS       TF 7 zilizojengwa kutoka M1           + spread stats kwa kila bar
  │
 L3  FEATURES   kwa TF, as-of closed bar pekee        feature card kwa kila moja
  │
-L4  LABELS     quantile · barrier · fill · quality   zinatatuliwa kwa path ya M1
+L4  LABELS     quantile · barrier · fill · quality   zinatatuliwa kwa path ya TICKS
  │
 L5  DATASETS   train / validation / holdout          manifest + fingerprint
 ```
@@ -73,15 +78,46 @@ L1 na kuendelea, ili tuweze kujenga upya kila kitu kutoka chanzo.
 
 | Kitu | Sharti | Sababu |
 |---|---|---|
-| Granularity | **M1** (tick ikipatikana, bora zaidi) | M1 ndiyo inatatua labels za touch (§5.2) |
-| Bei | **bid NA ask** (OHLC pande zote) | spread ya kihistoria ni malighafi ya RCE §3.1; mid pekee = gharama ya kubuni |
-| Volume | tick volume + real volume ikipatikana | intensity ya M5 (§4 F6) |
-| Muda | timestamp ya server + **UTC** | rollover/swap ni server time; kila kitu kingine ni UTC |
-| Umbizo | parquet, columnar, partition kwa `symbol/year` | kusoma sehemu bila kufungua yote |
+| Granularity | **TICKS** (bid+ask, quote volumes) | ticks ndizo zinatatua labels za touch (§5.2) kwa usahihi wa juu kuliko M1 |
+| Bei | **bid NA ask** | spread ya kihistoria ni malighafi ya RCE §3.1; mid pekee = gharama ya kubuni |
+| Volume | quote volumes (bid_vol/ask_vol); real volume haipatikani FX | intensity (§4 F6) |
+| Muda | timestamp **UTC** (µs au ms) | rollover/swap ni server time; kila kitu kingine ni UTC |
+| Umbizo | parquet, Hive partition `symbol=XXX` | kusoma sehemu bila kufungua yote |
 | Hadhi | **immutable, append-only**, SHA256 kwa kila partition | reproducibility (kanuni 4) |
 
-**Chanzo:** broker huyu huyu atakayetumika live. Data ya broker mwingine inaweza kutumika kwa
-uchunguzi, **haiwezi** kutumika kuthibitisha namba zitakazoingia live — spread na fills ni zake.
+### 2.1 Schema halisi (kama ilivyo kwenye `data/raw/ticks/`, 2026-08-04)
+Symbols 12, ticks ~bilioni 3.4, 2016-01 → 2026-04, matoleo **MAWILI**:
+
+| | Toleo A (symbols 9) | Toleo B (EURCHF, GBPJPY, XAUUSD) |
+|---|---|---|
+| Columns | `timestamp, bid, ask, bid_vol, ask_vol` | `ts, bid, ask, bid_volume, ask_volume` |
+| Precision | µs | ms |
+| Partition | ~daily (files 2693) | ~monthly (files 124) |
+
+**Sheria ya normalization:** L0 haibadilishwi (immutable). L1 inasoma matoleo yote mawili na
+kutoa schema MOJA ya kawaida (`timestamp[UTC], bid, ask, bid_vol, ask_vol`). Symbols za Toleo B
+zinapita ukaguzi wa §3 kwa uzito maalum (session boundaries zao zinaonyesha dalili za chanzo
+tofauti — kuthibitishwa R0). Dirisha la pamoja: **2016-01-04 → 2026-04-30** (splits za
+`config/data.yaml`).
+
+### 2.2 Provenance ya chanzo (sera — PD 2026-08-04)
+Data ya L0 iliyopo ni ya **aggregator wa kihistoria**, si feed ya broker wa live. Matumizi:
+
+| Inaruhusiwa | Hairuhusiwi peke yake |
+|---|---|
+| labels zote (touch, quantile, fill-bootstrap) | spread stats za MWISHO zinazolisha RCE live |
+| features, screening, baselines, models, calibration (R0–R5) | attestation ya `cost_pips`/`P(fill)` ya live |
+| pretraining (§5A ya KAIROS-1) | — |
+
+**Sharti mbili za kufunga pengo:**
+1. **Kurekodi feed ya broker wa live/demo kuanzia SASA** (ticks bid+ask → L0 partition mpya yenye
+   `provenance: broker`). Kila mwezi usiorekodiwa ni data ya broker iliyopotea bure.
+2. R6/R8 zinafanyika kwa data ya aggregator **+ cost stress ×1.5** (ipo) **+ ulinganisho wa
+   spread** aggregator↔broker kwa kipindi kinachopishana, ukishapatikana. Attestation inaandika
+   provenance ya gharama waziwazi.
+
+**Refresh:** L0 inaishia 2026-04-30. Kila mzunguko wa utafiti unaanza kwa append ya partitions
+mpya + hashes — data ya 2026-05+ ni RESERVE (holdout ya mzunguko ujao, `DATA_SPLIT_PLAN.md` §3).
 
 ---
 
@@ -111,9 +147,9 @@ inaruhusu (imeandikwa kwenye feature card).
 
 ## 4. L2 — BARS ZA TF 7 + AS-OF RULE
 
-**Bars zote saba zinajengwa kutoka M1 kwenye repo yetu**, si kupakuliwa kutoka broker. Sababu:
-broker anaweza kutumia mipaka tofauti ya bar; tukijenga wenyewe, D1/H4/H2/H1/M30/M15/M5 zote
-zinatoka chanzo kimoja na zinalingana kikamilifu.
+**Bars zote saba zinajengwa kutoka TICKS kwenye repo yetu** (kupitia M1 ya ndani kama hatua ya
+kati), si kupakuliwa kutoka broker. Sababu: broker anaweza kutumia mipaka tofauti ya bar;
+tukijenga wenyewe, D1/H4/H2/H1/M30/M15/M5 zote zinatoka chanzo kimoja na zinalingana kikamilifu.
 
 Kila bar inabeba, zaidi ya OHLCV:
 ```
@@ -141,8 +177,11 @@ Test hii inakimbia kwa kila build ya L3. Si hiari.
 
 ## 5. L4 — LABELS (nne, kila moja kwa model yake)
 
-Labels zinatatuliwa kwa **path ya M1**, si OHLC ya H1. Sababu: bar ya H1 inaonyesha kwamba high na
-low zote mbili ziligusa — **haisemi ipi iligusa kwanza**. Bila M1, label ya barrier ni ubashiri.
+Labels zinatatuliwa kwa **path ya TICKS**, si OHLC ya H1 wala M1. Sababu: bar inaonyesha kwamba
+high na low zote mbili ziligusa — **haisemi ipi iligusa kwanza**. Hata ndani ya M1 moja, mpangilio
+wa touch unaweza kugeuza label; ticks ndizo pekee zinazoutatua kwa uhakika. Kwa BUY, touch ya SL
+inapimwa kwa **bid**, ya TP kwa **bid** (unafunga kwa bid); kwa SELL kinyume — spread iko ndani ya
+label, si dhana.
 
 ### 5.1 L-A — QUANTILE (Quantile NN)
 ```
@@ -159,8 +198,10 @@ SL/TP zilizotoka Quantile head. Badala yake:
 Kwa kila decision point, tengeneza labels kwa GRID ya barriers:
    sl_atr ∈ {0.5, 0.75, 1.0, 1.5, 2.0}
    tp_atr ∈ {0.5, 1.0, 1.5, 2.0, 3.0}
-Fuata path ya M1 hadi horizon H:
+Fuata path ya TICKS hadi horizon H:
    1 = TP iligusa kwanza · 0 = SL iligusa kwanza · timeout = darasa la tatu
+Kwa kila TIMEOUT:  rekodi pia terminal return (R-units) kwenye horizon
+   → hii ndiyo malighafi ya E[R|timeout] kwenye EV ya madarasa matatu (§2.1 ya KAIROS-1)
 ```
 **Matokeo:** `p_tp_first = f(features, sl_atr, tp_atr)` — barriers ni **INPUT**, si kitu
 kilichotokana na model ile ile. Quantile head inapendekeza SL/TP, Barrier head inaziita kwa
@@ -173,10 +214,15 @@ ya kwanza baada ya gap — ndivyo live itakavyokuwa.
 Utekelezaji wa S4 kwa data ya kihistoria:
 ```
 Kwa order ya aina A (market/stop/limit) kwenye bei X na cap C (config §slippage_cap_pips):
-   fuata M1 kuanzia t:  je bei ilipatikana ndani ya X ± C kabla ya kupita?
+   fuata TICKS kuanzia t:  je bei ilipatikana ndani ya X ± C kabla ya kupita?
    fill = 1 / 0        (+ rekodi slippage iliyohitajika)
 ```
 Hii ndiyo inayoruhusu kuanza **bila kusubiri data ya broker**. Demo → fine-tune, live → calibrate.
+
+**Mipaka ya bootstrap (uwazi):** kwa **stop/limit** orders, path ya ticks inajibu swali sahihi.
+Kwa **market** orders, kutojazwa live kunatokana na latency/liquidity ya wakati ule — path ya
+kihistoria haiwezi kukisia hilo. Kwa market: `P(fill)` inaanza na **prior ya juu** (≈0.98) na
+inakalibiwa kwa data ya demo/live mapema iwezekanavyo; haitegemei bootstrap hii.
 
 ### 5.4 L-D — QUALITY (XGBoost)
 Inatokana na L-B + gharama, si label mpya:
@@ -195,7 +241,7 @@ bucket:  A+ / A / B / reject   (mipaka kwenye config)
 
 ## 6. L3 — FEATURES
 
-### 6.1 Sheria saba
+### 6.1 Sheria nane
 1. **Scale-free.** Kila feature iwe log-return, ratio, z-score, percentile rank, au ATR-units.
    **Kamwe raw price.** Bei ya EURUSD 1.09 na XAUUSD 2400 haziwezi kulisha model moja.
 2. **Point-in-time normalization.** Rolling/expanding kwa data ya nyuma pekee. Global `mean/std`
@@ -206,6 +252,11 @@ bucket:  A+ / A / B / reject   (mipaka kwenye config)
 6. **Determinism:** fomula moja, mahali pamoja. ATR ya H1 ni function moja inayotumiwa na kila
    familia — haiandikwi upya.
 7. **NaN ni NaN.** Window haijajaa → `is_valid=false`, si sifuri.
+8. **Feature inayotokana na MODEL inafundishwa per-fold.** `hmm_state_post_k`, embeddings, na
+   feature yoyote inayotokana na model iliyofundishwa (fitted) lazima ifundishwe kwa **expanding
+   window / ndani ya fold ya train pekee** — HMM iliyofit dataset nzima inavujisha regimes za
+   baadaye kwenye posterior za nyuma, na **sentinel ya §4.2 HAITAIGUNDUA** (shuffle ya data ya
+   baadaye haibadilishi output ya model iliyoshafundishwa). Sheria hii ni ya S6 ya KAIROS-1.
 
 ### 6.2 Familia saba
 | ID | Familia | TF | Mifano ya features |

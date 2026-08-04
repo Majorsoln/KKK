@@ -30,9 +30,16 @@ inayotekelezeka, inayolipa baada ya gharama.*
 | **XGBoost** | ubora wa setup | `A+/A/B/reject` + score |
 | **PPO** | strategy selection (trend/breakout/reversal/MR) | strategy iliyochaguliwa |
 | **Quantile NN** | distribution ya move → SL/TP | `Q10, Q50, Q90` |
-| **Barrier** | P(kugusa TP kabla ya SL) | `p_tp_first` |
-| **EV** | thamani inayotarajiwa | `EV_signal` |
+| **Barrier** | P(TP/SL/timeout) — madarasa MATATU | `p_tp · p_sl · p_timeout` |
+| **EV** | thamani inayotarajiwa (madarasa matatu, §2.1) | `EV_signal` |
 | **Fill** | uwezekano wa kujaza ndani ya cap | `P(fill)` |
+
+**Lango la kuingia kwa kila model (halali kwa ZOTE):** hakuna model inayoingia kwa nafasi yake
+kwenye mchoro — inaingia kwa kushinda §6 dhidi ya baseline ya R4. Kwa deep models (Transformer,
+LSTM, CNN) njia halali ya kufikia uwezo huo kwa bajeti ya trade-labels iliyopo ni **pretraining
+(§5A)**. Kwa **PPO**: baseline yake ya lazima ni **contextual bandit / quality-per-strategy
+classifier** — PPO isiyoshinda bandit rahisi kwenye purged CV haiingii (offline RL kwa maelfu ya
+trades ni hatari kubwa ya kukariri kelele; hii ni R4-logic ile ile ngazi ya juu).
 
 ### 1.2 Timeframe hierarchy — kila TF ina KAZI moja (PD 2026-08-02)
 | TF | Kazi | Inalisha |
@@ -81,9 +88,20 @@ SELL:  SL = Q90   ·  TP = Q10
 Mafunzo: **pinball (quantile) loss** — `L = max(q·(y−ŷ), (q−1)·(y−ŷ))` — inajifunza hatari
 isiyo-linganifu (under- vs over-estimation si sawa kwenye trading).
 
+### 2.1 EV YA MADARASA MATATU (PD 2026-08-04 — inachukua nafasi ya EV ya binary)
+Barrier ina madarasa matatu (TP kwanza / SL kwanza / timeout, hadi 35% ya labels). EV ya binary
+`p×TP − (1−p)×SL` inadhania timeout haipo — inapotosha hadi theluthi ya matokeo. Fomula rasmi:
+```
+EV_signal = p_tp × TP  −  p_sl × SL  +  p_timeout × E[R | timeout]
+```
+- `p_tp, p_sl, p_timeout` — Barrier head (3-class, calibrated §5.3).
+- `E[R|timeout]` — kutoka **terminal returns za timeout labels zenyewe** (§5.2 ya standard ya
+  data): wastani kwa kila kisanduku cha grid, au regressor ndogo maalum. **SI** kutoka Quantile
+  head — hiyo ingerudisha mduara ambao S1 imeukata.
+
 ---
 
-## 3. STANDARDS TANO (zilizokubaliwa na PD)
+## 3. STANDARDS SITA (S1–S5 PD 2026-08-02 · S6 PD 2026-08-04)
 
 ### S1 — MIPAKA na HUKUMU zitenganishwe (anti-circularity)
 Distribution inayoweka barriers **HAIRUHUSIWI** kuzihukumu. Ni **heads mbili tofauti**:
@@ -123,6 +141,8 @@ Kutoka tick/bar history:  "kama entry ingekuwa X na cap ingekuwa C,
 Label:  fill = 1 / 0
 ```
 Kisha: **demo → fine-tune · live → calibrate.** Hii inaruhusu kuanza **bila kusubiri data ya broker**.
+Bootstrap hii ni halali kwa **stop/limit**; kwa **market** orders P(fill) inaanza na prior ya juu
+na inakalibiwa demo/live (§5.3 ya standard ya data — latency haipo kwenye path ya kihistoria).
 
 ### S5 — OPPORTUNITY COST HAIINGII KWENYE LANGO
 ```
@@ -132,6 +152,21 @@ Kisha: **demo → fine-tune · live → calibrate.** Hii inaruhusu kuanza **bila
 **Sababu:** trade isipojaza, **hupotezi pesa** — unakosa faida tu. Kuiondoa kwenye EV ya trade moja
 ni adhabu mara mbili.
 **Mahali pake:** kupanga wagombea (nani apewe slot), allocation ya capital, portfolio optimization.
+
+### S6 — CROSS-FITTING: output ya model inayolisha model nyingine ni OUT-OF-FOLD
+Pipeline ya §1 ina tabaka: outputs za UNDERSTANDING (HMM posterior, Transformer P(up/down), CNN
+pattern confidence, LSTM similarity) zinalisha DECISION (XGBoost/PPO) kama features. Sheria:
+```
+Output yoyote ya model inayotumika kama FEATURE ya model nyingine lazima iwe
+OUT-OF-FOLD prediction ndani ya purged folds ZILE ZILE za DATA_SPLIT_PLAN.
+In-sample predictions kama meta-features = UVUJAJI.
+```
+**Sababu:** model ya juu iliyofundishwa kwenye data ile ile inatoa in-sample predictions "safi
+kupita kiasi" — meta-model inajifunza ukamilifu usiokuwepo live. Uvujaji huu **HAUONEKANI** kwa
+sentinel ya shuffle (§4.2 ya standard ya data) — model iliyoshafundishwa haibadilishi output
+zake data ya baadaye ikichanganywa. Kinga pekee ni nidhamu ya cross-fitting.
+**Inahusu pia:** features zinazotokana na model yoyote iliyofit (sheria ya 8, §6.1 ya standard
+ya data) — HMM inafundishwa expanding/per-fold, kamwe si full-sample.
 
 ---
 
@@ -178,6 +213,46 @@ Model **haiamui** ukubwa wala ruhusa. RCE **haiamui** entry wala mwelekeo.
    inahitaji ihalalishwe kwa data iliyopo — si kwa matumaini.
 5. **Fill-aware backtest:** trades zinazoshindwa kujaza ndani ya cap **hazihesabiwi kama trades**.
    Hii inaondoa upendeleo wa "perfect fills".
+6. **Cross-fitting (S6):** output ya model inayolisha model nyingine ni out-of-fold, daima.
+7. **Model-derived features** zinafundishwa expanding/per-fold (sheria ya 8, §6.1 ya standard
+   ya data).
+
+---
+
+## 5A. NJIA YA DEEP MODELS — PRETRAINING NA MULTI-TASK (PD 2026-08-04)
+
+**Tatizo:** trade-labels ni ~38,000 (§0.1 ya standard ya data). Transformer/LSTM/CNN
+zikifundishwa from-scratch kwa labels hizo zitakariri kelele na R4 itazikataa. **Suluhisho:**
+bajeti ya trade-labels inabana *hukumu za trade*, si *uelewa wa soko* — na uelewa wa soko
+unaweza kujifunzwa kutoka data isiyo na labels za trade:
+
+```
+HATUA 1 — PRETRAIN (self-supervised, HAKUNA trade label):
+   corpus:  bars zote za TRAIN+VAL (~770k H1 pooled; M1/ticks kwa encoders za chini)
+   malengo: next-bar direction · masked-bar reconstruction · contrastive
+            (sequences za regime moja karibu, tofauti mbali)
+   ⚠ corpus inaishia trainval_end (2024-03-31). Kupretrain kwenye kipindi cha HOLDOUT
+     ni uvujaji — marufuku kabisa.
+
+HATUA 2 — FINE-TUNE (heads ndogo kwenye trade labels):
+   encoder iliyoganda/nusu-ganda + heads: quantile · barrier(3) · quality
+   parameters zinazofundishwa kwa labels 38k ni za heads pekee — ndogo
+
+HATUA 3 — LANGO LILE LILE (§6):
+   model iliyopretrainiwa inashindana na GBM baseline kama kila mtu.
+   Isiposhinda → LESSON. Pretraining si tiketi ya kuingia; ni njia ya kufika mstarini.
+```
+
+**Multi-task shared trunk inaruhusiwa:** encoder mmoja + heads tofauti (quantile, barrier,
+direction). S1 inahusu **labels na hukumu** — heads zibaki na labels huru (quantile: terminal
+return; barrier: touch grid) na hakuna head inayolisha nyingine bila S6. Multi-task ni
+regularizer mzuri kwa data ndogo; mgongano wa S1 haupo maadamu hukumu hazichanganyiki.
+
+**Kwa nini hii ndiyo njia ya "kuona opportunity":** edge ya kuona setup sokoni inatokana na
+representation ya hali ya soko (regime, structure, momentum katika muktadha). Representation
+hiyo inajifunzika kutoka mamilioni ya bars bila label ya trade hata moja — kisha hukumu ya
+trade (ndogo, ya gharama kubwa kwa data) inajengwa juu yake. Kutumia labels 38k kujifunza
+representation NA hukumu kwa pamoja ndiko kunakofanya deep models kufeli kwenye trading.
 
 ---
 

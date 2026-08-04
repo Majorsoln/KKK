@@ -22,9 +22,10 @@
 ```
 engine/
 ├── docs/RISK_COST_ENGINE.md       spec kamili (bajeti · gharama · lots · gate)
-├── docs/KAIROS_1_STANDARD.md      standard ya Idara 3 (models)
-├── docs/DATA_FEATURE_STANDARD.md  mkataba wa data/features/labels (utafiti → uzalishaji)
-├── docs/RESEARCH_PLAN_R0.md       awamu R0–R8: kupima kila eneo, kuanzia data
+├── docs/KAIROS_1_STANDARD.md      standard ya Idara 3 (models: S1–S6, EV madarasa 3, §5A pretraining)
+├── docs/DATA_FEATURE_STANDARD.md  mkataba wa data/features/labels (ticks, provenance, utafiti → uzalishaji)
+├── docs/RESEARCH_PLAN_R0.md       awamu R0–R9 + track P: kupima kila eneo, kuanzia data
+├── docs/DATA_SPLIT_PLAN.md        mgawanyo rasmi train/validation/holdout (2016–2026)
 ├── config/risk.yaml               vigezo VYOTE vya risk/cost (PD anahariri, hakuna code)
 ├── config/data.yaml               vigezo VYOTE vya data/features/utafiti
 ├── src/rce/                       budget · cost · sizing · gate

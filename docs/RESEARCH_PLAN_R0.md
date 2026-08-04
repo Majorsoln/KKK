@@ -29,30 +29,36 @@ Ikifunguliwa mapema, mzunguko mzima unakuwa batili — hakuna njia ya kuurekebis
 
 ```
 R0 DATA AUDIT ──► R1 LABEL AUDIT ──► R2 FEATURE SCREENING ──► R3 REDUNDANCY
-                                                                    │
-R8 HOLDOUT ◄── R7 ABLATION ◄── R6 FILL-AWARE EV ◄── R5 CALIBRATION ◄┴─ R4 BASELINE
+      │                                                             │
+      └─► P PRETRAINING (sambamba na R1–R3; TRAIN+VAL PEKEE) ──┐    │
+                                                               ▼    │
+R9 LIVE ◄── R8 HOLDOUT ◄── R7 ABLATION ◄── R6 EV ◄── R5 CALIB ◄┴─ R4 BASELINE
 ```
 Mishale ni **ngumu**: R2 haianzi kabla R1 haijafaulu. Sababu — IC ya feature dhidi ya label
-mbovu ni namba isiyo na maana.
+mbovu ni namba isiyo na maana. Track P (pretraining, §5A ya KAIROS-1) haiitaji labels za trade,
+kwa hiyo inakwenda sambamba — lakini models zake zinaingia R4+ kwa lango lile lile.
 
 | Awamu | Swali kuu | Deliverable |
 |---|---|---|
-| **R0** | Data yetu ni safi kiasi gani? | `quality_report.json` + kalenda ya sessions |
+| **R0** | Data yetu ni safi kiasi gani? | `quality_report.json` + kalenda ya sessions + schema moja |
 | **R1** | Labels zetu zina maana? | curve ya utulivu wa label + base rates |
-| **R2** | Feature ipi ina taarifa? | jedwali la IC/MI + utulivu wa muda |
+| **R2** | Feature ipi ina taarifa? | jedwali la IC/MI + utulivu wa muda (FDR-corrected) |
 | **R3** | Features zipi zinarudia nyingine? | clusters + wawakilishi waliochaguliwa |
+| **P** | Encoder inajifunza soko bila trade labels? | pretrained encoder + ripoti ya malengo |
 | **R4** | Baseline ni ipi? | EV_R ya baseline (bar ya kushinda) |
 | **R5** | Probabilities zetu ni za kweli? | reliability curve + Brier skill |
-| **R6** | Edge inabaki baada ya gharama na cap? | EV_R net, fill-aware |
+| **R6** | Edge inabaki baada ya gharama na cap? | EV_R net, fill-aware, madarasa 3 |
 | **R7** | Kila familia inalipa kiasi gani? | jedwali la ablation |
 | **R8** | Je inashikilia kwa data isiyoonekana? | attestation ya mwisho |
+| **R9** | Je inaendelea kuwa hai baada ya deployment? | vigezo vya kustaafu + ratiba ya re-attestation |
 
 ---
 
 ## 2. AWAMU KWA AWAMU
 
 ### R0 — DATA AUDIT
-**Swali:** je data ya broker inatosha kujenga chochote?
+**Swali:** je data tuliyonayo (ticks 2016–2026, symbols 12, matoleo 2 ya schema) inatosha
+kujenga chochote?
 
 | Kipimo | Kizingiti |
 |---|---|
@@ -60,10 +66,18 @@ mbovu ni namba isiyo na maana.
 | partitions zilizofeli §3 ya standard | 0 zinazoingia L2 |
 | gaps ndani ya session | ≤ `max_gap_bars` |
 | ukamilifu wa bid **na** ask | 100% ya bars zinazotumika |
-| miaka inayotumika | ≥ `min_years` (5) |
+| miaka inayotumika | ≥ `min_years` (10) |
+| **normalization ya Toleo A/B** (§2.1 ya standard) | schema moja; Toleo B inapita checks zote |
+| **ulinganisho A↔B** (spread/sessions kwenye pair zinazofanana) | tofauti zinaelezeka |
+
+**Kazi mbili za ziada za R0 (PD 2026-08-04):**
+1. **Kurekodi feed ya broker wa live/demo kuanzia sasa** (§2.2 ya standard — provenance).
+   Hii inaanza R0 na haiishii kamwe.
+2. Kalenda ya sessions inathibitishwa kwa matoleo yote mawili ya schema tofauti-tofauti
+   (dalili za chanzo tofauti kwa EURCHF/GBPJPY/XAUUSD).
 
 **Deliverable:** `quality_report.json` kwa kila symbol/mwaka + kalenda ya sessions
-iliyothibitishwa kwa data (si kudhaniwa).
+iliyothibitishwa kwa data (si kudhaniwa) + schema moja ya kawaida L1.
 
 **Ikifeli:** (a) omba data ndefu/safi kwa broker, au (b) punguza symbols hadi zenye ubora, na
 **rekodi** kwamba wigo umepungua. Kamwe usiendelee na partition iliyofeli "kwa sababu ni ndogo".
@@ -108,6 +122,13 @@ Kila feature inapimwa **ndani ya purged folds**, si in-sample:
 
 **Permutation baseline ni ya lazima:** kila feature inalinganishwa na toleo lake lililochanganywa.
 Feature isiyoshinda toleo lake la bahati nasibu **haipo**.
+
+**FDR control ni ya lazima (PD 2026-08-04):** permutation test inalinda feature MOJA; haitulindi
+tunapopima features mia kadhaa kwa pamoja — kwa bajeti ya ~770 candidates, kizingiti cha 2σ
+kinaruhusu false positives kadhaa kwa bahati tu. Kwa hiyo p-values za screening zinapita
+**Benjamini–Hochberg kwa `fdr_q` (0.10)** kabla ya feature yoyote kuwa `screened`. Kumbuka pia:
+IC inapimwa kwa **pooled** labels (~38k, SE≈0.005 → `ic_min` 0.02 ≈ 4σ); maamuzi ya per-symbol
+kwa labels ~3,200 (SE≈0.018) **hayafanyiki** kwa kizingiti hiki — kelele.
 
 **Deliverable:** jedwali la features zote na hadhi `candidate → screened | LESSON`.
 
@@ -176,12 +197,16 @@ wala sizing. Bila hii, lango la EV ni pambo.
 **Swali:** edge inabaki baada ya gharama halisi na cap ya slippage?
 
 ```
-EV_signal   kutoka p_tp_first (R5, calibrated) + SL/TP
+EV_signal   = p_tp×TP − p_sl×SL + p_timeout×E[R|timeout]     ← madarasa 3 (§2.1 ya KAIROS-1)
+              probabilities kutoka R5 (calibrated) · E[R|timeout] kutoka timeout labels zenyewe
 cost_pips   kutoka RCE (§3 ya RISK_COST_ENGINE) — spread_effective + slip cap + comm + swap
 P(fill)     kutoka L-C (§5.3 ya standard)
 EV_final    = P(fill) × EV_signal                      ← S5: hakuna opportunity cost
 EV_R        = EV_final ÷ SL
 ```
+**Provenance ya gharama (§2.2 ya standard):** spread ya kihistoria ni ya aggregator; kwa hiyo
+stress ya cost ×1.5 hapa si anasa — ndiyo bima ya pengo la aggregator↔broker hadi feed ya broker
+iliyorekodiwa itoe ulinganisho halisi.
 Trades zisizojaza ndani ya cap **hazihesabiwi kama trades** (§5.5 ya KAIROS-1).
 
 | Kipimo | Kizingiti |
@@ -228,7 +253,37 @@ vilivyotangazwa kabla · namba zilizopatikana · PASS/LESSON. Hii ndiyo pekee in
 engine (sheria 2 ya README).
 
 **Ikifeli:** mzunguko unaisha kama **LESSON**. Hakuna "jaribu tena kwenye holdout" — holdout
-iliyoonekana imekufa; mzunguko ujao unahitaji data mpya au split mpya.
+iliyoonekana imekufa; mzunguko ujao unahitaji data mpya (RESERVE ya 2026-05+, inayokua kila
+mwezi) au split mpya.
+
+---
+
+### R9 — LIVE MONITORING & RE-ATTESTATION (PD 2026-08-04)
+**Swali:** model iliyopasi R8 — je inaendelea kuwa hai, na tutajuaje siku imekufa?
+
+Soko si stationary. Attestation ya R8 ni picha ya wakati mmoja; bila vigezo vya kustaafu
+vilivyoandikwa KABLA, mfumo utaendelea kutrade model iliyokufa kwa sababu hakuna kipimo
+kilichotangazwa cha kifo chake.
+
+**Awamu ya SHADOW (kabla ya pesa halisi):** demo/paper kwa muda uliotangazwa; inathibitisha
+mnyororo mzima (data → KAIROS → RCE → fills) na inaanza kujaza data ya broker (fills, slippage,
+spread) — malighafi ya calibration ya P(fill) na ulinganisho wa provenance.
+
+**Vigezo vya kustaafu (pre-registered, `config/data.yaml` §monitoring):**
+| Kipimo | Kizingiti cha kustaafu |
+|---|---|
+| rolling ECE ya live (baada ya trades ≥ `min_live_trades`) | > `live_ece_mult_max` × ECE ya validation |
+| EV_R halisi ya live (rolling) | < `live_ev_frac_min` × EV_R ya attestation |
+| fill_rate | < `fill_rate_min` (tayari kwenye RCE — hurudi hapa kama trigger ya utafiti) |
+| drift ya features (PSI kwenye features za mwakilishi) | > `psi_max` kwa kudumu |
+
+Kikigongwa chochote → model inasimamishwa kwa entries mpya (**RCE haiguswi** — positions wazi
+zinafuata sheria zake), na mzunguko mpya wa utafiti unaanza kwenye data iliyoongezeka.
+
+**Ratiba ya re-attestation:** kila robo mwaka AU trigger yoyote hapo juu — kipi kitangulie.
+Kila re-attestation inatumia RESERVE mpya kama holdout (holdout ya zamani imeshaonekana).
+
+**Deliverable:** dashboard ya vigezo hivi + rekodi ya kila tathmini (hata "hakuna hatua").
 
 ---
 
@@ -248,17 +303,20 @@ iliyoonekana imekufa; mzunguko ujao unahitaji data mpya au split mpya.
 
 | Hatua | Kazi | Inategemea |
 |---|---|---|
-| 1 | Vuta M1 bid+ask, jenga L0 + hashes | — |
+| 0 | **Anza kurekodi feed ya broker** (haina mwisho) + hash L0 iliyopo | — |
+| 1 | Normalization ya Toleo A/B → schema moja (L1 inasoma zote) | — |
 | 2 | Jenga L1 + `quality_report.json` (**R0**) | 1 |
-| 3 | Jenga L2 (TF 7 + spread stats) + sentinel ya uvujaji | 2 |
-| 4 | Jenga L-B grid labels kwa path ya M1 (**R1**) | 3 |
+| 3 | Jenga L2 (TF 7 kutoka ticks + spread stats) + sentinel ya uvujaji | 2 |
+| 4 | Jenga L-B grid labels kwa path ya TICKS + terminal returns za timeout (**R1**) | 3 |
 | 5 | Andika feature cards za familia F1–F7 (kabla ya code) | — |
-| 6 | Jenga L3 + screening (**R2**) → **R3** | 4, 5 |
+| 6 | Jenga L3 + screening na FDR (**R2**) → **R3** | 4, 5 |
+| P | **Pretraining** ya encoder (TRAIN+VAL pekee, §5A ya KAIROS-1) | 3 |
 | 7 | Baselines (**R4**) — **lango la GO/NO-GO** | 6 |
-| 8 | R5 → R6 → R7 | 7 |
+| 8 | R5 → R6 (EV madarasa 3) → R7 | 7 |
 | 9 | R8 + attestation → kabidhi kwa engine | 8 |
+| 10 | **R9**: shadow → live monitoring → re-attestation kila robo | 9 |
 
-Hatua 5 inaweza kwenda sambamba na 1–4 (ni kuandika, si kuhesabu). Zingine ni mfululizo.
+Hatua 0, 5 na P zinakwenda sambamba na mfululizo mkuu. Zingine ni mfululizo.
 
 ---
 
