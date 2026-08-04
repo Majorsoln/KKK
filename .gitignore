@@ -6,8 +6,16 @@ __pycache__/
 .venv/
 venv/
 
-# Data ya utafiti HAIINGII repo hii (sheria ya README + §9 ya DATA_FEATURE_STANDARD)
-research/
+# ---------------------------------------------------------------------------
+# DATA YA UTAFITI HAIINGII GIT (§9 ya DATA_FEATURE_STANDARD; lango G11)
+# `research/` iko NDANI ya repo (uamuzi wa PD 2026-08-04) ili reports na code
+# ya utafiti zisafiri na repo. `research/data/` PEKEE ndiyo haipushwi.
+# Ni ignore ya FOLDA (si glob) — git haiingii ndani yake kabisa, kwa hiyo
+# `git status` inabaki nyepesi hata ikiwa na GB 31 za ticks.
+# ---------------------------------------------------------------------------
+research/data/
+
+# Kinga ya pili (belt-and-braces): data ghafi popote ilipo
 *.parquet
 manifest_l0.json
 freshness.json

@@ -337,6 +337,7 @@ za vigezo vya kustaafu (data.yaml §monitoring). Ripoti ya shadow -> PD kwa uamu
 | DF-13 | §6.2 | F6 ni ya kusoma tu — cost ya RCE; news kwa muda pekee | AUD | T3 |
 | DF-14 | §7 + SPLIT_PLAN | splits kwa tarehe za config; purge + embargo bars 36; pooled kwa wakati; random split MARUFUKU | UT + **CI** (splitter anasoma config pekee) | T1+ |
 | DF-15 | §8 | kila dataset ina manifest + dataset_id; namba bila dataset_id haiingii engine | **CI**: ripoti bila dataset_id inakataliwa | T1+ |
+| DF-17 | §9 | `research/` ndani ya repo: reports+src zinapushwa, `research/data/` haipushwi kamwe; engine hairudii code ya utafiti | **UT/CI**: `tests/test_repo_guards.py` (G11 · G12) — imethibitishwa kwa jaribio hasi | T0 |
 
 ### 3.4 UTAFITI — `RESEARCH_PLAN_R0.md` + `DATA_SPLIT_PLAN.md`
 | ID | Spec | Logic | Uthibitisho | Term |
@@ -356,7 +357,7 @@ za vigezo vya kustaafu (data.yaml §monitoring). Ripoti ya shadow -> PD kwa uamu
 | RS-13 | §3 | LESSON inaandikwa kwa undani sawa na PASS | PROC | zote |
 | RS-14 | SPLIT §3 | RESERVE (2026-05+) haionwi kabisa hadi mzunguko ujao | **CI** (access guard ile ile) | zote |
 
-**Jumla: vipengele 56.** `100% = 56/56 VERIFIED` (au LESSON iliyoandikwa pale eneo lilipofeli
+**Jumla: vipengele 57.** `100% = 57/57 VERIFIED` (au LESSON iliyoandikwa pale eneo lilipofeli
 kwa vigezo — LESSON ni jibu halali; kificho ni pale tu eneo linaruka bila kupimwa).
 
 ### 3.5 LEDGER YA HADHI (hii ndiyo safu ya hadhi ya §3 — inasasishwa kila wiki)
@@ -397,6 +398,8 @@ G7  GOLDEN RCE       test ya §6 (lots 0.16 / $34.88) kila commit         (RCE-1
 G8  CORPUS DATE      pretraining data > 2024-03-31 → FAIL                (K1-13)
 G9  SPEC-REF         PR bila "Spec: ..." + ID za rejista → inakataliwa   (§1.2)
 G10 CONFIG ONLY      kigezo cha maamuzi nje ya risk.yaml/data.yaml → FAIL (DoD)
+G11 NO DATA IN GIT   parquet / `research/data/` / faili > 5MB iliyo-track → FAIL (DF-17)
+G12 ENGINE ⊥ RESEARCH `src/` (engine) ikimport `research.src` → FAIL     (DF-17)
 ```
 
 ### 4.3 Ulinzi wa HOLDOUT (G2 — ufafanuzi)

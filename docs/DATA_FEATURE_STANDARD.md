@@ -334,19 +334,39 @@ engine — ndio unavyotimizwa mtiririko wa upande mmoja (sheria 2 ya README).
 
 ---
 
-## 9. MUUNDO WA FOLDA (nje ya repo hii)
+## 9. MUUNDO WA FOLDA (`research/` — ndani ya repo, data haipushwi)
 ```
 research/
-├── data/
-│   ├── L0_raw/       <symbol>/<year>/m1_bidask.parquet   (immutable)
+├── data/             ← HAIPUSHWI (.gitignore: `research/data/`)
+│   ├── L0_raw/       provenance=<aggregator|broker>/symbol=<SYM>/...  (immutable)
 │   ├── L1_clean/     + quality_report.json
 │   ├── L2_bars/      <symbol>/<tf>.parquet
 │   ├── L3_features/  <dataset_id>/
 │   ├── L4_labels/    <dataset_id>/
 │   └── L5_datasets/  <dataset_id>/{train,val,holdout}.parquet + manifest.json
-├── reports/          quality/ · screening/ · ablation/ · calibration/
-└── src/
+├── reports/          ← INAPUSHWA: quality/ · screening/ · ablation/ · calibration/
+└── src/              ← INAPUSHWA: code ya utafiti
 ```
+
+**Uamuzi wa PD 2026-08-04 (badiliko la §9):** `research/` inakaa **ndani ya repo**, si nje.
+Sababu: reports (ushahidi wa kila awamu) na code ya utafiti zinasafiri na repo, kwa hiyo
+attestation, LESSON na namba zinapatikana pamoja na spec zilizozizalisha. **Data pekee
+(`research/data/`) haipushwi** — imezuiwa kwa ignore ya folda.
+
+Mpaka wa engine↔utafiti **haujafutwa; umehamia kwenye code**, na sasa unatekelezwa na
+mashine badala ya folda:
+
+| Sheria (README 1 na 2) | Ilivyokuwa inalindwa | Inavyolindwa sasa |
+|---|---|---|
+| data haiingii repo | folda ilikuwa nje | `.gitignore` + **lango G11** (test) |
+| engine hairudii code ya utafiti | folda ilikuwa nje | **lango G12** (test): `src/` (engine) hairuhusiwi ku-import `research/src` |
+| mtiririko upande mmoja | folda ilikuwa nje | attestation + `dataset_id` (§8) — havijabadilika |
+
+`research_root` inabaki kigezo cha config (`storage.research_root`, env `ELITEFX_RESEARCH_ROOT`)
+— kwa hiyo **data inaweza kuhamishiwa diski nyingine wakati wowote** bila kubadilisha code wala
+muundo (muhimu: L1–L5 zitahitaji nafasi kubwa kuliko L0). Repo inashikilia `research/reports/`
+na `research/src/`; `research/data/` inaweza kuwa hapo hapo au mahali pengine kabisa.
+
 Repo hii (engine) inapokea **models + namba zilizothibitishwa** pekee.
 
 ---

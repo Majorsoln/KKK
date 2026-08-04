@@ -27,9 +27,12 @@ source:
   record_broker_feed: true              # ANZA SASA; partitions mpya zina provenance: broker
   immutable:         true               # append-only + SHA256 kwa kila partition
 
-# ---------- STORAGE YA RESEARCH (spec §9 — NJE ya repo hii; PD anathibitisha) ----------
+# ---------- STORAGE YA RESEARCH (spec §9 — `research/` NDANI ya repo; data haipushwi) ----------
+# PD 2026-08-04: research_root inaelekezwa `<repo>/research`. `research/data/` iko kwenye
+# .gitignore (lango G11). Diski ikijaa (L1+ zinahitaji zaidi ya L0), badilisha env HII PEKEE —
+# reports/src zinabaki kwenye repo, data inahamia diski nyingine bila kugusa code.
 storage:
-  research_root:  "${ELITEFX_RESEARCH_ROOT}"                 # PD anaamua eneo; env au njia kamili
+  research_root:  "${ELITEFX_RESEARCH_ROOT}"                 # mf. C:\Users\Hp\project\elitefx-engine\research
   l0_root:        "${ELITEFX_RESEARCH_ROOT}/data/L0_raw"     # partitions za L0 (immutable)
   l0_manifest:    "${ELITEFX_RESEARCH_ROOT}/data/L0_raw/manifest_l0.json"   # SHA256 + provenance
   holdout_root:   "${ELITEFX_HOLDOUT_ROOT}"                  # G2: ruhusa ya R8 pekee (§4.3, T1)

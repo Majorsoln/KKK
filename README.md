@@ -44,8 +44,10 @@ python -m src.data.cli hash-l0            # DF-01 — SHA256 ya partitions ZOTE 
 python -m src.data.cli verify-l0          # DF-01 — lango la CI (hash check kila build)
 python -m src.data.cli check-freshness    # DF-04 — ONYO: siku ya trading bila data mpya
 ```
-Data yenyewe **haiishi hapa**: `ELITEFX_RESEARCH_ROOT` inaelekeza storage ya research (§9 ya
-`DATA_FEATURE_STANDARD.md`). Sifa za MT5 zinatoka environment, si config wala code.
+`research/` iko **ndani ya repo** (§9, PD 2026-08-04): `reports/` na `src/` zinapushwa;
+**`research/data/` haipushwi kamwe** (.gitignore + lango G11). `ELITEFX_RESEARCH_ROOT` inaelekeza
+mzizi wa research — badilisha env hiyo pekee ukitaka data ihamie diski nyingine.
+Sifa za MT5 zinatoka environment, si config wala code.
 
 ## CONFIG
 `engine/config/risk.yaml` ndicho **chanzo cha ukweli** cha vigezo vya risk/cost vya engine.
