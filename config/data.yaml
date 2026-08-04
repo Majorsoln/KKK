@@ -27,6 +27,20 @@ source:
   record_broker_feed: true              # ANZA SASA; partitions mpya zina provenance: broker
   immutable:         true               # append-only + SHA256 kwa kila partition
 
+# ---------- DATA PLANES: HUB na TENANT (spec §2.3) ----------
+data_planes:
+  hub:                                  # eneo la kujifunzia la kudumu
+    delete_policy:        "never"       # append-only MILELE — mafunzo yote hapa pekee
+    receives:             [aggregator_l0, broker_feeds, tenant_telemetry_optin]
+    training:             "hub_only"    # R-cycles, pretraining, re-attestation — HUB pekee
+  tenant:                               # server ya kila mtumiaji
+    retention_months:     6             # rolling window ya ticks; kufuta kwa UMRI tu, si edit
+    immutable_while_live: true          # append-only + SHA256 kama L0 (Toleo A/B)
+    uses:                 [spread_windows, calibration, fill_finetune, drift_monitoring]
+    local_training:       false         # tenant ana-CALIBRATE, ha-TRAIN (attestation inavunjika)
+    ship_telemetry_before_prune: true   # muhtasari -> HUB (opt-in) KABLA ya kufuta
+    trade_records_retention_months: 24  # fills/trades (audit) — retention tofauti na ticks
+
 # ---------- L1: MALANGO YA UBORA (spec §3) ----------
 quality:
   min_coverage:        0.995            # bars zilizopo / zinazotarajiwa (kalenda ya session)

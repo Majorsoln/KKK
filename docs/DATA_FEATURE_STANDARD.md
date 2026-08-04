@@ -119,6 +119,50 @@ Data ya L0 iliyopo ni ya **aggregator wa kihistoria**, si feed ya broker wa live
 **Refresh:** L0 inaishia 2026-04-30. Kila mzunguko wa utafiti unaanza kwa append ya partitions
 mpya + hashes — data ya 2026-05+ ni RESERVE (holdout ya mzunguko ujao, `DATA_SPLIT_PLAN.md` §3).
 
+### 2.3 MAENEO MAWILI YA DATA — HUB na TENANT (PD 2026-08-04)
+
+Mfumo unatumika na broker **YEYOTE**. Kanuni: soko lina tabia zinazofanana; broker ana spec
+zake. Kwa hiyo data zinaishi maeneo mawili yenye sera tofauti:
+
+**HUB — eneo la kujifunzia la kudumu (letu, moja):**
+- **Haifuti KAMWE.** Immutable, append-only, SHA256 — sera ile ile ya L0 (Toleo A/B).
+- Kinachoingia: aggregator L0 · feeds za broker zinazorekodiwa · **telemetry ya execution
+  kutoka kwa tenants** (opt-in, minimal: fills, slippage halisi, spread summaries za siku —
+  hakuna data za akaunti/utambulisho).
+- Kinachotokea hapa **PEKEE**: R-cycles zote, pretraining, mafunzo ya models, re-attestation.
+  Kadri tenants wanavyoongezeka, HUB inajifunza tabia za soko kwa ujumla + tofauti za
+  ki-broker — mfumo unazidi kuwa bora kwa wote.
+
+**TENANT — server ya mtumiaji (kila trader, yake):**
+- User anaweka **spec za broker wake tu** kwenye config (`broker_costs.yaml` + `risk.yaml`) —
+  hakuna code.
+- Live data za broker wake: **append-only + SHA256 WAKATI ZIPO** — immutability ile ile ya
+  Toleo A/B. Retention ya rolling (**default miezi 6**, config); kufuta ni kwa **sera ya
+  umri pekee**, kamwe si kuhariri.
+- Matumizi (runtime ya maamuzi): windows za `spread_effective` za RCE · **calibration ya
+  per-broker/tenant** (isotonic — nyepesi, halali) · fine-tune ya P(fill) · drift monitoring
+  ya R9.
+- **Kabla ya partition kufutwa kwa umri:** muhtasari wa telemetry unasafirishwa HUB (opt-in) —
+  malighafi ya kujifunzia **haipotei**; inabadilisha tu anwani. Trade/fill records za tenant
+  (audit) zina retention ndefu zaidi, tofauti na ticks (config).
+
+**MARUFUKU YA MSINGI — tenant ana-CALIBRATE, ha-TRAIN:**
+```
+Kufundisha upya model kwenye tenant = MARUFUKU.
+```
+Miezi 6 ya broker mmoja haitoshi kufundisha chochote (overfitting), na model
+iliyofundishwa nje ya HUB haina attestation — hairuhusiwi kutrade (sheria 2 ya README).
+Mtiririko unabaki upande mmoja, sasa kwa kila tenant:
+```
+HUB (utafiti/mafunzo)  ──►  TENANT (uzalishaji: model + calibration ya kwake)
+TENANT  ──►  HUB:  data ya matokeo tu (telemetry)
+```
+**Kwa nini model moja inafaa broker wote (kwa ujenzi, si kwa bahati):** features ni
+scale-free (§6.1) — hazibebi bei wala spread ya broker; gharama zinaingia kama **INPUT**
+kutoka RCE ya tenant (chanzo kimoja, §4.2 ya KAIROS-1); tofauti za mwisho za broker
+zinafyonzwa na tabaka la calibration la tenant. Uelewa wa soko ni wa pamoja; utekelezaji
+ni wa kila mmoja.
+
 ---
 
 ## 3. L1 — USAFI NA MALANGO YA UBORA
