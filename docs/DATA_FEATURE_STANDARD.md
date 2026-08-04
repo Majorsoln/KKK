@@ -85,6 +85,12 @@ L1 na kuendelea, ili tuweze kujenga upya kila kitu kutoka chanzo.
 | Umbizo | parquet, Hive partition `symbol=XXX` | kusoma sehemu bila kufungua yote |
 | Hadhi | **immutable, append-only**, SHA256 kwa kila partition | reproducibility (kanuni 4) |
 
+**Mutation ya L0 (PD 2026-08-04):** default ni **KAMWE**. Kifungu pekee cha dharura (mf. partition
+iliyoharibika kwenye disk): kuandika juu ya partition yenye hash iliyobadilika kunaruhusiwa **TU
+kwa idhini ya PD**, kwa `--allow-mutation --reason "<sababu>"`, na tukio linaingia `mutation_log`
+ya manifest (lini, sababu, hash ya zamani na mpya). Mutation bila idhini ya PD ni **UKIUKAJI WA
+DF-01** — inakataliwa na build inasimama.
+
 ### 2.1 Schema halisi (kama ilivyo kwenye `data/raw/ticks/`, 2026-08-04)
 Symbols 12, ticks ~bilioni 3.4, 2016-01 → 2026-04, matoleo **MAWILI**:
 
