@@ -69,14 +69,26 @@ labels:
     a:       0.8
     b:       0.2                         # chini ya hii -> reject
 
-# ---------- L5: SPLITS (spec §7) ----------
+# ---------- L5: SPLITS (spec §7 + docs/DATA_SPLIT_PLAN.md) ----------
 splits:
   scheme:            "purged_kfold"
   folds:             5
-  embargo_mult:      1.5                # embargo = horizon_bars x hii
+  embargo_mult:      1.5                # embargo = horizon_bars x hii (24 x 1.5 = bars 36 za H1)
   holdout_frac:      0.2                # ya mwisho kwa mfuatano wa wakati
   holdout_opens:     "once"             # R8 PEKEE
   random_split:      false              # kamwe
+  # --- MIPAKA HALISI (PD 2026-08-04; data ya ticks 2016-01-04 -> 2026-04-30) ---
+  data_start:        "2016-01-04"       # mwanzo wa pamoja kwa symbols zote
+  data_end:          "2026-04-30"       # mwisho wa pamoja (Toleo A); Toleo B inakatwa hapa
+  trainval_end:      "2024-03-31"       # miezi 99 (~80%) — TRAIN+VALIDATION
+  holdout_start:     "2024-04-01"       # miezi 25 (~20%) — HAIFUNGULIWI hadi R8
+  fold_boundaries:                      # blocks 5 za muda, symbols ZOTE fold ile ile (pooled)
+    - "2017-08-31"                      # F1: 2016-01-04 -> 2017-08-31
+    - "2019-04-30"                      # F2: 2017-09-01 -> 2019-04-30
+    - "2020-12-31"                      # F3: 2019-05-01 -> 2020-12-31
+    - "2022-08-31"                      # F4: 2021-01-01 -> 2022-08-31
+                                        # F5: 2022-09-01 -> 2024-03-31
+  future_reserve:    "2026-05-01+"      # data mpya (Mei 2026+) — mzunguko UJAO / shadow; haionwi sasa
 
 # ---------- VIZINGITI VYA UTAFITI (RESEARCH_PLAN_R0) ----------
 research:
