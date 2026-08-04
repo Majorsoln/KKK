@@ -65,21 +65,210 @@ T0 MSINGI ─► T1 R0 ─► T2 R1 ─► T3 R2+R3 ─► T4 R4+R5 ─► T5 R6
                 └── TRACK P: PRETRAINING ── sambamba T3–T5 (TRAIN+VAL pekee)
 ```
 
-| Term | Wiki (mak.) | Kazi | Exit criteria (hakuna mjadala) |
-|---|---|---|---|
-| **T0 — MSINGI** | 1–2 | recorder wa feed ya broker (huanza, hauishii); normalization A/B → schema moja; L0 hashes; muundo wa research repo | recorder unarekodi kila siku ya trading; symbols 12 zinasomeka kwa schema moja; SHA256 za partitions zote zimehifadhiwa |
-| **T1 — R0** | 2 | L1 (checks 8) + `quality_report.json`; kalenda ya sessions; L2 (TF 7 kutoka ticks + spread stats); sentinel ya uvujaji kwenye CI | R0 PASS kwa vizingiti vya `data.yaml`; sentinel inakimbia na kufelisha build ikigundua uvujaji; ulinganisho A↔B umeripotiwa |
-| **T2 — R1** | 2–3 | L4: grid labels kwa path ya ticks + terminal returns za timeout; fill bootstrap; quality buckets | R1 PASS (base rates + jiometri + utulivu); `min_labels_per_cell ≥ 200`; M1-vs-tick disagreement imeripotiwa |
-| **T3 — R2+R3** | 2–3 | feature cards F1–F7 (kabla ya code); L3 + screening (IC/MI + permutation + **FDR**); redundancy clustering | kila feature ina card; jedwali la screening na FDR limetoka; set ya mwisho ≤ bajeti (`labels ÷ 50`) |
-| **T4 — R4+R5** | 2 | baselines B0/B1/B2; **GO/NO-GO**; calibration (isotonic kwenye validation folds) | B1/B2 > B0 kwa CI isiyogusa sifuri — AU **SIMAMA na rudi T2/T3**; ECE ≤ 0.05, Brier skill > 0 |
-| **T5 — R6+R7** | 2–3 | EV ya madarasa 3, fill-aware, cost stress ×1.5; ablation ya familia + TF; wagombea wa Track P wanaingia hapa kupitia lango la R4 | EV_R net > baseline na inabaki chanya kwa cost ×1.5; jedwali la ablation limetoka |
-| **T6 — R8** | 1 | PD anafungua HOLDOUT **mara moja**; attestation | vigezo vya `data.yaml §holdout`; attestation yenye `dataset_id` + config_hash imesainiwa — AU mzunguko unaisha LESSON |
-| **T7 — SHADOW→LIVE** | 4+ | integration (KAIROS→RCE→MT5); shadow/demo; kisha live + R9 monitoring (haina mwisho) | mnyororo mzima unafanya kazi demo; vigezo vya R9 vinapimwa live; fills za broker zinajaza calibration ya P(fill) |
-| **TRACK E** | sambamba T1–T5 | `src/rce/`: budget, cost, lots, gate — kwa spec ILE ILE bila kuigusa | tests zote za RCE-* (§3.1) zinapita, ikiwemo golden test ya §6 ya spec |
-| **TRACK P** | sambamba T3–T5 | pretraining ya encoder (§5A ya KAIROS-1) kwenye TRAIN+VAL pekee | corpus inaishia 2024-03-31 (CI inathibitisha); ripoti ya malengo; wagombea wanapimwa T5 |
+| Term | Kazi | Exit criteria (hakuna mjadala) |
+|---|---|---|
+| **T0 — MSINGI** | recorder wa feed ya broker (huanza, hauishii); normalization A/B → schema moja; L0 hashes; muundo wa research repo | recorder unarekodi kila siku ya trading; symbols 12 zinasomeka kwa schema moja; SHA256 za partitions zote zimehifadhiwa |
+| **T1 — R0** | L1 (checks 8) + `quality_report.json`; kalenda ya sessions; L2 (TF 7 kutoka ticks + spread stats); sentinel ya uvujaji kwenye CI | R0 PASS kwa vizingiti vya `data.yaml`; sentinel inakimbia na kufelisha build ikigundua uvujaji; ulinganisho A↔B umeripotiwa |
+| **T2 — R1** | L4: grid labels kwa path ya ticks + terminal returns za timeout; fill bootstrap; quality buckets | R1 PASS (base rates + jiometri + utulivu); `min_labels_per_cell ≥ 200`; M1-vs-tick disagreement imeripotiwa |
+| **T3 — R2+R3** | feature cards F1–F7 (kabla ya code); L3 + screening (IC/MI + permutation + **FDR**); redundancy clustering | kila feature ina card; jedwali la screening na FDR limetoka; set ya mwisho ≤ bajeti (`labels ÷ 50`) |
+| **T4 — R4+R5** | baselines B0/B1/B2; **GO/NO-GO**; calibration (isotonic kwenye validation folds) | B1/B2 > B0 kwa CI isiyogusa sifuri — AU **SIMAMA na rudi T2/T3**; ECE ≤ 0.05, Brier skill > 0 |
+| **T5 — R6+R7** | EV ya madarasa 3, fill-aware, cost stress ×1.5; ablation ya familia + TF; wagombea wa Track P wanaingia hapa kupitia lango la R4 | EV_R net > baseline na inabaki chanya kwa cost ×1.5; jedwali la ablation limetoka |
+| **T6 — R8** | PD anafungua HOLDOUT **mara moja**; attestation | vigezo vya `data.yaml §holdout`; attestation yenye `dataset_id` + config_hash imesainiwa — AU mzunguko unaisha LESSON |
+| **T7 — SHADOW→LIVE** | integration (KAIROS→RCE→MT5); shadow/demo; kisha live + R9 monitoring (haina mwisho) | mnyororo mzima unafanya kazi demo kwa kipindi kilichotangazwa KABLA na PD; vigezo vya R9 vinapimwa live; fills za broker zinajaza calibration ya P(fill) |
+| **TRACK E** (sambamba T1–T5) | `src/rce/`: budget, cost, lots, gate — kwa spec ILE ILE bila kuigusa | tests zote za RCE-* (§3.1) zinapita, ikiwemo golden test ya §6 ya spec |
+| **TRACK P** (sambamba T3–T5) | pretraining ya encoder (§5A ya KAIROS-1) kwenye TRAIN+VAL pekee | corpus inaishia 2024-03-31 (CI inathibitisha); ripoti ya malengo; wagombea wanapimwa T5 |
 
-**Makadirio ya jumla hadi attestation: wiki ~14–18.** Shadow ≥ wiki 4 baada ya hapo. Tarehe ni
-makadirio; **vigezo ndivyo sheria.**
+**Terms HAZINA timeline.** Term inaisha pale exit criteria zake zinapotimia na PD kusaini —
+kamwe si kwa tarehe. Mfuatano ndio mgumu; kasi inafuata ubora, si kinyume.
+
+---
+
+## 2A. ENEO LA UONGOZI — PROMPT YA KILA TERM + WAJIBU WA PD
+
+> Hapa ndipo kazi inapoongozwa. Kila term ina **(a) PROMPT ya utekelezaji** — unayoitoa kwa
+> session ya kazi (Claude) kuanzisha term, na **(b) WAJIBU WAKO (PD)** — unachopaswa **KUSOMA**,
+> **KUPITIA**, **KUFANYA** au **KUSHIRIKI**. Term inayofuata haianzishwi kabla ya sahihi yako ya
+> exit ya iliyotangulia. Safu ya **HALI** inasasishwa hapa kila term inapofunguliwa au kufungwa.
+
+**▶ HALI YA SASA: T0 na TRACK E ziko TAYARI KUANZA. Nyingine zote: zinasubiri mfuatano.**
+
+---
+
+### T0 — MSINGI ▶ `TAYARI KUANZA`
+**PROMPT:**
+```
+Tekeleza TERM T0 (docs/IMPLEMENTATION_PLAN.md §2, rejista DF-01..DF-04):
+1. Jenga recorder wa tick feed ya broker (MT5): bid/ask/volumes kila siku ya trading,
+   partitions za L0 zenye tag `provenance: broker` + SHA256 (spec §2.2 ya DATA_FEATURE_STANDARD).
+2. Andika normalization ya Toleo A/B -> schema moja (spec §2.1); L0 haibadilishwi.
+3. Hash partitions ZOTE za L0 zilizopo (SHA256 kwa kila partition) + rekodi manifest.
+4. Simamisha muundo wa research repo (§9 ya DATA_FEATURE_STANDARD).
+USIGUSE RCE. Mwisho: sasisha rejista (hadhi + ushahidi) na toa ripoti ya T0.
+```
+**WEWE (PD):**
+- **KUSOMA:** `DATA_FEATURE_STANDARD.md` §2.1–2.2; rejista §3.3 (DF-01..04).
+- **KUFANYA:** chagua/thibitisha **broker na akaunti** (demo au live) ya kurekodi feed — hili
+  haliwezi kufanywa na mtu mwingine; toa access ya MT5 kwa mazingira ya recorder; amua
+  **storage ya research** (nje ya repo hii, §9).
+- **KUPITIA:** ripoti ya normalization (tofauti za A↔B zilizoonekana) + manifest ya hashes.
+- **SAHIHI YA EXIT:** recorder unarekodi kila siku · schema moja inasomeka symbols 12 · hashes zipo.
+
+---
+
+### TRACK E — ENGINE (RCE) ▶ `TAYARI KUANZA` (sambamba na T1–T5)
+**PROMPT:**
+```
+Tekeleza TRACK E (rejista RCE-01..RCE-13): jenga src/rce/ kwa spec RISK_COST_ENGINE.md
+KAMA ILIVYO — hakuna kuibadilisha, hakuna kigezo nje ya config/risk.yaml.
+Mpangilio: (1) andika KWANZA golden tests kutoka namba za spec — jedwali la bajeti §2
+(safu 4), mfano wa lots §6 (0.16 lots / $34.88); (2) kisha code: budget -> cost_pips
+(spread mseto, slippage cap, commission round-turn, swap modes 3 + triple WED, pip
+conversion) -> lots (volume_step/min/max + REJECT) -> gate (checks 6 kwa mpangilio,
+REJECT reasons + config-fingerprint kwenye log); (3) hakuna signal queue (§5b).
+Mwisho: tests zote RCE-* kijani kwenye CI + rejista imesasishwa.
+```
+**WEWE (PD):**
+- **KUFANYA:** toa **namba halisi za broker**: commission (round-turn?), swap za symbols,
+  volume_min/step/max — zinaingia `broker_costs.yaml`, si kwenye code.
+- **KUPITIA:** matokeo ya golden tests (yanalingana na mifano ya spec yako bit-kwa-bit).
+- **SAHIHI YA EXIT:** RCE-01..13 zote IMPLEMENTED → wewe unazipandisha VERIFIED.
+
+---
+
+### T1 — R0 (DATA AUDIT) ▶ `INASUBIRI T0`
+**PROMPT:**
+```
+Tekeleza TERM T1 (rejista DF-05..DF-08, DF-14, RS-03): L1 checks 8 + quality_report.json
+kwa kila symbol/mwaka; kalenda ya sessions kutoka data (si kudhaniwa) kwa matoleo yote
+mawili ya schema; L2 bars TF 7 kutoka ticks + spread stats kwa kila bar; as-of rule +
+test yake (mfano wa §4.1); sentinel ya shuffle kwenye CI (G1); splitter anayesoma
+config/data.yaml pekee (G2 holdout guard inaanza HAPA). Ripoti: R0 dhidi ya vizingiti
+vya data.yaml + ulinganisho A<->B.
+```
+**WEWE (PD):**
+- **KUSOMA:** `quality_report.json` (muhtasari) + ripoti ya ulinganisho A↔B.
+- **KUFANYA:** thibitisha `broker_server_tz` na kalenda kwa broker halisi; amua hatma ya
+  partitions zilizofeli (default: exclude + rekodi wigo uliopungua).
+- **KUPITIA:** uthibitisho kwamba sentinel inafelisha build ya uvujaji wa makusudi (demo ya G1).
+- **SAHIHI YA EXIT:** R0 PASS/LESSON kwa kila symbol.
+
+---
+
+### T2 — R1 (LABEL AUDIT) ▶ `INASUBIRI T1`
+**PROMPT:**
+```
+Tekeleza TERM T2 (rejista DF-09..DF-11, K1-07, RS-04): L4 grid labels (5x5) kwa path ya
+TICKS — touch kwa bei ya kufungia (BUY: bid / SELL: ask), gap-honest; timeout = darasa la
+3 NA terminal return inarekodiwa; fill bootstrap (stop/limit kwa ticks; market = prior
+0.98); quality buckets (R_net). Ripoti ya R1: base rates dhidi ya jiometri
+(p ~ sl/(sl+tp)), utulivu kwa miaka, timeout share, M1-vs-tick disagreement,
+curve ya utulivu wa label. TRAIN+VAL PEKEE — takwimu za holdout MARUFUKU (G2).
+```
+**WEWE (PD):**
+- **KUPITIA:** ripoti ya R1 — hasa base rate vs jiometri na utulivu kwa miaka.
+- **KUFANYA:** ikifeli — amua horizon/grid mpya (fahamu: hiyo ni dataset mpya, si tweak).
+- **SAHIHI YA EXIT:** R1 PASS/LESSON.
+
+---
+
+### T3 — R2+R3 (FEATURES) ▶ `INASUBIRI T2`
+**PROMPT:**
+```
+Tekeleza TERM T3 (rejista DF-12, DF-13, K1-09, RS-05, RS-06): KWANZA feature cards za
+F1-F7 zenye hypothesis (PD anazithibitisha KABLA ya code — G4); kisha L3 kwa sheria 8
+(scale-free, rolling norm, as-of, bajeti 50, per-fold kwa model-derived); screening ndani
+ya purged folds: IC/MI + permutation + FDR (BH, q=0.10) — pooled pekee; redundancy
+clustering |rho|>=0.80 -> mwakilishi mmoja. Meta-features zote OOF (G5).
+Deliverables: jedwali la screening (candidate->screened|LESSON) + dendrogram + set ya mwisho.
+```
+**WEWE (PD):**
+- **KUSHIRIKI:** **kuandika/kuthibitisha hypothesis za feature cards** — owner wa card ni wewe;
+  hakuna feature inayojengwa bila hypothesis uliyoikubali.
+- **KUPITIA:** jedwali la screening + FDR, orodha ya walioondolewa na sababu.
+- **SAHIHI YA EXIT:** set ya mwisho ≤ bajeti; R2/R3 PASS/LESSON kwa kila familia.
+
+---
+
+### TRACK P — PRETRAINING ▶ `INASUBIRI T1 (L2 bars)` (sambamba na T3–T5)
+**PROMPT:**
+```
+Tekeleza TRACK P (rejista K1-13, §5A ya KAIROS_1_STANDARD): pretraining ya encoder kwa
+malengo ya config (next_bar_direction, masked_bar, contrastive_regime) kwenye bars za
+TRAIN+VAL PEKEE — corpus inaishia 2024-03-31 (G8 inathibitisha). Fine-tune heads
+pekee kwenye trade labels. Wagombea wanaingia T5 kupitia lango la R4 — hakuna upendeleo.
+Deliverable: encoder + ripoti ya malengo (loss curves, probing) + rejista.
+```
+**WEWE (PD):**
+- **KUPITIA:** ripoti ya pretraining (haina namba za EV — ni uwezo wa representation tu).
+- **HAKUNA SAHIHI YA ZIADA:** hukumu ya wagombea inatolewa T5 kwa vigezo vya §6 ya KAIROS-1.
+
+---
+
+### T4 — R4+R5 (BASELINE + CALIBRATION) ▶ `INASUBIRI T3` — **GO/NO-GO YAKO**
+**PROMPT:**
+```
+Tekeleza TERM T4 (rejista RS-07, RS-08, K1-12): baselines B0 (base rate), B1 (logistic,
+features 5 bora), B2 (GBM depth 3 / trees 200, set ya R3) — purged CV, EV_R na CI yake;
+kisha calibration: isotonic kwenye validation folds pekee, ECE, Brier skill, reliability
+kwa symbol na session. Andaa kifurushi cha ushahidi cha GO/NO-GO kwa PD: EV_R ya kila
+baseline + CI, reliability curves. HAKUNA kuendelea bila uamuzi wa PD.
+```
+**WEWE (PD):**
+- **KUSOMA:** kifurushi cha GO/NO-GO (EV_R + confidence intervals + calibration).
+- **KUFANYA:** **UAMUZI WA GO/NO-GO — wako peke yako.** NO-GO = rudi T2/T3 na LESSON;
+  hii ndiyo hatua inayookoa miezi — usiipite kwa matumaini.
+- **SAHIHI YA EXIT:** GO iliyoandikwa, au NO-GO + maelekezo ya kurudi.
+
+---
+
+### T5 — R6+R7 (EV + ABLATION) ▶ `INASUBIRI T4`
+**PROMPT:**
+```
+Tekeleza TERM T5 (rejista K1-02..K1-06, K1-08, RS-09, RS-10): pipeline kamili ya uamuzi
+kwa mfuatano rasmi (§2 ya KAIROS-1) — SL floor, EV ya madarasa 3 (E[R|timeout] kutoka
+timeout labels — SI quantile head), EV_final = P(fill) x EV_signal, filters kwa R-units;
+cost stress x1.5; ablation ya familia F1-F7 na TF zote (ondoa -> funza upya -> delta EV_R).
+Wagombea wa Track P wanapimwa hapa dhidi ya B2. Deliverables: EV_R net fill-aware +
+jedwali la ablation + mapendekezo ya kuondoa familia.
+```
+**WEWE (PD):**
+- **KUPITIA:** jedwali la ablation (ramani ya thamani ya mfumo mzima) + matokeo ya stress.
+- **KUFANYA:** amua familia/TF za kuondoa (kila ondoleo = LESSON iliyoandikwa).
+- **SAHIHI YA EXIT:** mchanganyiko wa mwisho umefungwa (frozen) tayari kwa R8.
+
+---
+
+### T6 — R8 (HOLDOUT + ATTESTATION) ▶ `INASUBIRI T5` — **MARA MOJA**
+**PROMPT:**
+```
+Tekeleza TERM T6 (rejista RS-11, DF-03, K1-14): thibitisha vigezo vya kupita vime-commit
+KABLA (G4); PD anawasha job ya R8 (yeye pekee ana ruhusa ya holdout); pima mchanganyiko
+ULIOFUNGWA T5 — hakuna marekebisho baada ya kuona namba; andika ATTESTATION: dataset_id,
+config_hash, feature set, vigezo vilivyotangazwa, namba, provenance ya gharama, PASS/LESSON.
+```
+**WEWE (PD):**
+- **KUFANYA:** **wewe pekee unafungua holdout — MARA MOJA.** Kabla ya kubofya, jiulize:
+  vigezo vime-commit? mchanganyiko umefungwa? Ndiyo → fungua.
+- **KUPITIA + SAHIHI:** attestation. PASS → T7. LESSON → mzunguko unaisha kwa heshima;
+  mzunguko ujao unatumia RESERVE mpya.
+
+---
+
+### T7 — SHADOW → LIVE + R9 ▶ `INASUBIRI T6`
+**PROMPT:**
+```
+Tekeleza TERM T7 (rejista K1-10, K1-11, RCE-05, RS-12): integration KAIROS-1 -> RCE ->
+MT5 kwa mkataba wa §4 ya KAIROS-1 (cost_pips chanzo kimoja; mamlaka hazichanganyiki);
+shadow/demo kwa kipindi PD alichokitangaza KABLA; kila fill inarekodi requested_px/fill_px/
+slippage/fill_rate; dashboard ya R9 (rolling ECE, EV_R live, PSI, fill_rate) na alerts
+za vigezo vya kustaafu (data.yaml §monitoring). Ripoti ya shadow -> PD kwa uamuzi wa live.
+```
+**WEWE (PD):**
+- **KUFANYA:** tangaza **kipindi cha shadow KABLA** ya kuanza; andaa akaunti ya demo; baada ya
+  ripoti ya shadow — **uamuzi wa LIVE ni wako**.
+- **KUPITIA:** dashboard ya R9 **kila wiki** (hii ni ya kudumu, haina mwisho); kila alert ya
+  kustaafu inahitaji uamuzi wako ndani ya muda uliojiwekea.
+- **KUSHIRIKI:** re-attestation kila robo (RESERVE mpya kama holdout).
 
 ---
 
