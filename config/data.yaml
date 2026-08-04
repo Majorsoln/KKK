@@ -27,6 +27,34 @@ source:
   record_broker_feed: true              # ANZA SASA; partitions mpya zina provenance: broker
   immutable:         true               # append-only + SHA256 kwa kila partition
 
+# ---------- STORAGE YA RESEARCH (spec §9 — NJE ya repo hii; PD anathibitisha) ----------
+storage:
+  research_root:  "${ELITEFX_RESEARCH_ROOT}"                 # PD anaamua eneo; env au njia kamili
+  l0_root:        "${ELITEFX_RESEARCH_ROOT}/data/L0_raw"     # partitions za L0 (immutable)
+  l0_manifest:    "${ELITEFX_RESEARCH_ROOT}/data/L0_raw/manifest_l0.json"   # SHA256 + provenance
+  holdout_root:   "${ELITEFX_HOLDOUT_ROOT}"                  # G2: ruhusa ya R8 pekee (§4.3, T1)
+
+# ---------- RECORDER WA FEED YA BROKER (spec §2.2 sharti 1; DF-03, DF-04) ----------
+recorder:
+  enabled:               true          # inaanza SASA; haiishii (§2.2)
+  provenance_tag:        "broker"      # partitions mpya zinatofautishwa na za aggregator
+  source:                "mt5"
+  symbols:               []            # tupu = symbols zote za `source.symbols`
+  poll_seconds:          60            # mzunguko wa kuvuta ticks
+  day_lag_minutes:       15            # subiri baada ya siku ya UTC kufungwa kabla ya kuandika
+  initial_backfill_days: 3             # kuanzia lini pale recorder inapoanza mara ya kwanza
+  compression:           "zstd"
+  calendar:
+    holidays_md:         ["01-01", "12-25"]   # kalenda KAMILI inatoka kwenye data (T1)
+  freshness_alert:
+    grace_hours:         26            # siku ya trading bila data baada ya hii -> ONYO (DF-04)
+  mt5:                                  # sifa za kuingia zinatoka ENVIRONMENT, si config
+    symbol_suffix:       ""            # mf. ".raw" kwa baadhi ya brokers
+    login_env:           "ELITEFX_MT5_LOGIN"
+    password_env:        "ELITEFX_MT5_PASSWORD"
+    server_env:          "ELITEFX_MT5_SERVER"
+    terminal_path_env:   "ELITEFX_MT5_TERMINAL"
+
 # ---------- L1: MALANGO YA UBORA (spec §3) ----------
 quality:
   min_coverage:        0.995            # bars zilizopo / zinazotarajiwa (kalenda ya session)

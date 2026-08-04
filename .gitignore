@@ -1,0 +1,13 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+*.egg-info/
+.venv/
+venv/
+
+# Data ya utafiti HAIINGII repo hii (sheria ya README + §9 ya DATA_FEATURE_STANDARD)
+research/
+*.parquet
+manifest_l0.json
+freshness.json

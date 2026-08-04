@@ -90,11 +90,13 @@ kamwe si kwa tarehe. Mfuatano ndio mgumu; kasi inafuata ubora, si kinyume.
 > **KUPITIA**, **KUFANYA** au **KUSHIRIKI**. Term inayofuata haianzishwi kabla ya sahihi yako ya
 > exit ya iliyotangulia. Safu ya **HALI** inasasishwa hapa kila term inapofunguliwa au kufungwa.
 
-**▶ HALI YA SASA: T0 na TRACK E ziko TAYARI KUANZA. Nyingine zote: zinasubiri mfuatano.**
+**▶ HALI YA SASA (2026-08-04): T0 — zana zote nne zimejengwa, DF-01..DF-04 ziko `IMPLEMENTED`,
+zinasubiri vitu vitatu vya PD (§T0 hapa chini) ili kupanda `VERIFIED`. TRACK E: TAYARI KUANZA.
+Nyingine zote: zinasubiri mfuatano.**
 
 ---
 
-### T0 — MSINGI ▶ `TAYARI KUANZA`
+### T0 — MSINGI ▶ `IMEJENGWA — INASUBIRI PD` (ripoti: `docs/T0_REPORT.md`)
 **PROMPT:**
 ```
 Tekeleza TERM T0 (docs/IMPLEMENTATION_PLAN.md §2, rejista DF-01..DF-04):
@@ -106,12 +108,15 @@ Tekeleza TERM T0 (docs/IMPLEMENTATION_PLAN.md §2, rejista DF-01..DF-04):
 USIGUSE RCE. Mwisho: sasisha rejista (hadhi + ushahidi) na toa ripoti ya T0.
 ```
 **WEWE (PD):**
-- **KUSOMA:** `DATA_FEATURE_STANDARD.md` §2.1–2.2; rejista §3.3 (DF-01..04).
+- **KUSOMA:** `DATA_FEATURE_STANDARD.md` §2.1–2.2; rejista §3.3 + ledger §3.5; `docs/T0_REPORT.md`.
 - **KUFANYA:** chagua/thibitisha **broker na akaunti** (demo au live) ya kurekodi feed — hili
   haliwezi kufanywa na mtu mwingine; toa access ya MT5 kwa mazingira ya recorder; amua
-  **storage ya research** (nje ya repo hii, §9).
+  **storage ya research** (nje ya repo hii, §9) na uweke `ELITEFX_RESEARCH_ROOT`; thibitisha
+  sehemu mpya `storage:` na `recorder:` za `config/data.yaml`.
 - **KUPITIA:** ripoti ya normalization (tofauti za A↔B zilizoonekana) + manifest ya hashes.
 - **SAHIHI YA EXIT:** recorder unarekodi kila siku · schema moja inasomeka symbols 12 · hashes zipo.
+- **HALI:** zana zote nne zimejengwa na zina tests (ripoti §2). Vigezo vitatu vya exit vinasubiri
+  vitu vyako vitatu hapo juu — ndio pekee vinavyozuia `VERIFIED`.
 
 ---
 
@@ -353,6 +358,22 @@ za vigezo vya kustaafu (data.yaml §monitoring). Ripoti ya shadow -> PD kwa uamu
 
 **Jumla: vipengele 56.** `100% = 56/56 VERIFIED` (au LESSON iliyoandikwa pale eneo lilipofeli
 kwa vigezo — LESSON ni jibu halali; kificho ni pale tu eneo linaruka bila kupimwa).
+
+### 3.5 LEDGER YA HADHI (hii ndiyo safu ya hadhi ya §3 — inasasishwa kila wiki)
+
+> Vipengele visivyotajwa hapa viko `PLANNED`. Kupanda `IMPLEMENTED` ni kazi ya mtekelezaji
+> (code + test ya spec inapita CI); kupanda `VERIFIED` ni **sahihi ya PD** juu ya ushahidi.
+
+| ID | Hadhi | Tarehe | Ushahidi | Kinachosubiriwa kwa VERIFIED |
+|---|---|---|---|---|
+| DF-01 | `IMPLEMENTED` | 2026-08-04 | `src/data/{hashing,manifest}.py` · `tests/data/test_hashing_manifest.py` (append-only, mutation = FAIL) · lango `verify-l0` kwenye `.github/workflows/ci.yml` · `docs/T0_REPORT.md` §1.3, §2 | manifest ya L0 **HALISI** (inahitaji storage ya PD) |
+| DF-02 | `IMPLEMENTED` | 2026-08-04 | `src/data/schema.py` · `tests/data/test_schema_normalization.py` (Toleo A na B → frame ile ile; ms→µs; L0 haibadilishwi) · ripoti §1.2 | kusomwa kwa partitions halisi za symbols 12 |
+| DF-03 | `IMPLEMENTED` | 2026-08-04 | tag `provenance=broker` kwenye njia + metadata ya parquet · `tests/data/test_recorder.py::test_partition_ina_tag_ya_provenance_broker` · `manifest.provenance_counts()` | partitions halisi za broker; provenance ya gharama kwenye attestation (T6) |
+| DF-04 | `IMPLEMENTED` | 2026-08-04 | `src/data/{recorder,freshness,calendar}.py` · `tests/data/{test_recorder,test_freshness}.py` · lango `check-freshness` (schedule ya kila siku ya trading) · ripoti §2.2 (ALERT imeonyeshwa) | recorder **kuanza kweli** kwenye akaunti ya broker ya PD |
+
+**Vinavyozuia (T0):** (1) broker + akaunti + mazingira ya MT5; (2) `ELITEFX_RESEARCH_ROOT`;
+(3) sahihi ya PD juu ya `storage:` na `recorder:` za `config/data.yaml`. Bila (2), malango ya CI
+yanarudisha **SKIPPED** — na SKIPPED si ushahidi (§0, sheria 3).
 
 ---
 

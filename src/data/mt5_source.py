@@ -1,0 +1,195 @@
+"""Vyanzo vya ticks kwa recorder: MT5 (live/demo) na replay (tests/backfill).
+
+`MetaTrader5` haipo kwenye mazingira ya CI (ni Windows-only), kwa hiyo import
+yake ni ya **ndani ya function** — module hii inapakiwa popote, na kosa la
+kukosekana kwa MT5 linatokea pale tu mtu anapojaribu kuunganisha kweli.
+"""
+
+from __future__ import annotations
+
+import logging
+import os
+from dataclasses import dataclass
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any, Iterable
+
+import pandas as pd
+
+from .schema import CANONICAL_COLUMNS
+
+LOG = logging.getLogger("elitefx.recorder.source")
+
+# Bendera za MT5 (MqlTick.flags) — zinatumika kugawa volume kwa upande sahihi.
+TICK_FLAG_BID = 2
+TICK_FLAG_ASK = 4
+
+
+class SourceError(RuntimeError):
+    """Chanzo cha ticks hakikuweza kuunganishwa au kutoa data."""
+
+
+def _empty_frame(extra: Iterable[str] = ()) -> pd.DataFrame:
+    frame = pd.DataFrame({column: pd.Series(dtype="float64") for column in CANONICAL_COLUMNS})
+    frame["timestamp"] = pd.Series(dtype="datetime64[us, UTC]")
+    for column in extra:
+        frame[column] = pd.Series(dtype="float64")
+    return frame[list(CANONICAL_COLUMNS) + list(extra)]
+
+
+@dataclass
+class MT5Credentials:
+    """Sifa za kuingia — zinatoka environment, KAMWE si kwenye config au code."""
+
+    login: int | None = None
+    password: str | None = None
+    server: str | None = None
+    terminal_path: str | None = None
+
+    @classmethod
+    def from_env(cls, cfg=None) -> "MT5Credentials":
+        def _env(key: str, default: str) -> str | None:
+            name = str(cfg.get(f"recorder.mt5.{key}", default)) if cfg is not None else default
+            return os.environ.get(name)
+
+        login = _env("login_env", "ELITEFX_MT5_LOGIN")
+        return cls(
+            login=int(login) if login else None,
+            password=_env("password_env", "ELITEFX_MT5_PASSWORD"),
+            server=_env("server_env", "ELITEFX_MT5_SERVER"),
+            terminal_path=_env("terminal_path_env", "ELITEFX_MT5_TERMINAL"),
+        )
+
+
+class MT5TickSource:
+    """Ticks za bid/ask kutoka terminal ya MT5 (`copy_ticks_range`, COPY_TICKS_ALL).
+
+    Uwazi kuhusu volumes (spec §2 inataka `bid_vol`/`ask_vol`): MT5 haitoi
+    volume kwa kila upande. Tick moja inabeba `volume_real` na bendera
+    zinazoonyesha upande uliobadilika. Kwa hiyo volume ya tick inawekwa kwenye
+    upande ulioupdate (BID -> `bid_vol`, ASK -> `ask_vol`); tick isiyo na
+    bendera hizo inapata 0. Hii ni **mgawanyo uliotangazwa**, si makadirio —
+    columns za ziada `flags`/`volume_real` zinahifadhiwa kwenye partition ili
+    ukweli wa chanzo usipotee.
+    """
+
+    name = "mt5"
+    extra_columns = ("flags", "volume_real")
+
+    def __init__(self, credentials: MT5Credentials | None = None, symbol_suffix: str = "") -> None:
+        self.credentials = credentials or MT5Credentials()
+        self.symbol_suffix = symbol_suffix
+        self._mt5: Any | None = None
+
+    # ---------- muunganisho ----------
+
+    def _module(self) -> Any:
+        if self._mt5 is not None:
+            return self._mt5
+        try:
+            import MetaTrader5 as mt5  # type: ignore import-not-found
+        except ImportError as exc:  # pragma: no cover - MT5 haipo Linux/CI
+            raise SourceError(
+                "package `MetaTrader5` haipo. Recorder inahitaji terminal ya MT5 "
+                "(Windows au Wine) — PD anaandaa mazingira na akaunti (T0)."
+            ) from exc
+        self._mt5 = mt5
+        return mt5
+
+    def connect(self) -> None:
+        """Anzisha terminal + login. Ikishindikana → SourceError yenye sababu ya MT5."""
+        mt5 = self._module()
+        kwargs: dict[str, Any] = {}
+        creds = self.credentials
+        if creds.terminal_path:
+            kwargs["path"] = creds.terminal_path
+        if creds.login:
+            kwargs.update(login=creds.login, password=creds.password, server=creds.server)
+        if not mt5.initialize(**kwargs):
+            raise SourceError(f"mt5.initialize imeshindikana: {mt5.last_error()}")
+        LOG.info("MT5 imeunganishwa: %s", mt5.terminal_info())
+
+    def shutdown(self) -> None:
+        if self._mt5 is not None:
+            self._mt5.shutdown()
+
+    def __enter__(self) -> "MT5TickSource":
+        self.connect()
+        return self
+
+    def __exit__(self, *_exc: object) -> None:
+        self.shutdown()
+
+    # ---------- kuvuta ticks ----------
+
+    def broker_symbol(self, symbol: str) -> str:
+        return f"{symbol}{self.symbol_suffix}"
+
+    def fetch_ticks(self, symbol: str, start: datetime, end: datetime) -> pd.DataFrame:
+        mt5 = self._module()
+        broker_symbol = self.broker_symbol(symbol)
+        if not mt5.symbol_select(broker_symbol, True):
+            raise SourceError(f"{broker_symbol}: symbol_select imeshindikana: {mt5.last_error()}")
+        ticks = mt5.copy_ticks_range(
+            broker_symbol,
+            start.astimezone(timezone.utc),
+            end.astimezone(timezone.utc),
+            mt5.COPY_TICKS_ALL,
+        )
+        if ticks is None:
+            raise SourceError(f"{broker_symbol}: copy_ticks_range: {mt5.last_error()}")
+        if len(ticks) == 0:
+            return _empty_frame(self.extra_columns)
+        return self._to_canonical(pd.DataFrame(ticks))
+
+    def _to_canonical(self, raw: pd.DataFrame) -> pd.DataFrame:
+        volume = (
+            raw["volume_real"]
+            if "volume_real" in raw.columns
+            else raw.get("volume", pd.Series(0.0, index=raw.index))
+        )
+        volume = pd.to_numeric(volume, errors="coerce").fillna(0.0).astype("float64")
+        flags = pd.to_numeric(raw.get("flags", 0), errors="coerce").fillna(0).astype("int64")
+
+        frame = pd.DataFrame(index=raw.index)
+        frame["timestamp"] = pd.to_datetime(raw["time_msc"], unit="ms", utc=True).astype(
+            "datetime64[us, UTC]"
+        )
+        frame["bid"] = pd.to_numeric(raw["bid"], errors="coerce").astype("float64")
+        frame["ask"] = pd.to_numeric(raw["ask"], errors="coerce").astype("float64")
+        frame["bid_vol"] = volume.where((flags & TICK_FLAG_BID) != 0, 0.0)
+        frame["ask_vol"] = volume.where((flags & TICK_FLAG_ASK) != 0, 0.0)
+        frame["flags"] = flags
+        frame["volume_real"] = volume
+        return frame.reset_index(drop=True)
+
+
+class ReplayTickSource:
+    """Chanzo cha ticks kutoka DataFrame/parquet — kwa tests na backfill.
+
+    Kinatumika pia pale PD anapokabidhi dump ya ticks za broker zilizovutwa nje
+    ya recorder: mtiririko wa kuandika, hashing na provenance unabaki ule ule.
+    """
+
+    name = "replay"
+
+    def __init__(self, frames: dict[str, pd.DataFrame]) -> None:
+        self.frames = {
+            symbol: frame.sort_values("timestamp", kind="stable").reset_index(drop=True)
+            for symbol, frame in frames.items()
+        }
+
+    @classmethod
+    def from_parquet_dir(cls, directory: str | Path) -> "ReplayTickSource":
+        frames: dict[str, pd.DataFrame] = {}
+        for path in sorted(Path(directory).glob("*.parquet")):
+            frames[path.stem.upper()] = pd.read_parquet(path)
+        return cls(frames)
+
+    def fetch_ticks(self, symbol: str, start: datetime, end: datetime) -> pd.DataFrame:
+        frame = self.frames.get(symbol)
+        if frame is None or frame.empty:
+            return _empty_frame()
+        stamps = pd.to_datetime(frame["timestamp"], utc=True)
+        window = frame.loc[(stamps >= start) & (stamps < end)]
+        return window.reset_index(drop=True)
