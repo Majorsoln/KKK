@@ -5,6 +5,7 @@
 # ============================================================
 
 # ---------- BAJETI YA SIKU ----------
+account_currency:      "USD"      # sarafu ya akaunti (spec §3.5: pip conversion inaielekea)
 base_balance:          10000      # salio la AWALI (rejea isiyobadilika, si salio la sasa)
 base_percentage:       0.04       # 4% -> base = 400
 penalty_factor:        0.50       # 50% ya DD ya jumla inakuwa adhabu

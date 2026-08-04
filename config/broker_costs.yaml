@@ -1,0 +1,54 @@
+# ============================================================
+#  broker_costs.yaml — NAMBA ZA BROKER (spec: docs/RISK_COST_ENGINE.md §3.3, §3.4, §4)
+#
+#  Faili hili ni la PD. Namba hizi HAZITOKI kwenye spec wala kwenye code —
+#  zinatoka kwa broker halisi (MT5: SymbolInfoDouble/SymbolInfoInteger, au
+#  jedwali la gharama la broker).
+#
+#  Hadhi: NAFASI TUPU. `confirmed_by_pd: false` inazuia sizing yoyote —
+#  `symbol_spec()` inatupa hitilafu badala ya kutumia namba za kubuni.
+#  PD akiweka namba: jaza, badilisha `confirmed_by_pd: true`, weka `as_of`.
+# ============================================================
+
+confirmed_by_pd:  false
+broker:           ""          # jina la broker
+server:           ""          # server ya MT5 (mf. "Broker-Live01")
+account_type:     ""          # raw/standard — commission inategemea hii
+as_of:            ""          # tarehe PD alipothibitisha namba hizi
+
+# ---------- MKATABA WA ISHARA (soma kabla ya kujaza) ----------
+# commission_usd_round_turn : gharama ya pande MBILI kwa lot 1, kwa sarafu ya
+#                             akaunti (spec §3.3). Broker akitoa bei ya upande
+#                             mmoja, weka `commission_side: one_side` kwenye
+#                             risk.yaml — RCE ndiyo itaizidisha mara mbili.
+# swap_long / swap_short    : GHARAMA kwa usiku, kwa lot 1. Chanya = unalipa;
+#                             hasi = unalipwa. (MT5 inatumia ishara kinyume —
+#                             adapter inayosoma MT5 inageuza ishara, si config.)
+# swap_mode                 : CURRENCY | POINTS | INTEREST (spec §3.4 hatua 2)
+# point / digits            : za broker; `pip_size` inakokotolewa kwa spec §3.1
+#                             (0.01 kwa JPY/XAU · 0.0001 kwa nyingine) isipojazwa.
+
+defaults:
+  contract_size:              null    # kawaida 100000 kwa FX — thibitisha kwa broker
+  volume_min:                 null
+  volume_step:                null
+  volume_max:                 null
+  commission_usd_round_turn:  null
+  swap_mode:                  "CURRENCY"
+
+# ---------- SYMBOLS ----------
+# Kila symbol inahitaji: digits, point, contract_size, base_ccy, quote_ccy,
+# volume_min, volume_step, volume_max, commission_usd_round_turn.
+symbols:
+  EURUSD: {base_ccy: "EUR", quote_ccy: "USD"}
+  GBPUSD: {base_ccy: "GBP", quote_ccy: "USD"}
+  USDJPY: {base_ccy: "USD", quote_ccy: "JPY"}
+  USDCHF: {base_ccy: "USD", quote_ccy: "CHF"}
+  USDCAD: {base_ccy: "USD", quote_ccy: "CAD"}
+  AUDUSD: {base_ccy: "AUD", quote_ccy: "USD"}
+  NZDUSD: {base_ccy: "NZD", quote_ccy: "USD"}
+  EURGBP: {base_ccy: "EUR", quote_ccy: "GBP"}
+  EURJPY: {base_ccy: "EUR", quote_ccy: "JPY"}
+  EURCHF: {base_ccy: "EUR", quote_ccy: "CHF"}
+  GBPJPY: {base_ccy: "GBP", quote_ccy: "JPY"}
+  XAUUSD: {base_ccy: "XAU", quote_ccy: "USD"}

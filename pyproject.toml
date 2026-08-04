@@ -8,6 +8,7 @@ version = "0.1.0"
 description = "ELITEFX engine — tabaka la data (T0) + RCE (Track E)"
 requires-python = ">=3.11"
 dependencies = [
+    "numpy>=1.24",
     "pandas>=2.0",
     "pyarrow>=14.0",
     "PyYAML>=6.0",
@@ -18,7 +19,7 @@ dev = ["pytest>=8.0"]
 mt5 = ["MetaTrader5>=5.0.45"]   # Windows pekee — recorder ya live
 
 [tool.setuptools]
-packages = ["src", "src.data"]
+packages = ["src", "src.data", "src.rce"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

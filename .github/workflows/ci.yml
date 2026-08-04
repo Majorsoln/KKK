@@ -1,9 +1,10 @@
 name: CI
 
-# Milango ya §4.2 ya docs/IMPLEMENTATION_PLAN.md zinazohusu T0:
+# Milango ya §4.2 ya docs/IMPLEMENTATION_PLAN.md zinazotekelezwa hapa:
 #   DF-01  hash check ya L0 kila build
 #   DF-02  tests za normalization ya Toleo A/B
 #   DF-04  alert: siku ya trading bila data mpya ya broker
+#   G7     GOLDEN RCE — mfano wa §6 (lots 0.16 / $34.88) KILA commit
 #
 # Storage ya research iko NJE ya repo (§9). Runner isipoiona, malango ya DF-01/DF-04
 # yanarudisha SKIPPED — hayafelishi build kwa uwongo, na hayapiti kwa uwongo pia:
@@ -33,6 +34,18 @@ jobs:
         run: python -m pip install --upgrade pip && pip install -e ".[dev]"
       - name: pytest
         run: python -m pytest -q
+
+  golden-rce:
+    name: G7 — golden test ya RCE (§2 jedwali · §6 lots 0.16 / $34.88)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: python -m pip install --upgrade pip && pip install -e ".[dev]"
+      - name: golden tests (hakuna override)
+        run: python -m pytest tests/rce/test_golden_spec.py -q
 
   l0-integrity:
     name: DF-01 — hash check ya partitions za L0

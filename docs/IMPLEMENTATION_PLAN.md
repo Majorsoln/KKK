@@ -91,8 +91,9 @@ kamwe si kwa tarehe. Mfuatano ndio mgumu; kasi inafuata ubora, si kinyume.
 > exit ya iliyotangulia. Safu ya **HALI** inasasishwa hapa kila term inapofunguliwa au kufungwa.
 
 **▶ HALI YA SASA (2026-08-04): T0 — zana zote nne zimejengwa, DF-01..DF-04 ziko `IMPLEMENTED`,
-zinasubiri vitu vitatu vya PD (§T0 hapa chini) ili kupanda `VERIFIED`. TRACK E: TAYARI KUANZA.
-Nyingine zote: zinasubiri mfuatano.**
+zinasubiri vitu vitatu vya PD (§T0 hapa chini). TRACK E — `src/rce/` imejengwa, RCE-01..RCE-13
+zote `IMPLEMENTED`, golden tests za §2/§6 ziko kijani (ripoti: `docs/TRACK_E_REPORT.md`);
+inasubiri namba za broker + sahihi ya PD. Nyingine zote: zinasubiri mfuatano.**
 
 ---
 
@@ -120,7 +121,7 @@ USIGUSE RCE. Mwisho: sasisha rejista (hadhi + ushahidi) na toa ripoti ya T0.
 
 ---
 
-### TRACK E — ENGINE (RCE) ▶ `TAYARI KUANZA` (sambamba na T1–T5)
+### TRACK E — ENGINE (RCE) ▶ `IMEJENGWA — INASUBIRI PD` (ripoti: `docs/TRACK_E_REPORT.md`)
 **PROMPT:**
 ```
 Tekeleza TRACK E (rejista RCE-01..RCE-13): jenga src/rce/ kwa spec RISK_COST_ENGINE.md
@@ -134,8 +135,11 @@ Mwisho: tests zote RCE-* kijani kwenye CI + rejista imesasishwa.
 ```
 **WEWE (PD):**
 - **KUFANYA:** toa **namba halisi za broker**: commission (round-turn?), swap za symbols,
-  volume_min/step/max — zinaingia `broker_costs.yaml`, si kwenye code.
-- **KUPITIA:** matokeo ya golden tests (yanalingana na mifano ya spec yako bit-kwa-bit).
+  volume_min/step/max — zinaingia `config/broker_costs.yaml` (template ipo; ina
+  `confirmed_by_pd: false` inayozuia sizing hadi ujaze), si kwenye code. Thibitisha pia
+  `account_currency` iliyoongezwa `config/risk.yaml` (§3.5 inahitaji sarafu ya akaunti).
+- **KUPITIA:** matokeo ya golden tests (yanalingana na mifano ya spec yako bit-kwa-bit) +
+  `docs/TRACK_E_REPORT.md` §3 (maswali matatu ya spec yanayohitaji uamuzi wako).
 - **SAHIHI YA EXIT:** RCE-01..13 zote IMPLEMENTED → wewe unazipandisha VERIFIED.
 
 ---
@@ -370,10 +374,29 @@ kwa vigezo — LESSON ni jibu halali; kificho ni pale tu eneo linaruka bila kupi
 | DF-02 | `IMPLEMENTED` | 2026-08-04 | `src/data/schema.py` · `tests/data/test_schema_normalization.py` (Toleo A na B → frame ile ile; ms→µs; L0 haibadilishwi) · ripoti §1.2 | kusomwa kwa partitions halisi za symbols 12 |
 | DF-03 | `IMPLEMENTED` | 2026-08-04 | tag `provenance=broker` kwenye njia + metadata ya parquet · `tests/data/test_recorder.py::test_partition_ina_tag_ya_provenance_broker` · `manifest.provenance_counts()` | partitions halisi za broker; provenance ya gharama kwenye attestation (T6) |
 | DF-04 | `IMPLEMENTED` | 2026-08-04 | `src/data/{recorder,freshness,calendar}.py` · `tests/data/{test_recorder,test_freshness}.py` · lango `check-freshness` (schedule ya kila siku ya trading) · ripoti §2.2 (ALERT imeonyeshwa) | recorder **kuanza kweli** kwenye akaunti ya broker ya PD |
+| RCE-01 | `IMPLEMENTED` | 2026-08-04 | `src/rce/budget.py` · **GT**: `tests/rce/test_golden_spec.py::test_jedwali_la_bajeti_la_spec_2` (safu zote 4) · `tests/rce/test_budget.py` | sahihi ya PD |
+| RCE-02 | `IMPLEMENTED` | 2026-08-04 | `DayCounters` + `trading_day` · `tests/rce/test_budget.py` (CET/CEST, reset, penalty haireseti) | sahihi ya PD |
+| RCE-03 | `IMPLEMENTED` | 2026-08-04 | `cost.spread_effective` · `tests/rce/test_cost_spread_slippage.py` (H1 100 · M5 p95 288 · max) | sahihi ya PD |
+| RCE-04 | `IMPLEMENTED` | 2026-08-04 | `cost.slippage_cap` + `deviation_points` · tests: dynamic kubwa haipandishi cap; deviation kwa POINTS | sahihi ya PD |
+| RCE-05 | `IMPLEMENTED` | 2026-08-04 | `src/rce/fills.py` · `tests/rce/test_fills.py` (ONYO < 0.60 + hatua (a)/(b)) | RPT ya fills halisi (T7) |
+| RCE-06 | `IMPLEMENTED` | 2026-08-04 | `cost.commission_pips` · `tests/rce/test_commission_swap_pipvalue.py` (round-turn; one_side → ×2) | namba za broker (PD) |
+| RCE-07 | `IMPLEMENTED` | 2026-08-04 | `cost.swap_per_night` + `swap_nights_weight` · tests: modes 3 zote × triple WED × usiku wa sehemu | swap halisi za broker (PD) |
+| RCE-08 | `IMPLEMENTED` | 2026-08-04 | `cost.pip_value_account` · tests: USDJPY→$6.70, EURGBP→GBPUSD, commission/swap zinafuata conversion | sahihi ya PD |
+| RCE-09 | `IMPLEMENTED` | 2026-08-04 | `src/rce/lots.py` · **GT** ya §6 + `tests/rce/test_lots.py` (step floor, min → REJECT, max cap) | namba za volume za broker (PD) |
+| RCE-10 | `IMPLEMENTED` | 2026-08-04 | `src/rce/gate.py` · `tests/rce/test_gate.py` (checks 6 kwa mpangilio, kila REJECT reason, fingerprint kwenye log) | sahihi ya PD |
+| RCE-11 | `IMPLEMENTED` | 2026-08-04 | check 4 inarudisha REJECT ya entry mpya · **AUD**: `test_hakuna_function_inayofunga_positions_zilizo_wazi` | sahihi ya PD |
+| RCE-12 | `IMPLEMENTED` | 2026-08-04 | `engine.evaluate` haina hali · **AUD**: `test_hakuna_njia_ya_foleni_wala_retry_kwenye_src_rce` (ast, si grep ya comments) | sahihi ya PD |
+| RCE-13 | `IMPLEMENTED` | 2026-08-04 | **GT ya lazima**: `test_spec_6_*` (cost 2.54 · lots 0.164→0.16 · hasara $34.88) · lango `golden-rce` kwenye CI (G7) | sahihi ya PD |
 
 **Vinavyozuia (T0):** (1) broker + akaunti + mazingira ya MT5; (2) `ELITEFX_RESEARCH_ROOT`;
 (3) sahihi ya PD juu ya `storage:` na `recorder:` za `config/data.yaml`. Bila (2), malango ya CI
 yanarudisha **SKIPPED** — na SKIPPED si ushahidi (§0, sheria 3).
+
+**Vinavyozuia (TRACK E):** namba halisi za broker (`config/broker_costs.yaml` ina
+`confirmed_by_pd: false` — sizing imezuiwa hadi PD ajaze commission round-turn, swap na
+volume_min/step/max), pamoja na kuthibitisha `account_currency` iliyoongezwa `risk.yaml`.
+Golden tests hazitegemei namba hizo (zinatumia za spec §6), kwa hiyo RCE-01..13 zote ni
+`IMPLEMENTED` leo; `VERIFIED` ni sahihi ya PD baada ya kupitia golden tests.
 
 ---
 

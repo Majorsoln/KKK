@@ -6,7 +6,7 @@
 ## IDARA (Doctrine: docs/SYSTEM_ARCHITECTURE_V3.md)
 | # | Idara | Iko wapi | Hali |
 |---|---|---|---|
-| 1+2 | **RISK & COST ENGINE (RCE)** | `engine/src/rce/` | **inajengwa** — spec tayari |
+| 1+2 | **RISK & COST ENGINE (RCE)** | `src/rce/` | **imejengwa** — RCE-01..13 IMPLEMENTED, inasubiri namba za broker + sahihi ya PD |
 | 3 | STRATEGY MODELS | `src/research/` (utafiti) → `config/models.yaml` | ipo |
 | 4 | OPEN-POSITION MGMT | `engine/src/opm/` | haijaanza (RL inakaa hapa) |
 | — | CONDUIT BRIDGE | `src/research/live_brain.py`, `mql5/` | itahamia hapa |
@@ -28,10 +28,12 @@ engine/
 ├── docs/DATA_SPLIT_PLAN.md        mgawanyo rasmi train/validation/holdout (2016–2026)
 ├── docs/IMPLEMENTATION_PLAN.md    terms za utekelezaji (T0–T7) + rejista ya compliance 56 + milango ya CI
 ├── docs/T0_REPORT.md              ripoti ya TERM T0 (tabaka la data L0)
+├── docs/TRACK_E_REPORT.md         ripoti ya TRACK E (RCE: budget · cost · lots · gate)
 ├── config/risk.yaml               vigezo VYOTE vya risk/cost (PD anahariri, hakuna code)
+├── config/broker_costs.yaml       namba za BROKER (commission · swap · volumes) — PD anajaza
 ├── config/data.yaml               vigezo VYOTE vya data/features/utafiti + storage/recorder
 ├── src/data/                      L0: recorder wa feed ya broker · normalization A/B · SHA256 + manifest
-├── src/rce/                       budget · cost · sizing · gate
+├── src/rce/                       budget · cost · sizing · gate (spec: docs/RISK_COST_ENGINE.md)
 ├── src/opm/                       (baadaye) open-position management
 └── tests/
 ```
