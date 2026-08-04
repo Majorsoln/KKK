@@ -26,6 +26,7 @@ engine/
 ├── docs/DATA_FEATURE_STANDARD.md  mkataba wa data/features/labels (ticks, provenance, utafiti → uzalishaji)
 ├── docs/RESEARCH_PLAN_R0.md       awamu R0–R9 + track P: kupima kila eneo, kuanzia data
 ├── docs/DATA_SPLIT_PLAN.md        mgawanyo rasmi train/validation/holdout (2016–2026)
+├── docs/IMPLEMENTATION_PLAN.md    terms za utekelezaji (T0–T7) + rejista ya compliance 56 + milango ya CI
 ├── config/risk.yaml               vigezo VYOTE vya risk/cost (PD anahariri, hakuna code)
 ├── config/data.yaml               vigezo VYOTE vya data/features/utafiti
 ├── src/rce/                       budget · cost · sizing · gate
