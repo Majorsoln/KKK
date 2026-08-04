@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "elitefx-engine"
+version = "0.1.0"
+description = "ELITEFX engine — tabaka la data (T0) + RCE (Track E)"
+requires-python = ">=3.11"
+dependencies = [
+    "pandas>=2.0",
+    "pyarrow>=14.0",
+    "PyYAML>=6.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+mt5 = ["MetaTrader5>=5.0.45"]   # Windows pekee — recorder ya live
+
+[tool.setuptools]
+packages = ["src", "src.data"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+filterwarnings = ["error::FutureWarning"]

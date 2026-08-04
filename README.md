@@ -27,12 +27,25 @@ engine/
 ├── docs/RESEARCH_PLAN_R0.md       awamu R0–R9 + track P: kupima kila eneo, kuanzia data
 ├── docs/DATA_SPLIT_PLAN.md        mgawanyo rasmi train/validation/holdout (2016–2026)
 ├── docs/IMPLEMENTATION_PLAN.md    terms za utekelezaji (T0–T7) + rejista ya compliance 56 + milango ya CI
+├── docs/T0_REPORT.md              ripoti ya TERM T0 (tabaka la data L0)
 ├── config/risk.yaml               vigezo VYOTE vya risk/cost (PD anahariri, hakuna code)
-├── config/data.yaml               vigezo VYOTE vya data/features/utafiti
+├── config/data.yaml               vigezo VYOTE vya data/features/utafiti + storage/recorder
+├── src/data/                      L0: recorder wa feed ya broker · normalization A/B · SHA256 + manifest
 ├── src/rce/                       budget · cost · sizing · gate
 ├── src/opm/                       (baadaye) open-position management
 └── tests/
 ```
+
+## TABAKA LA DATA (T0 — `src/data/`)
+```
+python -m src.data.cli init-research      # §9 — muundo wa research storage (nje ya repo)
+python -m src.data.cli record             # DF-04 — recorder wa feed ya broker (MT5)
+python -m src.data.cli hash-l0            # DF-01 — SHA256 ya partitions ZOTE + manifest
+python -m src.data.cli verify-l0          # DF-01 — lango la CI (hash check kila build)
+python -m src.data.cli check-freshness    # DF-04 — ONYO: siku ya trading bila data mpya
+```
+Data yenyewe **haiishi hapa**: `ELITEFX_RESEARCH_ROOT` inaelekeza storage ya research (§9 ya
+`DATA_FEATURE_STANDARD.md`). Sifa za MT5 zinatoka environment, si config wala code.
 
 ## CONFIG
 `engine/config/risk.yaml` ndicho **chanzo cha ukweli** cha vigezo vya risk/cost vya engine.
