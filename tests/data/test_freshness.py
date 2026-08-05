@@ -122,3 +122,36 @@ def test_ripoti_inaweza_kutolewa_kwa_json_na_maandishi(cfg, l0_root):
     assert payload["status"] == report.status
     assert payload["symbols"][0]["symbol"] == "EURUSD"
     assert "DF-04 freshness" in report.render()
+
+
+def test_dirisha_tupu_halisemi_OK(cfg, l0_root, monkeypatch):
+    """Siku ya kwanza: hakuna siku ya trading iliyofungwa — hadhi si `OK`.
+
+    Kusema OK bila kupima chochote ni kupita kwa uwongo (falsafa ile ile ya
+    SKIPPED ya malango, §4.2 ya IMPLEMENTATION_PLAN).
+    """
+    from datetime import datetime, timedelta, timezone
+
+    from src.data import freshness as fr
+    from tests.conftest import variant_a_frame
+
+    # Partition moja ya broker ya leo, kisha state inayosema recorder imeanza leo.
+    today = datetime.now(timezone.utc)
+    day = (today - timedelta(days=0)).date().isoformat()
+    part = l0_root / "provenance=broker" / "symbol=EURUSD" / f"date={day}" / "ticks.parquet"
+    part.parent.mkdir(parents=True, exist_ok=True)
+    variant_a_frame().to_parquet(part, index=False)
+
+    state_dir = l0_root / fr.STATE_DIRNAME
+    state_dir.mkdir(parents=True, exist_ok=True)
+    (state_dir / fr.STATE_FILENAME).write_text(
+        f'{{"started_at": "{today.isoformat()}", "watermarks": {{}}}}', encoding="utf-8"
+    )
+
+    from src.data.manifest import hash_l0_tree
+
+    hash_l0_tree(cfg, l0_root=l0_root)
+    report = fr.check_freshness(cfg)
+    assert report.status == fr.STATUS_NO_CLOSED_DAYS
+    assert report.exit_code == 0
+    assert "hakuna kilichopimwa" in report.reason

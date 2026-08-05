@@ -11,6 +11,7 @@ Hadhi zinazoweza kutoka:
 | `SKIPPED` | storage ya research haipatikani (mf. CI ya repo) | 0 |
 | `NOT_STARTED` | `recorder.enabled: true` lakini hakuna partition ya broker | 1 |
 | `ALERT` | siku ya trading ipo bila data — data ya broker inapotea SASA | 1 |
+| `NO_CLOSED_DAYS` | recorder imeanza; hakuna siku iliyofungwa bado — **hakuna kilichopimwa** | 0 |
 """
 
 from __future__ import annotations
@@ -29,6 +30,7 @@ STATUS_OK = "OK"
 STATUS_ALERT = "ALERT"
 STATUS_NOT_STARTED = "NOT_STARTED"
 STATUS_SKIPPED = "SKIPPED"
+STATUS_NO_CLOSED_DAYS = "NO_CLOSED_DAYS"
 
 
 @dataclass
@@ -54,7 +56,9 @@ class FreshnessReport:
 
     @property
     def exit_code(self) -> int:
-        return 0 if self.status in (STATUS_OK, STATUS_SKIPPED) else 1
+        # NO_CLOSED_DAYS si kufeli (hakuna la kufanya) wala si PASS ya kupimwa —
+        # exit 0 ili CI isilalamike siku ya kwanza, lakini hadhi inaonekana kwenye ripoti.
+        return 0 if self.status in (STATUS_OK, STATUS_SKIPPED, STATUS_NO_CLOSED_DAYS) else 1
 
     def to_json(self) -> dict[str, Any]:
         return {
@@ -167,6 +171,7 @@ def check_freshness(
     window_end = (now - timedelta(hours=grace_hours)).date()
 
     symbols: list[SymbolFreshness] = []
+    checked_days = 0
     for symbol in sorted(days_by_symbol):
         recorded = set(days_by_symbol[symbol])
         # Dirisha la symbol linaanza pale data yake inapoanza — hata kama hiyo ni
@@ -174,6 +179,7 @@ def check_freshness(
         # pengo lililo ndani ya kipindi kilichorekodiwa lingepita bila kuonekana.
         symbol_start = min(window_start, date.fromisoformat(min(recorded)))
         expected = calendar.full_trading_days(symbol_start, window_end)
+        checked_days += len(expected)
         missing = [day.isoformat() for day in expected if day.isoformat() not in recorded]
         symbols.append(
             SymbolFreshness(
@@ -186,6 +192,15 @@ def check_freshness(
 
     status = STATUS_OK if all(s.ok for s in symbols) else STATUS_ALERT
     reason = "" if status == STATUS_OK else "siku za trading bila data mpya (spec §2.2 / DF-04)"
+    if checked_days == 0 and status == STATUS_OK:
+        # Hakuna SIKU hata moja iliyopimwa (recorder imeanza tu; hakuna siku ya
+        # trading iliyofungwa zaidi ya `grace_hours`). Kusema "OK" hapa kungekuwa
+        # kupita kwa uwongo — falsafa ile ile ya SKIPPED ya malango (§4.2).
+        status = STATUS_NO_CLOSED_DAYS
+        reason = (
+            f"recorder imeanza {window_start.isoformat()}; hakuna siku ya trading "
+            f"iliyofungwa zaidi ya saa {grace_hours} bado — hakuna kilichopimwa."
+        )
     return FreshnessReport(
         status=status,
         checked_at=checked_at,
