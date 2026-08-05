@@ -121,6 +121,12 @@ yake haitoshi — spread na fills ni **za broker husika**. Kila partition inabeb
 baada ya partitions kuandikwa (data ya brokers wawili haichanganywi chini ya tag moja; zikichanganyika
 hakuna njia ya kuzitenganisha baadaye). Broker mpya → L0 root mpya, au kufuta zilizopo kwa idhini ya PD.
 
+Kando na lebo ya PD, kila partition inabeba `broker_server` — **ukweli kutoka MT5**
+(`account_info().server`, mf. `Dukascopy-demo-mt5-1`). Lebo inaweza kuandikwa vibaya; server
+haiwezi. Server ikibadilika bila lebo kubadilika, recorder inasimama vilevile.
+**`terminal_info().company` HAITUMIKI kamwe kama kitambulisho cha broker** — inaripoti msambazaji
+wa terminal ("MetaQuotes Ltd." hata kwa akaunti ya broker mwingine kabisa).
+
 **Sharti mbili za kufunga pengo:**
 1. **Kurekodi feed ya broker wa live/demo kuanzia SASA** (ticks bid+ask → L0 partition mpya yenye
    `provenance: broker`). Kila mwezi usiorekodiwa ni data ya broker iliyopotea bure.

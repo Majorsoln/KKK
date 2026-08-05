@@ -95,6 +95,7 @@ class RecorderState:
         self.path = Path(path)
         self.started_at = started_at or _iso(utcnow())
         self.broker_id = broker_id or ""
+        self.broker_server = ""
         self.symbols: dict[str, SymbolState] = {}
 
     @classmethod
@@ -108,6 +109,7 @@ class RecorderState:
             started_at=payload.get("started_at"),
             broker_id=payload.get("broker_id", ""),
         )
+        state.broker_server = payload.get("broker_server", "")
         for symbol, raw in payload.get("symbols", {}).items():
             state.symbols[symbol] = SymbolState(
                 watermark=raw["watermark"],
@@ -125,6 +127,7 @@ class RecorderState:
             "updated_at": _iso(utcnow()),
             "recorder_version": RECORDER_VERSION,
             "broker_id": self.broker_id,
+            "broker_server": self.broker_server,
             "symbols": {
                 symbol: {
                     "watermark": s.watermark,
@@ -263,6 +266,7 @@ class TickRecorder:
             b"timestamp_tz": b"UTC",
             b"source": str(getattr(self.source, "name", "unknown")).encode(),
             b"broker_id": self.settings.broker_id.encode(),
+            b"broker_server": self._source_identity().encode(),
             b"recorder_version": RECORDER_VERSION.encode(),
             b"recorded_at": _iso(self.clock()).encode(),
             b"config_hash": self.cfg.config_hash.encode(),
@@ -293,6 +297,14 @@ class TickRecorder:
 
     # ---------- utambulisho wa broker ----------
 
+    def _source_identity(self) -> str:
+        """Server halisi ya chanzo, ikiwa chanzo kinaijua (MT5). Vinginevyo tupu."""
+        getter = getattr(self.source, "source_identity", None)
+        try:
+            return str(getter()) if callable(getter) else ""
+        except Exception:  # chanzo kikishindwa kujitambulisha, lebo ya PD inatosha
+            return ""
+
     def _guard_broker_identity(self) -> None:
         """Zuia kuchanganya data ya brokers wawili chini ya tag moja (spec §2.2).
 
@@ -319,8 +331,21 @@ class TickRecorder:
                 "HAICHANGANYWI chini ya tag moja. PD anaamua: (a) L0 root tofauti kwa "
                 "broker mpya, au (b) kufuta partitions za broker wa zamani kwa idhini yake."
             )
-        if not previous:
+        # Ukweli kutoka chanzo (server ya MT5) unalinganishwa kando na lebo ya PD:
+        # lebo inaweza kuandikwa vibaya; server haiwezi.
+        server = self._source_identity()
+        known_server = (self.state.broker_server or "").strip()
+        if server and known_server and server != known_server:
+            raise ValueError(
+                f"UKIUKAJI WA PROVENANCE (§2.2): L0 hii ina data ya server "
+                f"`{known_server}`, lakini MT5 sasa imeunganishwa na `{server}`. "
+                "Lebo `broker_id` haijabadilika — hii ni dalili ya data ya broker "
+                "mwingine kuingia chini ya lebo ile ile."
+            )
+        if not previous or (server and not known_server):
             self.state.broker_id = current
+            if server:
+                self.state.broker_server = server
             self.state.save()
 
     # ---------- poll moja ----------

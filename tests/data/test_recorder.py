@@ -304,3 +304,27 @@ def test_broker_akibadilika_recorder_inasimama(cfg, l0_root):
 
     same = _recorder_with_broker(cfg, l0_root, "broker-a", ReplayTickSource({}))
     same.poll_once()  # broker yule yule — inaendelea
+
+
+def test_server_ikibadilika_bila_lebo_kubadilika_recorder_inasimama(cfg, l0_root):
+    """Lebo inaweza kuandikwa vibaya; server ya MT5 haiwezi — inalinganishwa kando."""
+    import pytest as _pytest
+
+    from src.data.mt5_source import ReplayTickSource
+
+    class _WithServer(ReplayTickSource):
+        def __init__(self, server: str) -> None:
+            super().__init__({})
+            self._server = server
+
+        def source_identity(self) -> str:
+            return self._server
+
+    first = _recorder_with_broker(cfg, l0_root, "broker-x", _WithServer("Dukascopy-demo-mt5-1"))
+    first.poll_once()
+    assert first.state.broker_server == "Dukascopy-demo-mt5-1"
+
+    # Lebo ile ile, lakini akaunti imehamia server nyingine — hii ndiyo hatari halisi.
+    second = _recorder_with_broker(cfg, l0_root, "broker-x", _WithServer("Exness-Real-7"))
+    with _pytest.raises(ValueError, match="UKIUKAJI WA PROVENANCE"):
+        second.poll_once()

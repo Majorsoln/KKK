@@ -125,6 +125,17 @@ class MT5TickSource:
             raise SourceError(f"mt5.initialize imeshindikana: {mt5.last_error()}{hint}")
         LOG.info("MT5 imeunganishwa: %s", mt5.terminal_info())
 
+    def source_identity(self) -> str:
+        """Server halisi ya akaunti (mf. `Dukascopy-demo-mt5-1`).
+
+        Hii ni **ukweli kutoka MT5**, tofauti na `recorder.broker_id` ambayo ni
+        lebo ya PD. `terminal_info().company` HAITUMIKI: inaripoti msambazaji wa
+        terminal (mara nyingi "MetaQuotes Ltd."), si broker wa akaunti.
+        """
+        mt5 = self._module()
+        account = mt5.account_info()
+        return str(getattr(account, "server", "") or "") if account else ""
+
     def shutdown(self) -> None:
         if self._mt5 is not None:
             self._mt5.shutdown()
