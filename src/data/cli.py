@@ -83,12 +83,14 @@ def cmd_hash_l0(args: argparse.Namespace) -> int:
         allow_mutation=args.allow_mutation,
         mutation_reason=args.reason,
         resume=not args.no_resume,
+        prune_missing=args.prune_missing,
         on_progress=_progress,
     )
     print(
         f"L0 hashing: scanned={result.scanned} added={result.added} "
         f"confirmed={result.confirmed} skipped={result.skipped} "
-        f"mutated={len(result.mutated)} · {time.monotonic() - started:.0f}s"
+        f"pruned={len(result.pruned)} mutated={len(result.mutated)} · "
+        f"{time.monotonic() - started:.0f}s"
     )
     print(f"provenance: {json.dumps(manifest.provenance_counts())}")
     print(f"manifest: {result.manifest_path}")
@@ -245,6 +247,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--no-resume",
         action="store_true",
         help="rudia partitions zote hata zilizo kwenye manifest (default: ruka zisizobadilika)",
+    )
+    p_hash.add_argument(
+        "--prune-missing",
+        action="store_true",
+        help="ondoa entries za partitions zilizofutwa (inahitaji --reason; inaingia mutation_log)",
     )
     p_hash.add_argument("--progress-every", type=int, default=100, help="chapisha maendeleo kila N")
     p_hash.set_defaults(func=cmd_hash_l0)
