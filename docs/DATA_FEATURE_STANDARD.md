@@ -115,6 +115,12 @@ Data ya L0 iliyopo ni ya **aggregator wa kihistoria**, si feed ya broker wa live
 | features, screening, baselines, models, calibration (R0–R5) | attestation ya `cost_pips`/`P(fill)` ya live |
 | pretraining (§5A ya KAIROS-1) | — |
 
+**Kitambulisho cha broker ni sehemu ya provenance (PD 2026-08-05):** `provenance: broker` peke
+yake haitoshi — spread na fills ni **za broker husika**. Kila partition inabeba
+`recorder.broker_id` kwenye metadata yake, na recorder **inasimama** `broker_id` ikibadilika
+baada ya partitions kuandikwa (data ya brokers wawili haichanganywi chini ya tag moja; zikichanganyika
+hakuna njia ya kuzitenganisha baadaye). Broker mpya → L0 root mpya, au kufuta zilizopo kwa idhini ya PD.
+
 **Sharti mbili za kufunga pengo:**
 1. **Kurekodi feed ya broker wa live/demo kuanzia SASA** (ticks bid+ask → L0 partition mpya yenye
    `provenance: broker`). Kila mwezi usiorekodiwa ni data ya broker iliyopotea bure.

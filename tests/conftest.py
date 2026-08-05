@@ -72,13 +72,18 @@ def research_root(tmp_path: Path) -> Path:
 @pytest.fixture
 def cfg(research_root: Path):
     """Config halisi ya repo, ikielekezwa kwenye storage ya muda."""
-    return load_config(
+    config = load_config(
         REPO_ROOT / "config" / "data.yaml",
         env={
             "ELITEFX_RESEARCH_ROOT": str(research_root),
             "ELITEFX_HOLDOUT_ROOT": str(research_root / "_holdout"),
         },
     )
+    # `recorder.broker_id` ni tupu kwenye repo (PD anaijaza kwa broker wake).
+    # Tests zinahitaji kitambulisho ili guard ya §2.2 ipite; zinazoipima yenyewe
+    # zinaweka thamani yao kwenye RecorderSettings.
+    config.raw.setdefault("recorder", {})["broker_id"] = "test-broker"
+    return config
 
 
 @pytest.fixture

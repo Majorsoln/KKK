@@ -89,9 +89,12 @@ class SymbolState:
 class RecorderState:
     """Watermarks + siku tupu, zinazodumu kati ya restarts."""
 
-    def __init__(self, path: Path, started_at: str | None = None) -> None:
+    def __init__(
+        self, path: Path, started_at: str | None = None, broker_id: str | None = None
+    ) -> None:
         self.path = Path(path)
         self.started_at = started_at or _iso(utcnow())
+        self.broker_id = broker_id or ""
         self.symbols: dict[str, SymbolState] = {}
 
     @classmethod
@@ -100,7 +103,11 @@ class RecorderState:
         if not path.is_file():
             return cls(path, started_at=_iso(now) if now is not None else None)
         payload = json.loads(path.read_text(encoding="utf-8"))
-        state = cls(path, started_at=payload.get("started_at"))
+        state = cls(
+            path,
+            started_at=payload.get("started_at"),
+            broker_id=payload.get("broker_id", ""),
+        )
         for symbol, raw in payload.get("symbols", {}).items():
             state.symbols[symbol] = SymbolState(
                 watermark=raw["watermark"],
@@ -117,6 +124,7 @@ class RecorderState:
             "started_at": self.started_at,
             "updated_at": _iso(utcnow()),
             "recorder_version": RECORDER_VERSION,
+            "broker_id": self.broker_id,
             "symbols": {
                 symbol: {
                     "watermark": s.watermark,
@@ -184,6 +192,7 @@ class RecorderSettings:
     day_lag_minutes: int = 15
     initial_backfill_days: int = 3
     compression: str = "zstd"
+    broker_id: str = ""
 
     @classmethod
     def from_config(cls, cfg: DataConfig) -> "RecorderSettings":
@@ -196,6 +205,7 @@ class RecorderSettings:
             day_lag_minutes=int(cfg.get("recorder.day_lag_minutes", 15)),
             initial_backfill_days=int(cfg.get("recorder.initial_backfill_days", 3)),
             compression=str(cfg.get("recorder.compression", "zstd")),
+            broker_id=str(cfg.get("recorder.broker_id", "") or ""),
         )
 
 
@@ -252,6 +262,7 @@ class TickRecorder:
             b"schema_variant": b"A",
             b"timestamp_tz": b"UTC",
             b"source": str(getattr(self.source, "name", "unknown")).encode(),
+            b"broker_id": self.settings.broker_id.encode(),
             b"recorder_version": RECORDER_VERSION.encode(),
             b"recorded_at": _iso(self.clock()).encode(),
             b"config_hash": self.cfg.config_hash.encode(),
@@ -280,10 +291,43 @@ class TickRecorder:
             out[column] = pd.to_numeric(out[column], errors="coerce").astype("float64")
         return out.sort_values("timestamp", kind="stable").reset_index(drop=True)
 
+    # ---------- utambulisho wa broker ----------
+
+    def _guard_broker_identity(self) -> None:
+        """Zuia kuchanganya data ya brokers wawili chini ya tag moja (spec §2.2).
+
+        Spread na fills ni **za broker husika**. Data ya broker A na B zikichanganyika
+        kwenye `provenance=broker`, attestation ya gharama haiwezi kujua ni ya nani —
+        na hakuna njia ya kuzitenganisha baadaye (partition haisemi).
+
+        Kwa hiyo: `recorder.broker_id` ikibadilika baada ya partitions kuandikwa,
+        recorder **inasimama**. PD anaamua: L0 mpya kwa broker mpya, au kufuta
+        zilizopo kwa idhini yake (§2 — mutation ya L0 ni kwa idhini ya PD).
+        """
+        current = self.settings.broker_id.strip()
+        previous = (self.state.broker_id or "").strip()
+        if not current:
+            raise ValueError(
+                "`recorder.broker_id` haijawekwa kwenye config/data.yaml. Spec §2.2: "
+                "gharama ni za broker husika — partition isiyojua broker wake haiwezi "
+                "kutumika kwenye attestation. Weka kitambulisho (mf. `exness-demo`)."
+            )
+        if previous and previous != current:
+            raise ValueError(
+                f"UKIUKAJI WA PROVENANCE (§2.2): L0 hii ina data ya broker `{previous}`, "
+                f"lakini config sasa inasema `{current}`. Data ya brokers wawili "
+                "HAICHANGANYWI chini ya tag moja. PD anaamua: (a) L0 root tofauti kwa "
+                "broker mpya, au (b) kufuta partitions za broker wa zamani kwa idhini yake."
+            )
+        if not previous:
+            self.state.broker_id = current
+            self.state.save()
+
     # ---------- poll moja ----------
 
     def poll_once(self, manifest: L0Manifest | None = None) -> PollResult:
         """Vuta ticks mpya kwa kila symbol na uandike siku zilizofungwa."""
+        self._guard_broker_identity()
         result = PollResult()
         now = self.clock()
         cutoff = now - timedelta(minutes=self.settings.day_lag_minutes)

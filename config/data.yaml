@@ -41,6 +41,10 @@ storage:
 recorder:
   enabled:               true          # inaanza SASA; haiishii (§2.2)
   provenance_tag:        "broker"      # partitions mpya zinatofautishwa na za aggregator
+  broker_id:             ""            # LAZIMA (spec §2.2): kitambulisho cha broker/server
+                                        # mf. "exness-demo". Kikibadilika baada ya kurekodi,
+                                        # recorder INASIMAMA — data ya brokers wawili
+                                        # haichanganywi chini ya tag moja.
   source:                "mt5"
   symbols:               []            # tupu = symbols zote za `source.symbols`
   poll_seconds:          60            # mzunguko wa kuvuta ticks

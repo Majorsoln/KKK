@@ -262,3 +262,45 @@ def test_mt5_bila_terminal_path_inatoa_ushauri_wa_10003():
     source._mt5 = _FakeMT5(ok=False)
     with _pytest.raises(SourceError, match="ELITEFX_MT5_TERMINAL"):
         source.connect()
+
+
+# ---------------------------------------------------------------------------
+# Provenance ya broker: data ya brokers wawili haichanganywi (spec §2.2)
+# ---------------------------------------------------------------------------
+
+
+def _recorder_with_broker(cfg, l0_root, broker_id, source):
+    from src.data.recorder import RecorderSettings, TickRecorder
+
+    settings = RecorderSettings.from_config(cfg)
+    settings.broker_id = broker_id
+    settings.symbols = ["EURUSD"]
+    return TickRecorder(source, cfg, settings=settings)
+
+
+def test_broker_id_ni_lazima(cfg, l0_root):
+    import pytest as _pytest
+
+    from src.data.mt5_source import ReplayTickSource
+
+    rec = _recorder_with_broker(cfg, l0_root, "", ReplayTickSource({}))
+    with _pytest.raises(ValueError, match="broker_id"):
+        rec.poll_once()
+
+
+def test_broker_akibadilika_recorder_inasimama(cfg, l0_root):
+    """Kubadilisha broker bila kubadilisha L0 = kuchanganya gharama za watu wawili."""
+    import pytest as _pytest
+
+    from src.data.mt5_source import ReplayTickSource
+
+    first = _recorder_with_broker(cfg, l0_root, "broker-a", ReplayTickSource({}))
+    first.poll_once()
+    assert first.state.broker_id == "broker-a"
+
+    second = _recorder_with_broker(cfg, l0_root, "broker-b", ReplayTickSource({}))
+    with _pytest.raises(ValueError, match="UKIUKAJI WA PROVENANCE"):
+        second.poll_once()
+
+    same = _recorder_with_broker(cfg, l0_root, "broker-a", ReplayTickSource({}))
+    same.poll_once()  # broker yule yule — inaendelea
