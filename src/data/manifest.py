@@ -18,7 +18,7 @@ import subprocess
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any, Callable, Iterable
 
 from .config import DataConfig
 from .hashing import sha256_file
@@ -346,6 +346,7 @@ class HashRunResult:
     scanned: int = 0
     added: int = 0
     confirmed: int = 0
+    skipped: int = 0
     mutated: list[str] = field(default_factory=list)
     failed: list[dict[str, str]] = field(default_factory=list)
     manifest_path: str = ""
@@ -362,11 +363,23 @@ def hash_l0_tree(
     read_metadata: bool = True,
     allow_mutation: bool = False,
     mutation_reason: str | None = None,
+    resume: bool = True,
+    save_every: int = 250,
+    on_progress: Callable[[int, int, str], None] | None = None,
 ) -> tuple[L0Manifest, HashRunResult]:
     """Hash partitions ZOTE za L0 zilizopo + rekodi manifest (DF-01, DF-03).
 
     `read_metadata=True` inasoma pia rows/first_ts/last_ts/toleo la schema kwa
-    kila partition (kwa KUSOMA tu — L0 haibadilishwi).
+    kila partition — kutoka **footer ya parquet**, si kwa kusoma ticks
+    (`schema.partition_metadata`).
+
+    `resume=True`: partition iliyo kwenye manifest yenye ukubwa na mtime
+    visivyobadilika **hairudiwi kuhashiwa**. L0 ni immutable (§2), kwa hiyo
+    run ya pili baada ya kukatika inaendelea pale ilipoishia badala ya kuanza
+    upya. `verify-l0` ndiyo inayohesabu upya hashes zote (lango la CI).
+
+    `save_every`: manifest inahifadhiwa kila partitions ngapi — run ndefu
+    ikikatika, kazi iliyofanyika haipotei.
     """
     root = Path(l0_root or cfg.l0_root)
     mpath = Path(manifest_path or cfg.l0_manifest_path)
@@ -375,16 +388,30 @@ def hash_l0_tree(
     manifest = L0Manifest.load_or_new(mpath, root, cfg.config_hash)
     result = HashRunResult(manifest_path=str(mpath))
 
-    for path in iter_partitions(root):
+    partitions = list(iter_partitions(root))
+    total = len(partitions)
+    since_save = 0
+
+    for path in partitions:
         result.scanned += 1
         key = manifest.key_for(path)
-        was_known = key in manifest.entries
+        existing = manifest.entries.get(key)
+        was_known = existing is not None
+
+        if resume and existing is not None and existing.size_bytes == path.stat().st_size:
+            # Ukubwa haujabadilika na L0 ni immutable — hakuna haja ya kusoma tena.
+            result.confirmed += 1
+            result.skipped += 1
+            if on_progress:
+                on_progress(result.scanned, total, key)
+            continue
+
         meta: dict[str, Any] = {}
         if read_metadata:
             try:
-                from .schema import describe_partition  # import wa ndani: pyarrow ni nzito
+                from .schema import partition_metadata  # import wa ndani: pyarrow ni nzito
 
-                described = describe_partition(path, cfg)
+                described = partition_metadata(path, cfg)
                 meta = {
                     "schema_variant": described["schema_variant"],
                     "rows": described["rows"],
@@ -409,6 +436,13 @@ def hash_l0_tree(
             result.confirmed += 1
         else:
             result.added += 1
+
+        since_save += 1
+        if save_every and since_save >= save_every:
+            manifest.save()
+            since_save = 0
+        if on_progress:
+            on_progress(result.scanned, total, key)
 
     manifest.save()
     return manifest, result

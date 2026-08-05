@@ -202,6 +202,71 @@ def read_partition(
     )
 
 
+def partition_metadata(path: str | Path, cfg: DataConfig) -> dict[str, Any]:
+    """Muhtasari wa partition kutoka **FOOTER** ya parquet — HAISOMI ticks.
+
+    `describe_partition()` inasoma faili nzima; inafaa kwa ukaguzi wa partition
+    MOJA. Kwa hashing ya L0 nzima (partitions 21,438 · ticks bilioni 3.4) kusoma
+    kila tick ni **saa kadhaa** kwa taarifa zinazopatikana kwenye footer.
+
+    Hapa tunatumia:
+      * `metadata.num_rows` — idadi ya rows bila kudecode data
+      * statistics za column ya timestamp (min/max kwa kila row group)
+
+    Statistics zisipopatikana, tunasoma **column ya timestamp pekee** — bado ni
+    nafuu mara nyingi kuliko kusoma columns zote.
+    """
+    import pyarrow.parquet as pq
+
+    pfile = pq.ParquetFile(path)
+    meta = pfile.metadata
+    names = list(pfile.schema_arrow.names)
+    spec = detect_variant(names, cfg)
+    ts_column = spec.columns[0]  # column ya kwanza ya kila toleo = timestamp
+
+    # Statistics za parquet zinarudisha INTEGER ya epoch kwa unit ya column
+    # (si datetime). Bila unit, `pd.Timestamp(int)` inasoma kama nanoseconds →
+    # tarehe za 1970. Unit halisi inatoka kwenye arrow schema ya faili.
+    ts_type = pfile.schema_arrow.field(ts_column).type
+    ts_unit = getattr(ts_type, "unit", None) or spec.time_unit
+
+    first_ts: Any = None
+    last_ts: Any = None
+    try:
+        col_index = meta.schema.names.index(ts_column)
+        for rg in range(meta.num_row_groups):
+            stats = meta.row_group(rg).column(col_index).statistics
+            if stats is None or not stats.has_min_max:
+                first_ts = last_ts = None
+                break
+            lo, hi = stats.min, stats.max
+            first_ts = lo if first_ts is None or lo < first_ts else first_ts
+            last_ts = hi if last_ts is None or hi > last_ts else last_ts
+    except (ValueError, AttributeError):
+        first_ts = last_ts = None
+
+    if meta.num_rows and first_ts is None:  # statistics hazipo — soma column MOJA
+        series = pq.read_table(path, columns=[ts_column]).column(0).to_pandas()
+        if not series.empty:
+            first_ts, last_ts = series.min(), series.max()
+
+    def _iso(value: Any) -> str | None:
+        if value is None:
+            return None
+        stamp = pd.Timestamp(value, unit=ts_unit) if isinstance(value, int) else pd.Timestamp(value)
+        stamp = stamp.tz_localize("UTC") if stamp.tzinfo is None else stamp.tz_convert("UTC")
+        return stamp.isoformat()
+
+    return {
+        "path": str(path),
+        "schema_variant": spec.name,
+        "rows": int(meta.num_rows),
+        "columns": list(CANONICAL_COLUMNS),
+        "first_ts": _iso(first_ts),
+        "last_ts": _iso(last_ts),
+    }
+
+
 def describe_partition(path: str | Path, cfg: DataConfig) -> dict[str, Any]:
     """Muhtasari wa partition baada ya normalization (kwa ripoti za T0/R0)."""
     frame = read_partition(path, cfg)

@@ -152,3 +152,69 @@ def test_manifest_inasomeka_upya_bila_kupoteza_kitu(cfg, aggregator_partitions, 
     assert reloaded.entries.keys() == manifest.entries.keys()
     assert reloaded.config_hash == cfg.config_hash
     assert reloaded.verify().ok
+
+
+# ---------------------------------------------------------------------------
+# Utendaji: metadata kutoka FOOTER, si kwa kusoma ticks (imegunduliwa T0)
+# ---------------------------------------------------------------------------
+
+
+def test_partition_metadata_inalingana_na_describe_partition(cfg, aggregator_partitions):
+    """Njia ya haraka (footer) lazima itoe namba ZILE ZILE za njia ya polepole.
+
+    `describe_partition` inasoma faili nzima; `partition_metadata` inasoma
+    footer pekee. Zikitofautiana, manifest ingebeba namba za uongo.
+    """
+    from src.data.schema import describe_partition, partition_metadata
+
+    for path in aggregator_partitions.values():
+        fast = partition_metadata(path, cfg)
+        slow = describe_partition(path, cfg)
+        assert fast["rows"] == slow["rows"]
+        assert fast["schema_variant"] == slow["schema_variant"]
+        assert fast["first_ts"] == slow["first_ts"]
+        assert fast["last_ts"] == slow["last_ts"]
+
+
+def test_partition_metadata_haisomi_ticks(cfg, aggregator_partitions, monkeypatch):
+    """Uthibitisho wa moja kwa moja: hakuna `read_partition` (pandas) inayoitwa."""
+    from src.data import schema
+
+    def _explode(*_a, **_k):
+        raise AssertionError("partition_metadata haipaswi kusoma ticks — footer pekee")
+
+    monkeypatch.setattr(schema, "read_partition", _explode)
+    meta = schema.partition_metadata(next(iter(aggregator_partitions.values())), cfg)
+    assert meta["rows"] > 0
+
+
+def test_hash_l0_resume_inaruka_partitions_zisizobadilika(cfg, l0_root, aggregator_partitions):
+    """Run ya pili inaruka zilizohashiwa (L0 ni immutable) — si kuanza upya."""
+    from src.data.manifest import hash_l0_tree
+
+    _, first = hash_l0_tree(cfg, l0_root=l0_root)
+    assert first.added == len(aggregator_partitions)
+    assert first.skipped == 0
+
+    _, second = hash_l0_tree(cfg, l0_root=l0_root)
+    assert second.skipped == len(aggregator_partitions)
+    assert second.added == 0
+
+    _, forced = hash_l0_tree(cfg, l0_root=l0_root, resume=False)
+    assert forced.skipped == 0
+    assert forced.confirmed == len(aggregator_partitions)
+
+
+def test_hash_l0_inahifadhi_katikati_ya_run(cfg, l0_root, aggregator_partitions):
+    """save_every: run ndefu ikikatika, kazi iliyofanyika haipotei."""
+    from src.data.manifest import L0Manifest, hash_l0_tree
+
+    seen: list[int] = []
+
+    def _progress(done: int, total: int, key: str) -> None:
+        seen.append(done)
+
+    manifest, _ = hash_l0_tree(cfg, l0_root=l0_root, save_every=1, on_progress=_progress)
+    assert seen == list(range(1, len(aggregator_partitions) + 1))
+    reloaded = L0Manifest.load(manifest.path)
+    assert len(reloaded.entries) == len(aggregator_partitions)

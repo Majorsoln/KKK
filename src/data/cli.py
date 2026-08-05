@@ -17,6 +17,7 @@ import argparse
 import json
 import logging
 import sys
+import time
 from pathlib import Path
 
 from .config import ConfigError, DataConfig, load_config
@@ -59,6 +60,21 @@ def cmd_hash_l0(args: argparse.Namespace) -> int:
     cfg = _load(args)
     root = Path(args.l0_root).expanduser() if args.l0_root else cfg.l0_root
     manifest_path = Path(args.manifest).expanduser() if args.manifest else cfg.l0_manifest_path
+    started = time.monotonic()
+    every = max(1, int(args.progress_every))
+
+    def _progress(done: int, total: int, key: str) -> None:
+        if done % every and done != total:
+            return
+        elapsed = time.monotonic() - started
+        rate = done / elapsed if elapsed > 0 else 0.0
+        eta = (total - done) / rate if rate > 0 else 0.0
+        print(
+            f"  [{done}/{total}] {done * 100 // max(total, 1)}% · "
+            f"{rate:.1f} partitions/s · imebaki ~{eta / 60:.1f} min · {key}",
+            flush=True,
+        )
+
     manifest, result = hash_l0_tree(
         cfg,
         l0_root=root,
@@ -66,10 +82,13 @@ def cmd_hash_l0(args: argparse.Namespace) -> int:
         read_metadata=not args.no_metadata,
         allow_mutation=args.allow_mutation,
         mutation_reason=args.reason,
+        resume=not args.no_resume,
+        on_progress=_progress,
     )
     print(
         f"L0 hashing: scanned={result.scanned} added={result.added} "
-        f"confirmed={result.confirmed} mutated={len(result.mutated)}"
+        f"confirmed={result.confirmed} skipped={result.skipped} "
+        f"mutated={len(result.mutated)} · {time.monotonic() - started:.0f}s"
     )
     print(f"provenance: {json.dumps(manifest.provenance_counts())}")
     print(f"manifest: {result.manifest_path}")
@@ -183,14 +202,18 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--config", help="njia ya data.yaml (default: config/data.yaml ya repo)")
     parser.add_argument("-v", "--verbose", action="store_true")
+    # `-v` ikubalike pia BAADA ya subcommand (`... record -v`) — SUPPRESS inazuia
+    # default ya subparser kufuta ile ya juu.
+    common = argparse.ArgumentParser(add_help=False)
+    common.add_argument("-v", "--verbose", action="store_true", default=argparse.SUPPRESS)
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    p_init = subparsers.add_parser("init-research", help="§9 — simamisha muundo wa research repo")
+    p_init = subparsers.add_parser("init-research", help="§9 — simamisha muundo wa research repo", parents=[common])
     p_init.add_argument("--root", help="mzizi wa research (default: storage.research_root)")
     p_init.add_argument("--no-readme", action="store_true")
     p_init.set_defaults(func=cmd_init_research)
 
-    p_hash = subparsers.add_parser("hash-l0", help="DF-01 — SHA256 ya partitions zote + manifest")
+    p_hash = subparsers.add_parser("hash-l0", help="DF-01 — SHA256 ya partitions zote + manifest", parents=[common])
     p_hash.add_argument("--l0-root")
     p_hash.add_argument("--manifest")
     p_hash.add_argument("--no-metadata", action="store_true", help="usisome rows/tarehe za ndani")
@@ -200,32 +223,38 @@ def build_parser() -> argparse.ArgumentParser:
         help="ruhusu hash iliyobadilika kuandikwa (inahitaji --reason; inaingia mutation_log)",
     )
     p_hash.add_argument("--reason", help="sababu ya kuandika juu ya hash iliyopo")
+    p_hash.add_argument(
+        "--no-resume",
+        action="store_true",
+        help="rudia partitions zote hata zilizo kwenye manifest (default: ruka zisizobadilika)",
+    )
+    p_hash.add_argument("--progress-every", type=int, default=100, help="chapisha maendeleo kila N")
     p_hash.set_defaults(func=cmd_hash_l0)
 
-    p_verify = subparsers.add_parser("verify-l0", help="DF-01 — lango la CI: hash check")
+    p_verify = subparsers.add_parser("verify-l0", help="DF-01 — lango la CI: hash check", parents=[common])
     p_verify.add_argument("--manifest")
     p_verify.add_argument("--strict", action="store_true", help="partition isiyo kwenye manifest = FAIL")
     p_verify.add_argument("--require-storage", action="store_true")
     p_verify.set_defaults(func=cmd_verify_l0)
 
-    p_record = subparsers.add_parser("record", help="DF-04 — recorder wa feed ya broker (MT5)")
+    p_record = subparsers.add_parser("record", help="DF-04 — recorder wa feed ya broker (MT5)", parents=[common])
     p_record.add_argument("--once", action="store_true", help="poll moja badala ya mzunguko usioisha")
     p_record.add_argument("--max-polls", type=int)
     p_record.add_argument("--symbols", help="orodha ya symbols (comma) badala ya config")
     p_record.add_argument("--replay-dir", help="chanzo cha replay (parquet kwa kila symbol)")
     p_record.set_defaults(func=cmd_record)
 
-    p_fresh = subparsers.add_parser("check-freshness", help="DF-04 — ONYO la siku isiyorekodiwa")
+    p_fresh = subparsers.add_parser("check-freshness", help="DF-04 — ONYO la siku isiyorekodiwa", parents=[common])
     p_fresh.add_argument("--json", action="store_true")
     p_fresh.add_argument("--out", help="andika ripoti ya JSON kwenye faili")
     p_fresh.add_argument("--require-storage", action="store_true")
     p_fresh.set_defaults(func=cmd_check_freshness)
 
-    p_inspect = subparsers.add_parser("inspect", help="DF-02 — schema moja kutoka Toleo A/B")
+    p_inspect = subparsers.add_parser("inspect", help="DF-02 — schema moja kutoka Toleo A/B", parents=[common])
     p_inspect.add_argument("paths", nargs="+")
     p_inspect.set_defaults(func=cmd_inspect)
 
-    p_cfg = subparsers.add_parser("config-hash", help="fingerprint ya config/data.yaml")
+    p_cfg = subparsers.add_parser("config-hash", help="fingerprint ya config/data.yaml", parents=[common])
     p_cfg.set_defaults(func=cmd_config_hash)
 
     return parser
@@ -234,7 +263,7 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
-    _configure_logging(args.verbose)
+    _configure_logging(getattr(args, "verbose", False))
     try:
         return int(args.func(args))
     except (ConfigError, ManifestError) as exc:
