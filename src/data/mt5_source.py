@@ -76,9 +76,15 @@ class MT5TickSource:
     name = "mt5"
     extra_columns = ("flags", "volume_real")
 
-    def __init__(self, credentials: MT5Credentials | None = None, symbol_suffix: str = "") -> None:
+    def __init__(
+        self,
+        credentials: MT5Credentials | None = None,
+        symbol_suffix: str = "",
+        timeout_ms: int | None = None,
+    ) -> None:
         self.credentials = credentials or MT5Credentials()
         self.symbol_suffix = symbol_suffix
+        self.timeout_ms = timeout_ms
         self._mt5: Any | None = None
 
     # ---------- muunganisho ----------
@@ -105,8 +111,18 @@ class MT5TickSource:
             kwargs["path"] = creds.terminal_path
         if creds.login:
             kwargs.update(login=creds.login, password=creds.password, server=creds.server)
+        if self.timeout_ms:
+            # Bila timeout, MT5 inasubiri sekunde 60 kimya terminal isipopatikana.
+            # Kigezo kinatoka config (`recorder.mt5.timeout_ms`) — si code (G10).
+            kwargs["timeout"] = int(self.timeout_ms)
         if not mt5.initialize(**kwargs):
-            raise SourceError(f"mt5.initialize imeshindikana: {mt5.last_error()}")
+            hint = ""
+            if not creds.terminal_path:
+                hint = (
+                    " — `ELITEFX_MT5_TERMINAL` haijawekwa; MT5 haiwezi kujitafuta yenyewe "
+                    "kwenye mazingira mengi (kosa -10003). Weka njia kamili ya terminal64.exe."
+                )
+            raise SourceError(f"mt5.initialize imeshindikana: {mt5.last_error()}{hint}")
         LOG.info("MT5 imeunganishwa: %s", mt5.terminal_info())
 
     def shutdown(self) -> None:

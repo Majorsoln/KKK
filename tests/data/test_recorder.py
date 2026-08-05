@@ -210,3 +210,55 @@ def test_run_forever_inaendelea_hadi_isimamishwe(recorder_factory):
     polls = recorder.run_forever(max_polls=3, sleeper=slept.append)
     assert polls == 3
     assert slept == [recorder.settings.poll_seconds] * 2
+
+
+# ---------------------------------------------------------------------------
+# Muunganisho wa MT5: timeout + ushauri wa terminal path (imegunduliwa T0, PD 2026-08-04)
+# ---------------------------------------------------------------------------
+
+
+class _FakeMT5:
+    """MT5 bandia: inarekodi kwargs za initialize na kurudisha matokeo yaliyopangwa."""
+
+    def __init__(self, ok: bool = True) -> None:
+        self.ok = ok
+        self.kwargs: dict = {}
+
+    def initialize(self, **kwargs):
+        self.kwargs = kwargs
+        return self.ok
+
+    def last_error(self):
+        return (-10003, "IPC initialize failed, MetaTrader 5 x64 not found")
+
+    def terminal_info(self):
+        return "fake-terminal"
+
+    def shutdown(self):
+        return None
+
+
+def test_mt5_inapitisha_timeout_na_path_kwenye_initialize():
+    from src.data.mt5_source import MT5Credentials, MT5TickSource
+
+    source = MT5TickSource(
+        credentials=MT5Credentials(terminal_path=r"C:\MT5\terminal64.exe"),
+        timeout_ms=15000,
+    )
+    fake = _FakeMT5(ok=True)
+    source._mt5 = fake
+    source.connect()
+    assert fake.kwargs["path"] == r"C:\MT5\terminal64.exe"
+    assert fake.kwargs["timeout"] == 15000
+
+
+def test_mt5_bila_terminal_path_inatoa_ushauri_wa_10003():
+    """Kosa -10003 lililoonekana T0: bila path MT5 haijitafuti — ujumbe uelekeze."""
+    import pytest as _pytest
+
+    from src.data.mt5_source import MT5Credentials, MT5TickSource, SourceError
+
+    source = MT5TickSource(credentials=MT5Credentials(), timeout_ms=15000)
+    source._mt5 = _FakeMT5(ok=False)
+    with _pytest.raises(SourceError, match="ELITEFX_MT5_TERMINAL"):
+        source.connect()

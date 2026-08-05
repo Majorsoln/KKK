@@ -122,6 +122,7 @@ def cmd_record(args: argparse.Namespace) -> int:
         source = MT5TickSource(
             credentials=MT5Credentials.from_env(cfg),
             symbol_suffix=str(cfg.get("recorder.mt5.symbol_suffix", "")),
+            timeout_ms=int(cfg.get("recorder.mt5.timeout_ms", 15000)),
         )
         source.connect()
 
