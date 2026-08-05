@@ -113,8 +113,26 @@ def cmd_verify_l0(args: argparse.Namespace) -> int:
         print(f"verify-l0: SKIPPED — manifest haipo ({manifest_path})")
         return 0
     manifest = L0Manifest.load(manifest_path)
-    result = manifest.verify()
-    print(f"verify-l0: {'PASS' if result.ok else 'FAIL'} · {result.summary()}")
+    started = time.monotonic()
+    every = max(1, int(args.progress_every))
+
+    def _progress(done: int, total: int, key: str) -> None:
+        if done % every and done != total:
+            return
+        elapsed = time.monotonic() - started
+        rate = done / elapsed if elapsed > 0 else 0.0
+        eta = (total - done) / rate if rate > 0 else 0.0
+        print(
+            f"  [{done}/{total}] {done * 100 // max(total, 1)}% · "
+            f"{rate:.1f} partitions/s · imebaki ~{eta / 60:.1f} min",
+            flush=True,
+        )
+
+    result = manifest.verify(on_progress=_progress)
+    print(
+        f"verify-l0: {'PASS' if result.ok else 'FAIL'} · {result.summary()} · "
+        f"{time.monotonic() - started:.0f}s"
+    )
     for key in result.changed:
         print(f"  ! IMEBADILIKA (DF-01): {key}", file=sys.stderr)
     for key in result.missing:
@@ -235,6 +253,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_verify.add_argument("--manifest")
     p_verify.add_argument("--strict", action="store_true", help="partition isiyo kwenye manifest = FAIL")
     p_verify.add_argument("--require-storage", action="store_true")
+    p_verify.add_argument("--progress-every", type=int, default=250, help="chapisha maendeleo kila N")
     p_verify.set_defaults(func=cmd_verify_l0)
 
     p_record = subparsers.add_parser("record", help="DF-04 — recorder wa feed ya broker (MT5)", parents=[common])

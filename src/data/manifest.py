@@ -316,20 +316,31 @@ class L0Manifest:
 
     # ---------- ukaguzi ----------
 
-    def verify(self, root: Path | None = None) -> VerifyResult:
-        """Hesabu upya hashes zote na ulinganishe na manifest (lango la CI)."""
+    def verify(
+        self,
+        root: Path | None = None,
+        on_progress: Callable[[int, int, str], None] | None = None,
+    ) -> VerifyResult:
+        """Hesabu **upya** hashes zote na ulinganishe na manifest (lango la CI).
+
+        Tofauti na `hash_l0_tree(resume=True)`, hapa hakuna kuruka: kila
+        partition inasomwa na kuhashiwa. Ndiyo maana lango hili linagundua
+        mabadiliko ya kimya — na ndiyo maana linachukua muda wa kusoma L0 nzima.
+        """
         root = Path(root or self.l0_root)
         result = VerifyResult()
         on_disk = {self.key_for(p): p for p in iter_partitions(root)}
-        for key, entry in self.entries.items():
+        total = len(self.entries)
+        for done, (key, entry) in enumerate(self.entries.items(), start=1):
             path = on_disk.pop(key, None)
             if path is None:
                 result.missing.append(key)
-                continue
-            if sha256_file(path) == entry.sha256:
+            elif sha256_file(path) == entry.sha256:
                 result.unchanged.append(key)
             else:
                 result.changed.append(key)
+            if on_progress:
+                on_progress(done, total, key)
         result.untracked.extend(sorted(on_disk))
         return result
 
