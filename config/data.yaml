@@ -53,6 +53,10 @@ recorder:
   compression:           "zstd"
   calendar:
     holidays_md:         ["01-01", "12-25"]   # kalenda KAMILI inatoka kwenye data (T1)
+  reconcile:                            # DF-03: kuziba siku zilizorukwa (backfill.py)
+    on_start:            true          # kila recorder inapoanza, linganisha kalenda na DISK
+    every_polls:         60            # na kila polls ngapi baadaye (60 x 60s ≈ saa 1)
+    lookback_days:       30            # dirisha la nyuma linalokaguliwa kila mara
   freshness_alert:
     grace_hours:         26            # siku ya trading bila data baada ya hii -> ONYO (DF-04)
   mt5:                                  # sifa za kuingia zinatoka ENVIRONMENT, si config

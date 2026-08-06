@@ -337,6 +337,7 @@ za vigezo vya kustaafu (data.yaml §monitoring). Ripoti ya shadow -> PD kwa uamu
 | DF-13 | §6.2 | F6 ni ya kusoma tu — cost ya RCE; news kwa muda pekee | AUD | T3 |
 | DF-14 | §7 + SPLIT_PLAN | splits kwa tarehe za config; purge + embargo bars 36; pooled kwa wakati; random split MARUFUKU | UT + **CI** (splitter anasoma config pekee) | T1+ |
 | DF-15 | §8 | kila dataset ina manifest + dataset_id; namba bila dataset_id haiingii engine | **CI**: ripoti bila dataset_id inakataliwa | T1+ |
+| DF-18 | §2.2 | recorder inajitibu: kalenda dhidi ya DISK (si state) → siku zilizorukwa zinazibwa; `backfill` CLI + reconcile on-start/kila polls N; siku isiyo na ticks HAIANDIKWI tupu | UT: `test_backfill_*` (state iliyopotea + siku ya kati iliyorukwa) | T0 |
 | DF-17 | §9 | `research/` ndani ya repo: reports+src zinapushwa, `research/data/` haipushwi kamwe; engine hairudii code ya utafiti | **UT/CI**: `tests/test_repo_guards.py` (G11 · G12) — imethibitishwa kwa jaribio hasi | T0 |
 
 ### 3.4 UTAFITI — `RESEARCH_PLAN_R0.md` + `DATA_SPLIT_PLAN.md`
@@ -357,7 +358,7 @@ za vigezo vya kustaafu (data.yaml §monitoring). Ripoti ya shadow -> PD kwa uamu
 | RS-13 | §3 | LESSON inaandikwa kwa undani sawa na PASS | PROC | zote |
 | RS-14 | SPLIT §3 | RESERVE (2026-05+) haionwi kabisa hadi mzunguko ujao | **CI** (access guard ile ile) | zote |
 
-**Jumla: vipengele 57.** `100% = 57/57 VERIFIED` (au LESSON iliyoandikwa pale eneo lilipofeli
+**Jumla: vipengele 58.** `100% = 58/58 VERIFIED` (au LESSON iliyoandikwa pale eneo lilipofeli
 kwa vigezo — LESSON ni jibu halali; kificho ni pale tu eneo linaruka bila kupimwa).
 
 ### 3.5 LEDGER YA HADHI (hii ndiyo safu ya hadhi ya §3 — inasasishwa kila wiki)
