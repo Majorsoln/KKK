@@ -35,8 +35,9 @@
 | Diski | L0 ya sasa ≈ 31GB; L1–L5 zinahitaji **zaidi** | ona §4.3 |
 | Mtandao | thabiti | recorder inavuta kila dakika |
 
-**Mashine inayorekodi haitakiwi kuzimwa.** Ikizimwa, `reconcile` itaziba mapengo ikianza tena
-(§6.4) — lakini kikomo ni history ya broker, si yetu.
+**Mashine ikizimwa, `reconcile` inaziba mapengo ikianza tena** (§6.4). Kikomo si siku moja
+bali **kina cha history ya broker** (~siku 100 kwa Dukascopy demo). Ona §8 kwa tofauti kati
+ya dev na production.
 
 ---
 
@@ -282,7 +283,21 @@ python -c "import pyarrow.parquet as pq,glob; f=sorted(glob.glob(r'research\data
 
 ---
 
-## 8. PRODUCTION — recorder kama huduma
+## 8. KUENDESHA RECORDER — dev dhidi ya production
+
+**Kikomo halisi si siku moja; ni kina cha history ya broker.** Dukascopy demo inatoa
+~siku 100 zinazosogea mbele (§2.2 ya standard). `reconcile` (on-start + kila polls 60)
+inaziba **mapengo yote ndani ya dirisha hilo**. Kwa hiyo:
+
+| Hatua | Inayohitajika | Sababu |
+|---|---|---|
+| **Dev (T0–T6)** | endesha `record` unapofanya kazi; usiache zaidi ya **~siku 60** bila kuiendesha | reconcile inaziba kilichokosekana; margin dhidi ya kikomo cha ~100 |
+| **Shadow/Live (T7+)** | Task Scheduler + restart-on-failure | kukosa siku kunaathiri trading na calibration ya P(fill), si utafiti tu |
+
+Kwenye dev, **kipimo ndicho kinachotawala, si hisia**: `check-freshness` ikirudisha `ALERT`,
+endesha `backfill`. Laptop kuzimwa usiku au wikendi hakupotezi chochote.
+
+### 8.1 Production — recorder kama huduma (T7 na kuendelea)
 
 Dirisha la cmd si production: likifungwa, kurekodi kunasimama.
 
@@ -297,7 +312,7 @@ Dirisha la cmd si production: likifungwa, kurekodi kunasimama.
 5. Env vars: ziwe za **system-level** (`setx /M`) au ziwekwe kwenye wrapper `.bat`
    inayoziweka kabla ya `python`
 
-**Ukaguzi wa kila siku** (task ya pili, au kwa mkono):
+**Ukaguzi** (kila siku production; kila unapoanza kazi dev):
 ```cmd
 python -m src.data.cli check-freshness --json --out research\reports\quality\freshness.json
 python -m src.data.cli verify-l0
