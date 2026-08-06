@@ -20,6 +20,8 @@
 5. Kitambulisho cha broker    →  config: recorder.broker_id
 6. Kuanzisha                  →  hash-l0 · verify-l0 · backfill · record
 7. Production                 →  Task Scheduler + ukaguzi wa kila siku
+
+Kila siku (baada ya kusimamisha):   scripts\catchup.bat  ->  scripts\record.bat
 ```
 
 ---
@@ -280,6 +282,46 @@ python -c "import pyarrow.parquet as pq,glob; f=sorted(glob.glob(r'research\data
 | `verify-l0 ... missing=N` | partitions zilifutwa kwa idhini | `hash-l0 --prune-missing --reason "..."` |
 | git inafungua **vim** kwenye merge | editor default | `Esc` → `:wq` → Enter; kisha `git config --global core.editor notepad` |
 | `git pull` inakataa: local changes | config imehaririwa | `git add config/data.yaml && git commit -m "..."` kisha pull |
+
+---
+
+## 7b. MZUNGUKO WA KILA SIKU — scripts za kubofya
+
+Kuandika env vars kila mara ni njia ya kusahau kimoja. `scripts/` ina za kubofya.
+
+**Mara moja tu (mashine mpya):**
+```cmd
+copy scripts\env.example.bat scripts\env.local.bat
+notepad scripts\env.local.bat        :: jaza login/password/server
+```
+`env.local.bat` **haipushwi kamwe** (.gitignore + lango G13). `env.example.bat` inapushwa
+ikiwa **tupu** — test inathibitisha haina thamani yoyote.
+
+**Kila unapoanza kazi:**
+```cmd
+scripts\catchup.bat
+```
+Inafanya nne kwa mfuatano: `backfill` → `hash-l0` → `verify-l0` → `check-freshness`.
+Ukiwa umekaa muda mrefu bila kurekodi, ipe tarehe: `scripts\catchup.bat 2026-04-27`.
+
+**Kisha iache ikikimbia unapofanya kazi:**
+```cmd
+scripts\record.bat
+```
+
+**Ukaguzi wa haraka (salama hata `record` ikiendelea):**
+```cmd
+scripts\status.bat
+```
+
+| Script | Kazi | MT5? |
+|---|---|---|
+| `catchup.bat [tarehe]` | ziba mapengo + hash + verify + freshness | **ndiyo** — simamisha `record` kwanza |
+| `record.bat` | recorder inayoendelea (Ctrl+C kusimamisha) | **ndiyo** |
+| `status.bat` | config hash + freshness (haisomi MT5) | hapana — salama wakati wowote |
+
+**Kanuni:** `catchup.bat` na `record.bat` **hazikimbii pamoja** — MT5 inakubali client mmoja
+(§3.2b). Mfuatano: `Ctrl+C` → `catchup.bat` → `record.bat`.
 
 ---
 

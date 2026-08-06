@@ -125,3 +125,23 @@ def test_g12_research_src_haiko_kwenye_packages_za_engine() -> None:
     assert "research" not in text.split("[tool.setuptools]")[-1].split("[tool.pytest")[0], (
         "UKIUKAJI WA G12: `research` haipaswi kuwa package ya engine kwenye pyproject.toml"
     )
+
+
+# ---------------------------------------------------------------------------
+# G13 — sifa za mashine haziingii git
+# ---------------------------------------------------------------------------
+
+
+def test_g13_hakuna_env_local_iliyotrackiwa() -> None:
+    """`scripts/env.local.bat` ina nywila ya MT5 — haipushwi kamwe."""
+    tracked = _git_tracked_files()
+    offenders = [n for n in tracked if n.endswith(".local.bat") or "env.local" in n]
+    assert not offenders, f"UKIUKAJI WA G13: sifa za mashine zimeingia git — {offenders}"
+
+
+def test_g13_env_example_haina_thamani() -> None:
+    """Template inapushwa, lakini ikiwa TUPU — mtu asisahau na kuacha nywila humo."""
+    text = (REPO / "scripts" / "env.example.bat").read_text(encoding="utf-8")
+    for key in ("ELITEFX_MT5_LOGIN", "ELITEFX_MT5_PASSWORD", "ELITEFX_MT5_SERVER"):
+        line = next(ln for ln in text.splitlines() if ln.startswith(f"set {key}="))
+        assert line.strip() == f"set {key}=", f"{key} ina thamani kwenye template: {line!r}"

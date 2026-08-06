@@ -339,6 +339,7 @@ za vigezo vya kustaafu (data.yaml §monitoring). Ripoti ya shadow -> PD kwa uamu
 | DF-13 | §6.2 | F6 ni ya kusoma tu — cost ya RCE; news kwa muda pekee | AUD | T3 |
 | DF-14 | §7 + SPLIT_PLAN | splits kwa tarehe za config; purge + embargo bars 36; pooled kwa wakati; random split MARUFUKU | UT + **CI** (splitter anasoma config pekee) | T1+ |
 | DF-15 | §8 | kila dataset ina manifest + dataset_id; namba bila dataset_id haiingii engine | **CI**: ripoti bila dataset_id inakataliwa | T1+ |
+| DF-19 | SETUP §7b | scripts za mzunguko wa kila siku (`catchup`/`record`/`status`); sifa za mashine ziko `env.local.bat` isiyopushwa; template inabaki tupu | **UT**: G13 (`test_repo_guards.py`) | T0 |
 | DF-18 | §2.2 | recorder inajitibu: kalenda dhidi ya DISK (si state) → siku zilizorukwa zinazibwa; `backfill` CLI + reconcile on-start/kila polls N; siku isiyo na ticks HAIANDIKWI tupu | UT: `test_backfill_*` (state iliyopotea + siku ya kati iliyorukwa) | T0 |
 | DF-17 | §9 | `research/` ndani ya repo: reports+src zinapushwa, `research/data/` haipushwi kamwe; engine hairudii code ya utafiti | **UT/CI**: `tests/test_repo_guards.py` (G11 · G12) — imethibitishwa kwa jaribio hasi | T0 |
 
@@ -360,7 +361,7 @@ za vigezo vya kustaafu (data.yaml §monitoring). Ripoti ya shadow -> PD kwa uamu
 | RS-13 | §3 | LESSON inaandikwa kwa undani sawa na PASS | PROC | zote |
 | RS-14 | SPLIT §3 | RESERVE (2026-05+) haionwi kabisa hadi mzunguko ujao | **CI** (access guard ile ile) | zote |
 
-**Jumla: vipengele 58.** `100% = 58/58 VERIFIED` (au LESSON iliyoandikwa pale eneo lilipofeli
+**Jumla: vipengele 59.** `100% = 59/59 VERIFIED` (au LESSON iliyoandikwa pale eneo lilipofeli
 kwa vigezo — LESSON ni jibu halali; kificho ni pale tu eneo linaruka bila kupimwa).
 
 ### 3.5 LEDGER YA HADHI (hii ndiyo safu ya hadhi ya §3 — inasasishwa kila wiki)
@@ -403,6 +404,7 @@ G9  SPEC-REF         PR bila "Spec: ..." + ID za rejista → inakataliwa   (§1.
 G10 CONFIG ONLY      kigezo cha maamuzi nje ya risk.yaml/data.yaml → FAIL (DoD)
 G11 NO DATA IN GIT   parquet / `research/data/` / faili > 5MB iliyo-track → FAIL (DF-17)
 G12 ENGINE ⊥ RESEARCH `src/` (engine) ikimport `research.src` → FAIL     (DF-17)
+G13 NO SECRETS       `*.local.bat` iliyo-track / template yenye thamani → FAIL (DF-19)
 ```
 
 ### 4.3 Ulinzi wa HOLDOUT (G2 — ufafanuzi)

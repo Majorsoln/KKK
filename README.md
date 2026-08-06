@@ -51,6 +51,16 @@ python -m src.data.cli check-freshness    # DF-04 — ONYO: siku ya trading bila
 mzizi wa research — badilisha env hiyo pekee ukitaka data ihamie diski nyingine.
 Sifa za MT5 zinatoka environment, si config wala code.
 
+## MZUNGUKO WA KILA SIKU
+```
+copy scripts\env.example.bat scripts\env.local.bat   # mara moja; haipushwi (G13)
+scripts\catchup.bat        # backfill -> hash-l0 -> verify-l0 -> check-freshness
+scripts\record.bat         # recorder inayoendelea (Ctrl+C kusimamisha)
+scripts\status.bat         # ukaguzi wa haraka (hausomi MT5)
+```
+`catchup.bat` na `record.bat` **hazikimbii pamoja** — MT5 inakubali client mmoja
+(`docs/SETUP.md` §3.2b · mzunguko kamili §7b).
+
 ## CONFIG
 `engine/config/risk.yaml` ndicho **chanzo cha ukweli** cha vigezo vya risk/cost vya engine.
 `engine/config/data.yaml` ndicho **chanzo cha ukweli** cha vigezo vya data/features/labels vya

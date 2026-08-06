@@ -15,6 +15,10 @@ venv/
 # ---------------------------------------------------------------------------
 research/data/
 
+# Sifa za mashine (nywila!) — env.example.bat PEKEE ndiyo inayopushwa
+scripts/env.local.bat
+*.local.bat
+
 # Kinga ya pili (belt-and-braces): data ghafi popote ilipo
 *.parquet
 manifest_l0.json
