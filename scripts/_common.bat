@@ -1,17 +1,17 @@
 @echo off
-:: Inaandaa mazingira kwa script yoyote: repo root + env + venv.
+:: scripts\_common.bat — repo root + env + venv kwa script yoyote. Haitwi peke yake.
 cd /d "%~dp0.."
 if not exist "scripts\env.local.bat" (
     echo.
-    echo   HITILAFU: scripts\env.local.bat haipo.
-    echo   Tengeneza kwa:  copy scripts\env.example.bat scripts\env.local.bat
-    echo   kisha ujaze login/password/server.
+    echo   scripts\env.local.bat haipo. Tengeneza kwa:
+    echo       copy scripts\env.example.bat scripts\env.local.bat
+    echo   kisha thibitisha ELITEFX_MT5_TERMINAL. Ona docs\SETUP.md §1.
     echo.
     exit /b 2
 )
 call "scripts\env.local.bat"
 if not exist ".venv\Scripts\activate.bat" (
-    echo   HITILAFU: .venv haipo. Ona docs\SETUP.md §2.
+    echo   .venv haipo. Endesha kwanza:  scripts\setup.bat
     exit /b 2
 )
 call ".venv\Scripts\activate.bat"

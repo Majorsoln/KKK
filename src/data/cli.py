@@ -6,6 +6,7 @@
     python -m src.data.cli record             # DF-04 — recorder wa feed ya broker
     python -m src.data.cli backfill           # DF-03 — ziba siku zilizorukwa
     python -m src.data.cli probe-history      # DF-03 — kina cha history ya broker
+    python -m src.data.cli check-mt5          # ukaguzi wa mazingira ya MT5
     python -m src.data.cli check-freshness    # DF-04 — ONYO: siku ya trading bila data
     python -m src.data.cli inspect <faili>    # DF-02 — schema moja kutoka Toleo A/B
     python -m src.data.cli config-hash        # fingerprint ya config/data.yaml (§8)
@@ -253,6 +254,49 @@ def cmd_backfill(args: argparse.Namespace) -> int:
     return 0 if outcome.ok else 1
 
 
+def cmd_check_mt5(args: argparse.Namespace) -> int:
+    """Ukaguzi wa mazingira ya MT5: muunganisho, server, symbols (SETUP §1)."""
+    cfg = _load(args)
+    from .mt5_source import MT5Credentials, MT5TickSource, SourceError
+
+    creds = MT5Credentials.from_env(cfg)
+    source = MT5TickSource(
+        credentials=creds,
+        symbol_suffix=str(cfg.get("recorder.mt5.symbol_suffix", "")),
+        timeout_ms=int(cfg.get("recorder.mt5.timeout_ms", 15000)),
+    )
+    print(f"terminal : {creds.terminal_path or '(HAIJAWEKWA — ELITEFX_MT5_TERMINAL)'}")
+    print(f"login    : {'kutoka env' if creds.login else 'session ya terminal (hiari haijawekwa)'}")
+    try:
+        source.connect()
+    except SourceError as exc:
+        print(f"muunganisho: IMESHINDIKANA — {exc}", file=sys.stderr)
+        return 1
+
+    try:
+        mt5 = source._module()
+        account = mt5.account_info()
+        server = source.source_identity()
+        broker_id = str(cfg.get("recorder.broker_id", "") or "")
+        available = {s.name for s in (mt5.symbols_get() or [])}
+        wanted = [source.broker_symbol(s) for s in cfg.symbols]
+        missing = [s for s in wanted if s not in available]
+
+        print(f"muunganisho: SAWA · akaunti {getattr(account, 'login', '?')}")
+        print(f"server   : {server}    <- kitambulisho cha broker (SI terminal_info().company)")
+        print(f"broker_id: {broker_id or '(HAIJAWEKWA — config/data.yaml recorder.broker_id)'}")
+        print(f"symbols  : {len(wanted) - len(missing)}/{len(wanted)} zinapatikana")
+        if missing:
+            print(f"  HAZIPO : {missing}", file=sys.stderr)
+            print("  Broker akiwa na kiambishi, weka `recorder.mt5.symbol_suffix` kwenye config.")
+        ok = not missing and bool(broker_id)
+        if not broker_id:
+            print("  `recorder.broker_id` ni LAZIMA kabla ya kurekodi (spec §2.2).", file=sys.stderr)
+        return 0 if ok else 1
+    finally:
+        source.shutdown()
+
+
 def cmd_probe_history(args: argparse.Namespace) -> int:
     """Tafuta kina cha tick history ya broker (binary search, maombi machache)."""
     cfg = _load(args)
@@ -400,6 +444,13 @@ def build_parser() -> argparse.ArgumentParser:
         help="kufeli mfululizo kunakosimamisha kazi (0 = usisimame)",
     )
     p_back.set_defaults(func=cmd_backfill)
+
+    p_mt5 = subparsers.add_parser(
+        "check-mt5",
+        help="ukaguzi wa mazingira ya MT5: muunganisho, server, symbols",
+        parents=[common],
+    )
+    p_mt5.set_defaults(func=cmd_check_mt5)
 
     p_probe = subparsers.add_parser(
         "probe-history",

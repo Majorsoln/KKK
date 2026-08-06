@@ -45,21 +45,23 @@ python -m src.data.cli backfill --dry-run # DF-03 — siku zilizorukwa (kalenda 
 python -m src.data.cli hash-l0            # DF-01 — SHA256 ya partitions ZOTE + manifest
 python -m src.data.cli verify-l0          # DF-01 — lango la CI (hash check kila build)
 python -m src.data.cli check-freshness    # DF-04 — ONYO: siku ya trading bila data mpya
+python -m src.data.cli check-mt5          # mazingira ya MT5: server, broker_id, symbols
 ```
 `research/` iko **ndani ya repo** (§9, PD 2026-08-04): `reports/` na `src/` zinapushwa;
 **`research/data/` haipushwi kamwe** (.gitignore + lango G11). `ELITEFX_RESEARCH_ROOT` inaelekeza
 mzizi wa research — badilisha env hiyo pekee ukitaka data ihamie diski nyingine.
 Sifa za MT5 zinatoka environment, si config wala code.
 
-## MZUNGUKO WA KILA SIKU
+## KUENDESHA (`docs/SETUP.md`)
 ```
-copy scripts\env.example.bat scripts\env.local.bat   # mara moja; haipushwi (G13)
-scripts\catchup.bat        # backfill -> hash-l0 -> verify-l0 -> check-freshness
+scripts\setup.bat          # MARA MOJA: venv + deps + tests + research + check-mt5
+scripts\catchup.bat        # KILA SIKU: backfill -> hash-l0 -> verify-l0 -> freshness
 scripts\record.bat         # recorder inayoendelea (Ctrl+C kusimamisha)
-scripts\status.bat         # ukaguzi wa haraka (hausomi MT5)
+scripts\status.bat         # ukaguzi wa haraka (haugusi MT5)
 ```
-`catchup.bat` na `record.bat` **hazikimbii pamoja** — MT5 inakubali client mmoja
-(`docs/SETUP.md` §3.2b · mzunguko kamili §7b).
+`catchup` na `record` **hazikimbii pamoja** — MT5 inakubali client mmoja.
+Terminal ikiwa imeingia, script inajiunganisha nayo: **login/nywila si lazima**;
+kinachohitajika ni `ELITEFX_MT5_TERMINAL` (`scripts\env.local.bat`, haipushwi).
 
 ## CONFIG
 `engine/config/risk.yaml` ndicho **chanzo cha ukweli** cha vigezo vya risk/cost vya engine.
