@@ -90,13 +90,12 @@ kamwe si kwa tarehe. Mfuatano ndio mgumu; kasi inafuata ubora, si kinyume.
 > **KUPITIA**, **KUFANYA** au **KUSHIRIKI**. Term inayofuata haianzishwi kabla ya sahihi yako ya
 > exit ya iliyotangulia. Safu ya **HALI** inasasishwa hapa kila term inapofunguliwa au kufungwa.
 
-**▶ HALI YA SASA (2026-08-04): T0 — zana zote nne zimejengwa, DF-01..DF-04 ziko `IMPLEMENTED`,
-zinasubiri vitu vitatu vya PD (§T0 hapa chini) ili kupanda `VERIFIED`. TRACK E: TAYARI KUANZA.
-Nyingine zote: zinasubiri mfuatano.**
+**▶ HALI YA SASA (2026-08-06): T0 IMEFUNGWA** — DF-01..04, DF-17, DF-18 ziko `VERIFIED` kwa
+data halisi (ledger §3.5). **T1 (R0) na TRACK E: TAYARI KUANZA.** Nyingine: zinasubiri mfuatano.
 
 ---
 
-### T0 — MSINGI ▶ `IMEJENGWA — INASUBIRI PD` (ripoti: `docs/T0_REPORT.md`)
+### T0 — MSINGI ▶ `IMEFUNGWA` 2026-08-06 (ripoti: `docs/T0_REPORT.md` · ledger §3.5)
 **PROMPT:**
 ```
 Tekeleza TERM T0 (docs/IMPLEMENTATION_PLAN.md §2, rejista DF-01..DF-04):
@@ -142,7 +141,7 @@ Mwisho: tests zote RCE-* kijani kwenye CI + rejista imesasishwa.
 
 ---
 
-### T1 — R0 (DATA AUDIT) ▶ `INASUBIRI T0`
+### T1 — R0 (DATA AUDIT) ▶ `TAYARI KUANZA`
 **PROMPT:**
 ```
 Tekeleza TERM T1 (rejista DF-05..DF-08, DF-14, RS-03): L1 checks 8 + quality_report.json
@@ -371,14 +370,27 @@ kwa vigezo — LESSON ni jibu halali; kificho ni pale tu eneo linaruka bila kupi
 
 | ID | Hadhi | Tarehe | Ushahidi | Kinachosubiriwa kwa VERIFIED |
 |---|---|---|---|---|
-| DF-01 | `IMPLEMENTED` | 2026-08-04 | `src/data/{hashing,manifest}.py` · `tests/data/test_hashing_manifest.py` (append-only, mutation = FAIL) · lango `verify-l0` kwenye `.github/workflows/ci.yml` · `docs/T0_REPORT.md` §1.3, §2 | manifest ya L0 **HALISI** (inahitaji storage ya PD) |
-| DF-02 | `IMPLEMENTED` | 2026-08-04 | `src/data/schema.py` · `tests/data/test_schema_normalization.py` (Toleo A na B → frame ile ile; ms→µs; L0 haibadilishwi) · ripoti §1.2 | kusomwa kwa partitions halisi za symbols 12 |
-| DF-03 | `IMPLEMENTED` | 2026-08-04 | tag `provenance=broker` kwenye njia + metadata ya parquet · `tests/data/test_recorder.py::test_partition_ina_tag_ya_provenance_broker` · `manifest.provenance_counts()` | partitions halisi za broker; provenance ya gharama kwenye attestation (T6) |
-| DF-04 | `IMPLEMENTED` | 2026-08-04 | `src/data/{recorder,freshness,calendar}.py` · `tests/data/{test_recorder,test_freshness}.py` · lango `check-freshness` (schedule ya kila siku ya trading) · ripoti §2.2 (ALERT imeonyeshwa) | recorder **kuanza kweli** kwenye akaunti ya broker ya PD |
+| DF-01 | `VERIFIED` | 2026-08-06 | **data halisi:** `verify-l0 PASS · unchanged=25486 changed=0 missing=0 untracked=0` (exit 0). Lango lilifanya kazi kabla ya hapo: `changed=4` lilipogundua partitions zilizoandikwa upya baada ya kufutwa kwa idhini — zilisasishwa kwa `--allow-mutation --reason` (`mutation_log`) | — |
+| DF-02 | `VERIFIED` | 2026-08-06 | **data halisi:** EURUSD (Toleo `A`, 89,873 rows, siku) na XAUUSD (Toleo `B`, 1,952,567 rows, mwezi) zote zikitoa `timestamp/bid/ask/bid_vol/ask_vol` | — |
+| DF-03 | `VERIFIED` | 2026-08-06 | **data halisi:** partitions 876 za `provenance=broker` (symbols 12 × siku 73, 2026-04-27 → 08-05) zenye `broker_id=dukascopy-demo` + `broker_server=Dukascopy-demo-mt5-1`; manifest `{aggregator: 24610, broker: 876}` | provenance ya gharama kwenye attestation (T6) |
+| DF-04 | `VERIFIED` | 2026-08-06 | **data halisi:** recorder imeandika siku 73 kwa kila symbol; `check-freshness OK` na `missing_days: []` kwa symbols zote 12 | — |
+| DF-17 | `VERIFIED` | 2026-08-06 | **mashine ya PD:** `git add research` ilistage `README.md` **pekee** ingawa folda ina GB 31; `git check-ignore` inathibitisha sheria; G11/G12 tests | — |
+| DF-18 | `VERIFIED` | 2026-08-06 | **data halisi:** backfill 2026-04-27 → 08-05 ilijaza siku 840 zilizokosekana kwa kutumia disk kama ukweli; kufeli 8 za ukingo zilirekebishwa kwa kurudia | — |
+| DF-19 | `IMPLEMENTED` | 2026-08-06 | `scripts/{setup,catchup,record,status}.bat` + `env.example.bat`; lango G13 (`test_repo_guards.py`) | kuendeshwa kwa scripts kwenye mashine ya PD |
 
-**Vinavyozuia (T0):** (1) broker + akaunti + mazingira ya MT5; (2) `ELITEFX_RESEARCH_ROOT`;
-(3) sahihi ya PD juu ya `storage:` na `recorder:` za `config/data.yaml`. Bila (2), malango ya CI
-yanarudisha **SKIPPED** — na SKIPPED si ushahidi (§0, sheria 3).
+**T0 IMEFUNGWA (PD 2026-08-06).** L0 ni **mfululizo 2016-01-04 → 2026-08-05**: aggregator
+(partitions 24,610, miaka 10.3) + broker (876, siku 73), zote zikiwa na SHA256 zilizothibitishwa
+kwa `verify-l0`. Siku 4 zinazopishana (2026-04-27…04-30) ndizo malighafi ya ulinganisho wa
+spread aggregator↔broker (kipimo cha R0).
+
+**Yaliyogunduliwa T0 na kurekebishwa** (yote yalitokana na data halisi, si tests):
+`hash-l0` iliyokuwa inasoma ticks bilioni 3.4 badala ya footer (saa 3 → sekunde 23) ·
+unit ya epoch kwenye statistics (tarehe zingesomeka 1970) · timeout + ushauri wa `-10003` ·
+`NO_CLOSED_DAYS` badala ya `OK` isiyopima chochote · `probe-history` iliyopima siku za kalenda
+badala ya siku za trading · circuit breaker ya backfill · `broker_id`/`broker_server` ·
+CRLF ya scripts za Windows.
+
+**Kinachofuata:** T1 (R0 — data audit). Prompt yake iko §2A.
 
 ---
 
