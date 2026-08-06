@@ -432,3 +432,45 @@ def test_backfill_inasimama_baada_ya_kufeli_mfululizo(cfg, l0_root):
     assert outcome.stopped_early
     assert "probe-history" in outcome.stopped_early
     assert not outcome.ok
+
+
+def test_probe_history_hairuki_wikendi(cfg, l0_root):
+    """Kasoro ya T0: probe ilipima siku za KALENDA, si za trading.
+
+    2026-05-16/17 ni Jumamosi/Jumapili — hazina ticks kihalali. Probe ya zamani
+    ilidhani ni mpaka wa history na ikatoa jibu la uongo (2026-05-18) ilhali
+    2026-05-01 ilikuwa na ticks.
+    """
+    from datetime import date
+
+    from src.data.backfill import probe_history
+    from src.data.mt5_source import ReplayTickSource, SourceError
+    from src.data.recorder import RecorderSettings, TickRecorder
+
+    have_from = date(2026, 5, 1)
+
+    class _HistoryFrom(ReplayTickSource):
+        def __init__(self) -> None:
+            super().__init__({})
+            self.asked: list[date] = []
+
+        def fetch_ticks(self, symbol, start, end):
+            day = start.date()
+            self.asked.append(day)
+            if day < have_from:
+                raise SourceError("copy_ticks_range: (-1, 'Terminal: Call failed')")
+            from tests.conftest import variant_a_frame
+
+            return variant_a_frame(start)
+
+    source = _HistoryFrom()
+    settings = RecorderSettings.from_config(cfg)
+    settings.broker_id = "test-broker"
+    settings.symbols = ["EURUSD"]
+    rec = TickRecorder(source, cfg, settings=settings)
+
+    report = probe_history(rec, "EURUSD", date(2026, 1, 1), date(2026, 8, 5))
+
+    assert all(d.weekday() < 5 for d in source.asked), "probe haipaswi kupima wikendi"
+    assert report["earliest_available"] == have_from.isoformat()
+    assert all("weekday" in p for p in report["probes"])

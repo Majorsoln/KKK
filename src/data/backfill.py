@@ -218,59 +218,76 @@ def probe_history(
     latest: date,
     on_step=None,
 ) -> dict[str, object]:
-    """Tafuta siku ya kwanza kabisa ambayo broker ana ticks (binary search).
+    """Tafuta siku ya kwanza ya TRADING ambayo broker ana ticks (binary search).
+
+    **Binary search inafanyika juu ya orodha ya siku za trading, si za kalenda.**
+    Sababu (kasoro iliyogunduliwa T0): wikendi na likizo hazina ticks kihalali.
+    Probe ikitua Jumamosi ikadhani "history imeishia hapa", inatua Jumatatu
+    inayofuata na kutoa jibu la uongo — mfano halisi: 2026-05-16/17 (Jumamosi/
+    Jumapili) zilifanya probe itoe `2026-05-18` ilhali `2026-05-01` ilikuwa na ticks.
 
     Bila hii, kugundua mpaka wa history kunahitaji kujaribu kila siku — na kila
-    kufeli ni ~sekunde 100 za timeout. Binary search inajibu swali lile lile kwa
-    maombi ~log2(siku), yaani chini ya 10 badala ya mamia.
+    kufeli ni ~sekunde 100 za timeout ya MT5. Binary search inajibu kwa maombi
+    ~log2(siku za trading).
 
     Inarudisha `{"symbol", "earliest_available", "probes", "checked"}`.
     """
-    def _has_ticks(day: date) -> bool:
-        start, end = _day_bounds(day)
-        try:
-            frame = recorder.source.fetch_ticks(symbol, start, end)
-        except Exception as exc:
-            LOG.info("probe %s %s: haipatikani (%s)", symbol, day, exc)
-            return False
-        return frame is not None and not frame.empty
+    trading_days = recorder.calendar.full_trading_days(earliest, latest)
+    if not trading_days:
+        return {
+            "symbol": symbol,
+            "earliest_available": None,
+            "probes": [],
+            "checked": f"{earliest} -> {latest}",
+            "note": "hakuna siku ya trading kwenye dirisha ulilotoa",
+        }
 
     probes: list[dict[str, object]] = []
 
     def _probe(day: date) -> bool:
-        ok = _has_ticks(day)
-        probes.append({"day": day.isoformat(), "has_ticks": ok})
+        start, end = _day_bounds(day)
+        try:
+            frame = recorder.source.fetch_ticks(symbol, start, end)
+            ok = frame is not None and not frame.empty
+        except Exception as exc:
+            LOG.info("probe %s %s: haipatikani (%s)", symbol, day, exc)
+            ok = False
+        probes.append({"day": day.isoformat(), "weekday": day.strftime("%A"), "has_ticks": ok})
         if on_step:
             on_step(day, ok)
         return ok
 
-    if not _probe(latest):
+    if not _probe(trading_days[-1]):
         return {
             "symbol": symbol,
             "earliest_available": None,
             "probes": probes,
             "checked": f"{earliest} -> {latest}",
-            "note": "hata siku ya mwisho haina ticks — angalia muunganisho au symbol",
+            "note": (
+                "hata siku ya mwisho ya trading haina ticks — angalia muunganisho, "
+                "symbol, au kama client mwingine wa MT5 anaendesha (§3.2b ya SETUP)"
+            ),
         }
-    if _probe(earliest):
+    if _probe(trading_days[0]):
         return {
             "symbol": symbol,
-            "earliest_available": earliest.isoformat(),
+            "earliest_available": trading_days[0].isoformat(),
             "probes": probes,
             "checked": f"{earliest} -> {latest}",
-            "note": "history inafika angalau mwanzo wa dirisha ulilotoa",
+            "note": "history inafika angalau mwanzo wa dirisha ulilotoa — jaribu dirisha pana zaidi",
         }
 
-    lo, hi = earliest, latest  # lo: haina · hi: ina
-    while (hi - lo).days > 1:
-        mid = lo + timedelta(days=(hi - lo).days // 2)
-        if _probe(mid):
+    lo, hi = 0, len(trading_days) - 1  # lo: haina · hi: ina
+    while hi - lo > 1:
+        mid = (lo + hi) // 2
+        if _probe(trading_days[mid]):
             hi = mid
         else:
             lo = mid
     return {
         "symbol": symbol,
-        "earliest_available": hi.isoformat(),
+        "earliest_available": trading_days[hi].isoformat(),
         "probes": probes,
         "checked": f"{earliest} -> {latest}",
+        "trading_days_in_window": len(trading_days),
     }

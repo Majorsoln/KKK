@@ -214,8 +214,12 @@ nyingi kwenye maombi yanayofeli (kila kufeli ni ~sekunde 100 za timeout ya MT5):
 ```cmd
 python -m src.data.cli probe-history --symbol EURUSD --from 2026-01-01
 ```
-Binary search inajibu kwa maombi <10 badala ya mamia. Kisha backfill kuanzia siku
-iliyorudishwa (`earliest_available`).
+Binary search inajibu kwa maombi <10 badala ya mamia, na **inapima siku za trading pekee**
+(wikendi/likizo hazina ticks kihalali — kuzipima kunatoa jibu la uongo). Kisha backfill
+kuanzia siku iliyorudishwa (`earliest_available`).
+
+Ripoti ikisema *"history inafika angalau mwanzo wa dirisha ulilotoa"*, mpaka halisi uko
+nyuma zaidi — rudia kwa dirisha pana (`--from` ya zamani zaidi).
 
 #### Kulazimisha MT5 ipakue tick history (Strategy Tester)
 
