@@ -18,7 +18,7 @@ dev = ["pytest>=8.0"]
 mt5 = ["MetaTrader5>=5.0.45"]   # Windows pekee — recorder ya live
 
 [tool.setuptools]
-packages = ["src", "src.data"]
+packages = ["src", "src.data", "src.rce"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -1,0 +1,37 @@
+# ============================================================
+#  broker_costs.yaml — gharama za BROKER (spec: docs/RISK_COST_ENGINE.md §3.3)
+#  PD anahariri HAPA. Vigezo vya risk viko config/risk.yaml.
+#
+#  Commission ndiyo kitu pekee MT5 haitoi kwa uhakika. Vingine
+#  (volume_min/step/max, swap_long/short/mode, contract_size, point)
+#  vinatoka MT5 wakati wa runtime — spec §3.4 na §4.
+# ============================================================
+
+# Thamani ni ya PANDE MBILI (round-turn) — spec §3.3: broker akitoa bei ya
+# upande mmoja, IONGEZWE MARADUFU kabla ya kuandikwa hapa.
+commission_usd_round_turn:
+  default:  7.0
+  EURUSD:   7.0
+  GBPUSD:   7.0
+  USDJPY:   7.0
+  USDCHF:   7.0
+  USDCAD:   7.0
+  AUDUSD:   7.0
+  NZDUSD:   7.0
+  EURGBP:   7.0
+  EURJPY:   7.0
+  EURCHF:   7.0
+  GBPJPY:   7.0
+  XAUUSD:   7.0
+
+# Usiku zinazotarajiwa kwa kila strategy (spec §3.4 hatua 4).
+# Takwimu za strategy, si kudhaniwa — H1 intraday = 0.
+expected_nights:
+  default:      0.0
+  intraday_h1:  0.0
+  swing_d1:     3.5
+
+# Sehemu ya usiku hizo zinazoangukia rollover ya Jumatano->Alhamisi (swap x3).
+# 0.2 = mmoja kati ya watano; strategy inayoshikilia wiki nzima ni kubwa zaidi.
+triple_night_share:
+  default:      0.2

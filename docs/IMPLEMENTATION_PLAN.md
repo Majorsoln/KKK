@@ -121,7 +121,7 @@ USIGUSE RCE. Mwisho: sasisha rejista (hadhi + ushahidi) na toa ripoti ya T0.
 
 ---
 
-### TRACK E — ENGINE (RCE) ▶ `TAYARI KUANZA` (sambamba na T1–T5)
+### TRACK E — ENGINE (RCE) ▶ `IMEJENGWA — INASUBIRI NAMBA ZA BROKER` (sambamba na T1–T5)
 **PROMPT:**
 ```
 Tekeleza TRACK E (rejista RCE-01..RCE-13): jenga src/rce/ kwa spec RISK_COST_ENGINE.md
@@ -376,6 +376,7 @@ kwa vigezo — LESSON ni jibu halali; kificho ni pale tu eneo linaruka bila kupi
 | DF-04 | `VERIFIED` | 2026-08-06 | **data halisi:** recorder imeandika siku 73 kwa kila symbol; `check-freshness OK` na `missing_days: []` kwa symbols zote 12 | — |
 | DF-17 | `VERIFIED` | 2026-08-06 | **mashine ya PD:** `git add research` ilistage `README.md` **pekee** ingawa folda ina GB 31; `git check-ignore` inathibitisha sheria; G11/G12 tests | — |
 | DF-18 | `VERIFIED` | 2026-08-06 | **data halisi:** backfill 2026-04-27 → 08-05 ilijaza siku 840 zilizokosekana kwa kutumia disk kama ukweli; kufeli 8 za ukingo zilirekebishwa kwa kurudia | — |
+| RCE-01..13 | `IMPLEMENTED` | 2026-08-06 | `src/rce/{budget,cost,sizing,gate,engine}.py` · `tests/rce/` (39 tests). **Golden**: jedwali la bajeti §2 (safu 4) · mfano wa §6 (lots 0.16 / $34.88 / deviation 3pt) · modes 3 za swap + triple WED · gate checks 6 kwa mpangilio · §5b (module haina hali inayodumu) | namba halisi za broker kwenye `broker_costs.yaml` (commission); kuunganishwa na MT5 (T7) |
 | DF-19 | `IMPLEMENTED` | 2026-08-06 | `scripts/{setup,catchup,record,status}.bat` + `env.example.bat`; lango G13 (`test_repo_guards.py`) | kuendeshwa kwa scripts kwenye mashine ya PD |
 
 **T0 IMEFUNGWA (PD 2026-08-06).** L0 ni **mfululizo 2016-01-04 → 2026-08-05**: aggregator
@@ -391,6 +392,11 @@ badala ya siku za trading · circuit breaker ya backfill · `broker_id`/`broker_
 CRLF ya scripts za Windows.
 
 **Kinachofuata:** T1 (R0 — data audit). Prompt yake iko §2A.
+
+**TRACK E:** `src/rce/` imejengwa kwa spec ILE ILE (haijaguswa). Kilichobaki kwa `VERIFIED`:
+namba halisi za Dukascopy kwenye `config/broker_costs.yaml` (commission round-turn), na
+`SymbolSpec` kusomwa moja kwa moja kutoka MT5 (volume_min/step/max, swap_*, contract_size,
+point) badala ya kuandikwa kwa mkono — kazi ya T7 (integration).
 
 ---
 

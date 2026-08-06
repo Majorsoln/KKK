@@ -32,7 +32,8 @@ engine/
 ├── config/risk.yaml               vigezo VYOTE vya risk/cost (PD anahariri, hakuna code)
 ├── config/data.yaml               vigezo VYOTE vya data/features/utafiti + storage/recorder
 ├── src/data/                      L0: recorder wa feed ya broker · normalization A/B · SHA256 + manifest
-├── src/rce/                       budget · cost · sizing · gate
+├── src/rce/                       budget · cost · sizing · gate · engine (Track E)
+├── config/broker_costs.yaml       commission round-turn + usiku za strategy (PD)
 ├── src/opm/                       (baadaye) open-position management
 └── tests/
 ```
