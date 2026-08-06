@@ -1,0 +1,16 @@
+# Scripts za Windows ZINAHITAJI CRLF — cmd.exe inaweza kuchanganya faili yenye LF
+# pekee (mf. "The system cannot find the path specified"). Repo hii inatengenezwa
+# kwenye Linux na kutumika Windows, kwa hiyo tunailazimisha wakati wa checkout.
+*.bat  text eol=crlf
+*.cmd  text eol=crlf
+*.ps1  text eol=crlf
+
+# Za Unix zinabaki LF
+*.sh   text eol=lf
+*.py   text eol=lf
+*.md   text eol=lf
+*.yaml text eol=lf
+*.yml  text eol=lf
+
+# Data si text
+*.parquet binary
