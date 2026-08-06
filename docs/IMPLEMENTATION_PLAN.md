@@ -109,6 +109,8 @@ USIGUSE RCE. Mwisho: sasisha rejista (hadhi + ushahidi) na toa ripoti ya T0.
 ```
 **WEWE (PD):**
 - **KUSOMA:** `DATA_FEATURE_STANDARD.md` §2.1–2.2; rejista §3.3 + ledger §3.5; `docs/T0_REPORT.md`.
+- **RUNBOOK:** `docs/SETUP.md` — hatua zote za kusimamisha (env, storage, broker_id, production,
+  kuhamia server nyingine) pamoja na makosa halisi na suluhisho zake.
 - **KUFANYA:** chagua/thibitisha **broker na akaunti** (demo au live) ya kurekodi feed — hili
   haliwezi kufanywa na mtu mwingine; toa access ya MT5 kwa mazingira ya recorder; amua
   **storage ya research** (nje ya repo hii, §9) na uweke `ELITEFX_RESEARCH_ROOT`; thibitisha
