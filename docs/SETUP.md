@@ -97,6 +97,16 @@ where /r "C:\Program Files" terminal64.exe
 Majina ya env yenyewe yanatoka `config/data.yaml` (`recorder.mt5.*_env`) — yanaweza
 kubadilishwa hapo bila kugusa code.
 
+### 3.2b MT5 inakubali CLIENT MMOJA kwa wakati (imegunduliwa T0)
+
+`record`, `backfill` na `probe-history` zote zinaunganishwa na terminal ile ile. Mbili
+zikikimbia kwa pamoja, ya pili inapata `(-1, 'Terminal: Call failed')` — dalili
+inayofanana kabisa na "history haipo", ingawa data ipo.
+
+**Kanuni:** simamisha `record` kabla ya kuendesha `backfill` au `probe-history`, kisha
+uianzishe tena. Ukiona `Call failed` kwa siku unayojua ipo kwenye disk yako, hicho ndicho
+kinachotokea.
+
 ### 3.3 Uthibitisho wa muunganisho
 
 ```cmd
@@ -207,6 +217,24 @@ python -m src.data.cli probe-history --symbol EURUSD --from 2026-01-01
 Binary search inajibu kwa maombi <10 badala ya mamia. Kisha backfill kuanzia siku
 iliyorudishwa (`earliest_available`).
 
+#### Kulazimisha MT5 ipakue tick history (Strategy Tester)
+
+MT5 haihifadhi tick history yote; haina kitufe cha "download ticks". Njia rasmi ni
+**Strategy Tester**:
+
+1. MT5 → **View → Strategy Tester** (`Ctrl+R`)
+2. Expert: yoyote (mf. `Examples\MACD\MACD Sample`) — matokeo yake hayana maana kwetu
+3. Symbol + Period (`M1`)
+4. **Modelling: "Every tick based on real ticks"** ← ndicho kinacholazimisha upakuaji
+5. Date range: kipindi unachokitaka
+6. **Start**; angalia **Journal** kwa `real ticks synchronized`
+
+Ticks zinakaa `...\Terminal\<ID>\bases\<server>\ticks\<SYMBOL>\`, kisha
+`copy_ticks_range` (na `backfill`) zinaweza kuzisoma. Rudia kwa kila symbol.
+
+Journal ikisema hakuna real ticks kwa kipindi hicho, huo ndio **mpaka halisi wa broker** —
+jibu la kudumu, si tatizo la kutatuliwa. Andika mpaka huo kwenye ripoti ya R0.
+
 Backfill ina **circuit breaker**: kufeli 5 mfululizo kunasimamisha kazi
 (`--max-consecutive-failures`), kwa sababu kufeli mfululizo ni jibu (mpaka wa history),
 si hali ya kurudia.
@@ -240,7 +268,8 @@ python -c "import pyarrow.parquet as pq,glob; f=sorted(glob.glob(r'research\data
 | `Set-Variable: A positional parameter...` | `set VAR=x` ndani ya PowerShell | tumia `$env:VAR = "x"` |
 | `broker_id haijawekwa` — recorder inakataa | guard ya §2.2 | jaza `recorder.broker_id` |
 | `UKIUKAJI WA PROVENANCE` | broker/server imebadilika | §5 hapo juu |
-| `copy_ticks_range: (-1, 'Terminal: Call failed')` | MT5 haina history hiyo kwenye terminal; ombi la kwanza linaanzisha upakuaji | `fetch_retries` (2) inajaribu tena. Ikiendelea kufeli mfululizo, ni **mpaka wa history ya broker** — tumia `probe-history` |
+| `copy_ticks_range: (-1, 'Terminal: Call failed')` **kwa siku unayojua ipo** | client wa pili wa MT5 (mf. `record` bado inaendelea) | simamisha `record` kwanza (§3.2b) |
+| `copy_ticks_range: (-1, 'Terminal: Call failed')` kwa siku za zamani | terminal haina tick history hiyo | `fetch_retries` (2); ikiendelea, pakua kwa **Strategy Tester** (§6.3) au ukubali mpaka wa broker |
 | backfill inafeli kila siku, ~100s kila moja | kina cha history hakitoshi | circuit breaker inasimamisha baada ya kufeli 5 mfululizo; pima kwanza kwa `probe-history` |
 | `verify-l0: manifest haipo` | `hash-l0` haijakamilika | endesha `hash-l0` hadi mwisho |
 | `verify-l0 ... missing=N` | partitions zilifutwa kwa idhini | `hash-l0 --prune-missing --reason "..."` |
