@@ -69,6 +69,7 @@ kujenga chochote?
 | miaka inayotumika | ≥ `min_years` (10) |
 | **normalization ya Toleo A/B** (§2.1 ya standard) | schema moja; Toleo B inapita checks zote |
 | **ulinganisho A↔B** (spread/sessions kwenye pair zinazofanana) | tofauti zinaelezeka |
+| **ulinganisho aggregator↔broker** kwa siku 4 zinazopishana (2026-04-27 … 04-30) | spread/ticks zinalingana kwa kiasi kinachoelezeka — kama hazilingani, provenance ya gharama si moja |
 
 **Kazi mbili za ziada za R0 (PD 2026-08-04):**
 1. **Kurekodi feed ya broker wa live/demo kuanzia sasa** (§2.2 ya standard — provenance).

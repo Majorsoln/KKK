@@ -134,6 +134,19 @@ wa terminal ("MetaQuotes Ltd." hata kwa akaunti ya broker mwingine kabisa).
    spread** aggregator↔broker kwa kipindi kinachopishana, ukishapatikana. Attestation inaandika
    provenance ya gharama waziwazi.
 
+**Kina cha history ya broker (kimepimwa T0, 2026-08-06):** Dukascopy demo
+(`Dukascopy-demo-mt5-1`) inatoa ticks kuanzia **2026-04-27** (`probe-history`, EURUSD;
+2026-04-24 haina). Matokeo mawili:
+
+1. **Pengo halipo.** Aggregator inaishia 2026-04-30, broker inaanza 2026-04-27 — L0
+   inakuwa mfululizo kutoka 2016-01-04 hadi leo.
+2. **Siku 4 zinapishana** (2026-04-27 … 04-30). Hapo ndipo **ulinganisho wa spread
+   aggregator↔broker** (sharti la 2 hapa chini) unafanyika kwa namba — siku zile zile,
+   vyanzo viwili. Ni kipimo cha R0.
+
+Kina hiki ni cha broker husika na kinasogea mbele kadri muda unavyopita (~miezi 3 ya
+nyuma). Kwa hiyo kurekodi kila siku si hiari: kilichopita mpaka huo hakipatikani tena.
+
 **Refresh:** L0 inaishia 2026-04-30. Kila mzunguko wa utafiti unaanza kwa append ya partitions
 mpya + hashes — data ya 2026-05+ ni RESERVE (holdout ya mzunguko ujao, `DATA_SPLIT_PLAN.md` §3).
 
