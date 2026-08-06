@@ -139,7 +139,9 @@ research\                       (ndani ya repo; `research\data\` HAIPUSHWI — l
 | `Call failed` kwa siku za zamani | terminal haina tick history hiyo → `probe-history`, au Strategy Tester (§8) |
 | `broker_id haijawekwa` | jaza `config\data.yaml` → `recorder.broker_id` |
 | `UKIUKAJI WA PROVENANCE` | broker/server imebadilika → §9 |
-| `verify-l0 … missing=N` | partitions zilifutwa kwa idhini → `python -m src.data.cli hash-l0 --prune-missing --reason "..."` |
+| `verify-l0 … missing=N` | partitions zilifutwa kwa idhini → `hash-l0 --prune-missing --reason "..."` |
+| `verify-l0 … changed=N` **baada ya kuandika upya kwa idhini** | manifest ina hashes za zamani → `hash-l0 --allow-mutation --reason "..."` (tukio linaingia `mutation_log`) |
+| `verify-l0 … changed=N` **bila kuwa umeidhinisha kitu** | **SIMAMA.** L0 imebadilika kimya — chunguza kabla ya kufanya lolote (DF-01) |
 | `env.local.bat haipo` | `copy scripts\env.example.bat scripts\env.local.bat` |
 | `ModuleNotFoundError: MetaTrader5` | endesha `scripts\setup.bat` (venv + extra `[mt5]`) |
 | `set VAR=x` inakataa (PowerShell) | tumia cmd, au `$env:VAR = "x"` |
