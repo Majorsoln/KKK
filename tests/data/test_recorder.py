@@ -328,3 +328,71 @@ def test_server_ikibadilika_bila_lebo_kubadilika_recorder_inasimama(cfg, l0_root
     second = _recorder_with_broker(cfg, l0_root, "broker-x", _WithServer("Exness-Real-7"))
     with _pytest.raises(ValueError, match="UKIUKAJI WA PROVENANCE"):
         second.poll_once()
+
+
+# ---------------------------------------------------------------------------
+# DF-03 — kuziba siku zilizorukwa (ukweli ni DISK, si state)
+# ---------------------------------------------------------------------------
+
+
+def test_backfill_inaziba_siku_iliyorukwa_hata_state_ikipotea(cfg, l0_root, tmp_path):
+    """Hali halisi ya production: state imepotea NA siku ya katikati imerukwa."""
+    from datetime import date, datetime, timezone
+
+    from src.data.backfill import backfill_missing, find_missing_days
+    from src.data.mt5_source import ReplayTickSource
+    from src.data.recorder import RecorderSettings, TickRecorder
+    from tests.conftest import variant_a_frame
+
+    days = [date(2026, 8, 3), date(2026, 8, 4), date(2026, 8, 5)]
+    frames = {
+        "EURUSD": pd.concat(
+            [variant_a_frame(datetime.combine(d, datetime.min.time(), timezone.utc)) for d in days],
+            ignore_index=True,
+        )
+    }
+    settings = RecorderSettings.from_config(cfg)
+    settings.broker_id = "test-broker"
+    settings.symbols = ["EURUSD"]
+    rec = TickRecorder(ReplayTickSource(frames), cfg, settings=settings)
+
+    # Siku ya kwanza na ya tatu zipo; ya kati (08-04) imerukwa.
+    manifest = None
+    for day in (days[0], days[2]):
+        group = frames["EURUSD"]
+        group = group[group["timestamp"].dt.date == day]
+        rec._write_partition("EURUSD", day, group.reset_index(drop=True))
+
+    missing = find_missing_days(l0_root, ["EURUSD"], days[0], days[2], rec.calendar)
+    assert [m.day for m in missing] == [days[1]]
+
+    outcome = backfill_missing(rec, start=days[0], end=days[2], symbols=["EURUSD"])
+    assert outcome.ok
+    assert len(outcome.written) == 1
+    assert outcome.written[0]["day"] == days[1].isoformat()
+    assert rec.partition_path("EURUSD", days[1]).exists()
+
+    # Kuendesha tena hakuandiki chochote (partition iliyopo haiguswi — §2).
+    again = backfill_missing(rec, start=days[0], end=days[2], symbols=["EURUSD"])
+    assert again.written == [] and again.scanned_days == 0
+
+
+def test_backfill_siku_isiyo_na_ticks_haiandikwi_kama_tupu(cfg, l0_root):
+    """Broker asipokuwa na ticks, HAKUNA partition tupu inayoandikwa (§3)."""
+    from datetime import date
+
+    from src.data.backfill import backfill_missing
+    from src.data.mt5_source import ReplayTickSource
+    from src.data.recorder import RecorderSettings, TickRecorder
+
+    settings = RecorderSettings.from_config(cfg)
+    settings.broker_id = "test-broker"
+    settings.symbols = ["EURUSD"]
+    rec = TickRecorder(ReplayTickSource({}), cfg, settings=settings)
+
+    day = date(2026, 8, 4)
+    outcome = backfill_missing(rec, start=day, end=day, symbols=["EURUSD"])
+    assert outcome.written == []
+    assert outcome.no_ticks == [f"EURUSD {day.isoformat()}"]
+    assert outcome.ok  # si kufeli — ni taarifa
+    assert not rec.partition_path("EURUSD", day).exists()

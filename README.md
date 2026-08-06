@@ -40,6 +40,7 @@ engine/
 ```
 python -m src.data.cli init-research      # §9 — muundo wa research storage (nje ya repo)
 python -m src.data.cli record             # DF-04 — recorder wa feed ya broker (MT5)
+python -m src.data.cli backfill --dry-run # DF-03 — siku zilizorukwa (kalenda dhidi ya disk)
 python -m src.data.cli hash-l0            # DF-01 — SHA256 ya partitions ZOTE + manifest
 python -m src.data.cli verify-l0          # DF-01 — lango la CI (hash check kila build)
 python -m src.data.cli check-freshness    # DF-04 — ONYO: siku ya trading bila data mpya

@@ -196,6 +196,9 @@ class RecorderSettings:
     initial_backfill_days: int = 3
     compression: str = "zstd"
     broker_id: str = ""
+    reconcile_on_start: bool = True
+    reconcile_every_polls: int = 60
+    reconcile_lookback_days: int = 30
 
     @classmethod
     def from_config(cls, cfg: DataConfig) -> "RecorderSettings":
@@ -209,6 +212,9 @@ class RecorderSettings:
             initial_backfill_days=int(cfg.get("recorder.initial_backfill_days", 3)),
             compression=str(cfg.get("recorder.compression", "zstd")),
             broker_id=str(cfg.get("recorder.broker_id", "") or ""),
+            reconcile_on_start=bool(cfg.get("recorder.reconcile.on_start", True)),
+            reconcile_every_polls=int(cfg.get("recorder.reconcile.every_polls", 60)),
+            reconcile_lookback_days=int(cfg.get("recorder.reconcile.lookback_days", 30)),
         )
 
 
@@ -446,6 +452,28 @@ class TickRecorder:
             sha256=entry.sha256,
         )
 
+    # ---------- kuziba mapengo (reconciliation) ----------
+
+    def reconcile(self, lookback_days: int | None = None, end: date | None = None):
+        """Linganisha kalenda na DISK, kisha uzibe siku zilizokosekana.
+
+        Hii ndiyo inayofanya recorder ijitibu yenyewe: watermark ikiruka siku
+        (MT5 ikishindwa), au state ikipotea kabisa, mapengo yanaonekana kwa
+        sababu ukweli unatoka kwenye partitions zilizoko, si kwenye state.
+        """
+        from .backfill import backfill_missing
+
+        days = lookback_days if lookback_days is not None else self.settings.reconcile_lookback_days
+        now = self.clock()
+        end = end or (now - timedelta(minutes=self.settings.day_lag_minutes) - timedelta(days=1)).date()
+        start = end - timedelta(days=max(days, 1))
+        outcome = backfill_missing(self, start=start, end=end, symbols=self.settings.symbols)
+        if outcome.scanned_days:
+            LOG.info(
+                "reconcile %s -> %s: %s", start, end, outcome.summary()
+            )
+        return outcome
+
     # ---------- mzunguko usioisha ----------
 
     def run_forever(self, max_polls: int | None = None, stop=None, sleeper=time.sleep) -> int:
@@ -457,6 +485,13 @@ class TickRecorder:
             self.settings.provenance,
             self.settings.l0_root,
         )
+        if self.settings.reconcile_on_start:
+            try:
+                self._guard_broker_identity()
+                self.reconcile()
+            except Exception as exc:  # reconcile ikishindwa, kurekodi kunaendelea
+                LOG.warning("reconcile ya mwanzo imeshindikana: %s", exc)
+
         while True:
             if stop is not None and stop():
                 LOG.info("recorder imesimamishwa kwa ombi")
@@ -464,6 +499,9 @@ class TickRecorder:
             try:
                 outcome = self.poll_once()
                 LOG.info("poll #%d: %s", polls + 1, outcome.summary())
+                every = self.settings.reconcile_every_polls
+                if every and (polls + 1) % every == 0:
+                    self.reconcile()
             except Exception as exc:  # pragma: no cover - kinga ya mwisho
                 LOG.exception("poll imeshindikana kabisa: %s", exc)
             polls += 1

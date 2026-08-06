@@ -4,6 +4,7 @@
     python -m src.data.cli hash-l0            # DF-01 — SHA256 ya partitions ZOTE + manifest
     python -m src.data.cli verify-l0          # DF-01 — lango la CI (hash check kila build)
     python -m src.data.cli record             # DF-04 — recorder wa feed ya broker
+    python -m src.data.cli backfill           # DF-03 — ziba siku zilizorukwa
     python -m src.data.cli check-freshness    # DF-04 — ONYO: siku ya trading bila data
     python -m src.data.cli inspect <faili>    # DF-02 — schema moja kutoka Toleo A/B
     python -m src.data.cli config-hash        # fingerprint ya config/data.yaml (§8)
@@ -83,12 +84,14 @@ def cmd_hash_l0(args: argparse.Namespace) -> int:
         allow_mutation=args.allow_mutation,
         mutation_reason=args.reason,
         resume=not args.no_resume,
+        prune_missing=args.prune_missing,
         on_progress=_progress,
     )
     print(
         f"L0 hashing: scanned={result.scanned} added={result.added} "
         f"confirmed={result.confirmed} skipped={result.skipped} "
-        f"mutated={len(result.mutated)} · {time.monotonic() - started:.0f}s"
+        f"pruned={len(result.pruned)} mutated={len(result.mutated)} · "
+        f"{time.monotonic() - started:.0f}s"
     )
     print(f"provenance: {json.dumps(manifest.provenance_counts())}")
     print(f"manifest: {result.manifest_path}")
@@ -181,6 +184,69 @@ def cmd_record(args: argparse.Namespace) -> int:
             shutdown()
 
 
+def cmd_backfill(args: argparse.Namespace) -> int:
+    """DF-03 — ziba siku zilizorukwa (ukweli ni disk, si state)."""
+    cfg = _load(args)
+    from datetime import date, timedelta
+
+    from .backfill import backfill_missing
+    from .mt5_source import MT5Credentials, MT5TickSource, ReplayTickSource
+    from .recorder import RecorderSettings, TickRecorder
+
+    settings = RecorderSettings.from_config(cfg)
+    if args.symbols:
+        settings.symbols = [s.strip().upper() for s in args.symbols.split(",") if s.strip()]
+
+    end = date.fromisoformat(args.to) if args.to else date.today() - timedelta(days=1)
+    start = (
+        date.fromisoformat(getattr(args, "from"))
+        if getattr(args, "from")
+        else end - timedelta(days=settings.reconcile_lookback_days)
+    )
+
+    if args.replay_dir:
+        source = ReplayTickSource.from_parquet_dir(args.replay_dir)
+    else:
+        source = MT5TickSource(
+            credentials=MT5Credentials.from_env(cfg),
+            symbol_suffix=str(cfg.get("recorder.mt5.symbol_suffix", "")),
+            timeout_ms=int(cfg.get("recorder.mt5.timeout_ms", 15000)),
+        )
+        if not args.dry_run:
+            source.connect()
+
+    recorder = TickRecorder(source, cfg, settings=settings)
+    started = time.monotonic()
+
+    def _progress(done: int, total: int, label: str) -> None:
+        print(f"  [{done}/{total}] {label}", flush=True)
+
+    try:
+        outcome = backfill_missing(
+            recorder,
+            start=start,
+            end=end,
+            symbols=settings.symbols,
+            dry_run=args.dry_run,
+            max_days=args.max_days,
+            on_progress=None if args.dry_run else _progress,
+        )
+    finally:
+        shutdown = getattr(source, "shutdown", None)
+        if callable(shutdown) and not args.dry_run:
+            shutdown()
+
+    print(
+        f"backfill {start} -> {end}: {outcome.summary()} · "
+        f"{time.monotonic() - started:.0f}s"
+    )
+    for item in outcome.no_ticks:
+        print(f"  ~ hakuna ticks kwa broker: {item}")
+    for item in outcome.failed:
+        print(f"  ! {item['symbol']} {item['day']}: {item['error']}", file=sys.stderr)
+    return 0 if outcome.ok else 1
+
+
 def cmd_check_freshness(args: argparse.Namespace) -> int:
     cfg = _load(args)
     report = check_freshness(cfg, require_storage=args.require_storage)
@@ -246,6 +312,11 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="rudia partitions zote hata zilizo kwenye manifest (default: ruka zisizobadilika)",
     )
+    p_hash.add_argument(
+        "--prune-missing",
+        action="store_true",
+        help="ondoa entries za partitions zilizofutwa (inahitaji --reason; inaingia mutation_log)",
+    )
     p_hash.add_argument("--progress-every", type=int, default=100, help="chapisha maendeleo kila N")
     p_hash.set_defaults(func=cmd_hash_l0)
 
@@ -262,6 +333,19 @@ def build_parser() -> argparse.ArgumentParser:
     p_record.add_argument("--symbols", help="orodha ya symbols (comma) badala ya config")
     p_record.add_argument("--replay-dir", help="chanzo cha replay (parquet kwa kila symbol)")
     p_record.set_defaults(func=cmd_record)
+
+    p_back = subparsers.add_parser(
+        "backfill",
+        help="DF-03 — ziba siku zilizorukwa (kalenda dhidi ya disk)",
+        parents=[common],
+    )
+    p_back.add_argument("--from", dest="from", help="tarehe ya kuanzia (YYYY-MM-DD)")
+    p_back.add_argument("--to", help="tarehe ya kuishia (YYYY-MM-DD; default: jana)")
+    p_back.add_argument("--symbols", help="orodha ya symbols (comma) badala ya config")
+    p_back.add_argument("--dry-run", action="store_true", help="onyesha zinazokosekana bila kuvuta")
+    p_back.add_argument("--max-days", type=int, help="kikomo cha siku kwa run moja")
+    p_back.add_argument("--replay-dir", help="chanzo cha replay badala ya MT5")
+    p_back.set_defaults(func=cmd_backfill)
 
     p_fresh = subparsers.add_parser("check-freshness", help="DF-04 — ONYO la siku isiyorekodiwa", parents=[common])
     p_fresh.add_argument("--json", action="store_true")

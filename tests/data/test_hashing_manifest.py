@@ -218,3 +218,28 @@ def test_hash_l0_inahifadhi_katikati_ya_run(cfg, l0_root, aggregator_partitions)
     assert seen == list(range(1, len(aggregator_partitions) + 1))
     reloaded = L0Manifest.load(manifest.path)
     assert len(reloaded.entries) == len(aggregator_partitions)
+
+
+def test_prune_missing_inaondoa_entries_za_partitions_zilizofutwa(cfg, l0_root, aggregator_partitions):
+    """Partition iliyofutwa kwa idhini ya PD isiache `missing` milele kwenye verify."""
+    from src.data.manifest import L0Manifest, hash_l0_tree
+
+    manifest, _ = hash_l0_tree(cfg, l0_root=l0_root)
+    victim = aggregator_partitions["A"]
+    key = manifest.key_for(victim)
+    victim.unlink()
+
+    # Bila prune: entry inabaki, verify inaripoti missing.
+    manifest, plain = hash_l0_tree(cfg, l0_root=l0_root)
+    assert plain.pruned == []
+    assert key in manifest.entries
+    assert key in manifest.verify().missing
+
+    manifest, pruned = hash_l0_tree(
+        cfg, l0_root=l0_root, prune_missing=True, mutation_reason="jaribio"
+    )
+    assert pruned.pruned == [key]
+    assert key not in manifest.entries
+    assert manifest.verify().ok
+    assert any(e["partition"] == key and e["reason"] == "jaribio" for e in manifest.mutation_log)
+    assert L0Manifest.load(manifest.path).verify().ok

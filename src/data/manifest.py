@@ -358,6 +358,7 @@ class HashRunResult:
     added: int = 0
     confirmed: int = 0
     skipped: int = 0
+    pruned: list[str] = field(default_factory=list)
     mutated: list[str] = field(default_factory=list)
     failed: list[dict[str, str]] = field(default_factory=list)
     manifest_path: str = ""
@@ -375,6 +376,7 @@ def hash_l0_tree(
     allow_mutation: bool = False,
     mutation_reason: str | None = None,
     resume: bool = True,
+    prune_missing: bool = False,
     save_every: int = 250,
     on_progress: Callable[[int, int, str], None] | None = None,
 ) -> tuple[L0Manifest, HashRunResult]:
@@ -402,6 +404,24 @@ def hash_l0_tree(
     partitions = list(iter_partitions(root))
     total = len(partitions)
     since_save = 0
+
+    if prune_missing:
+        # Partition iliyofutwa kwa idhini ya PD inaacha entry isiyo na faili;
+        # bila kuiondoa, `verify-l0` inaripoti `missing` milele. Kuondoa entry
+        # ni tukio la mutation — linaingia `mutation_log` kama lingine lolote.
+        on_disk = {manifest.key_for(p) for p in partitions}
+        for key in [k for k in manifest.entries if k not in on_disk]:
+            removed = manifest.entries.pop(key)
+            manifest.mutation_log.append(
+                {
+                    "partition": key,
+                    "old_sha256": removed.sha256,
+                    "new_sha256": None,
+                    "reason": mutation_reason or "prune-missing",
+                    "at": _iso(utcnow()),
+                }
+            )
+            result.pruned.append(key)
 
     for path in partitions:
         result.scanned += 1
