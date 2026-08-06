@@ -5,6 +5,7 @@
     python -m src.data.cli verify-l0          # DF-01 — lango la CI (hash check kila build)
     python -m src.data.cli record             # DF-04 — recorder wa feed ya broker
     python -m src.data.cli backfill           # DF-03 — ziba siku zilizorukwa
+    python -m src.data.cli probe-history      # DF-03 — kina cha history ya broker
     python -m src.data.cli check-freshness    # DF-04 — ONYO: siku ya trading bila data
     python -m src.data.cli inspect <faili>    # DF-02 — schema moja kutoka Toleo A/B
     python -m src.data.cli config-hash        # fingerprint ya config/data.yaml (§8)
@@ -163,6 +164,8 @@ def cmd_record(args: argparse.Namespace) -> int:
             credentials=MT5Credentials.from_env(cfg),
             symbol_suffix=str(cfg.get("recorder.mt5.symbol_suffix", "")),
             timeout_ms=int(cfg.get("recorder.mt5.timeout_ms", 15000)),
+            fetch_retries=int(cfg.get("recorder.mt5.fetch_retries", 2)),
+            retry_delay_s=float(cfg.get("recorder.mt5.retry_delay_s", 3)),
         )
         source.connect()
 
@@ -211,6 +214,8 @@ def cmd_backfill(args: argparse.Namespace) -> int:
             credentials=MT5Credentials.from_env(cfg),
             symbol_suffix=str(cfg.get("recorder.mt5.symbol_suffix", "")),
             timeout_ms=int(cfg.get("recorder.mt5.timeout_ms", 15000)),
+            fetch_retries=int(cfg.get("recorder.mt5.fetch_retries", 2)),
+            retry_delay_s=float(cfg.get("recorder.mt5.retry_delay_s", 3)),
         )
         if not args.dry_run:
             source.connect()
@@ -230,6 +235,7 @@ def cmd_backfill(args: argparse.Namespace) -> int:
             dry_run=args.dry_run,
             max_days=args.max_days,
             on_progress=None if args.dry_run else _progress,
+            max_consecutive_failures=args.max_consecutive_failures,
         )
     finally:
         shutdown = getattr(source, "shutdown", None)
@@ -245,6 +251,48 @@ def cmd_backfill(args: argparse.Namespace) -> int:
     for item in outcome.failed:
         print(f"  ! {item['symbol']} {item['day']}: {item['error']}", file=sys.stderr)
     return 0 if outcome.ok else 1
+
+
+def cmd_probe_history(args: argparse.Namespace) -> int:
+    """Tafuta kina cha tick history ya broker (binary search, maombi machache)."""
+    cfg = _load(args)
+    from datetime import date, timedelta
+
+    from .backfill import probe_history
+    from .mt5_source import MT5Credentials, MT5TickSource
+    from .recorder import RecorderSettings, TickRecorder
+
+    settings = RecorderSettings.from_config(cfg)
+    symbol = (args.symbol or settings.symbols[0]).upper()
+    latest = date.fromisoformat(args.to) if args.to else date.today() - timedelta(days=1)
+    earliest = (
+        date.fromisoformat(getattr(args, "from"))
+        if getattr(args, "from")
+        else latest - timedelta(days=365 * 2)
+    )
+
+    source = MT5TickSource(
+        credentials=MT5Credentials.from_env(cfg),
+        symbol_suffix=str(cfg.get("recorder.mt5.symbol_suffix", "")),
+        timeout_ms=int(cfg.get("recorder.mt5.timeout_ms", 15000)),
+        fetch_retries=int(cfg.get("recorder.mt5.fetch_retries", 2)),
+        retry_delay_s=float(cfg.get("recorder.mt5.retry_delay_s", 3)),
+    )
+    source.connect()
+    recorder = TickRecorder(source, cfg, settings=settings)
+
+    def _step(day, ok: bool) -> None:
+        print(f"  {day}: {'ina ticks' if ok else 'HAINA'}", flush=True)
+
+    try:
+        report = probe_history(recorder, symbol, earliest, latest, on_step=_step)
+    finally:
+        source.shutdown()
+
+    print(json.dumps(report, indent=2))
+    if args.out:
+        Path(args.out).write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
+    return 0 if report.get("earliest_available") else 1
 
 
 def cmd_check_freshness(args: argparse.Namespace) -> int:
@@ -345,7 +393,24 @@ def build_parser() -> argparse.ArgumentParser:
     p_back.add_argument("--dry-run", action="store_true", help="onyesha zinazokosekana bila kuvuta")
     p_back.add_argument("--max-days", type=int, help="kikomo cha siku kwa run moja")
     p_back.add_argument("--replay-dir", help="chanzo cha replay badala ya MT5")
+    p_back.add_argument(
+        "--max-consecutive-failures",
+        type=int,
+        default=5,
+        help="kufeli mfululizo kunakosimamisha kazi (0 = usisimame)",
+    )
     p_back.set_defaults(func=cmd_backfill)
+
+    p_probe = subparsers.add_parser(
+        "probe-history",
+        help="kina cha tick history ya broker (binary search)",
+        parents=[common],
+    )
+    p_probe.add_argument("--symbol", help="symbol moja (default: ya kwanza ya config)")
+    p_probe.add_argument("--from", dest="from", help="mwanzo wa dirisha (default: miaka 2 nyuma)")
+    p_probe.add_argument("--to", help="mwisho wa dirisha (default: jana)")
+    p_probe.add_argument("--out", help="andika ripoti ya JSON")
+    p_probe.set_defaults(func=cmd_probe_history)
 
     p_fresh = subparsers.add_parser("check-freshness", help="DF-04 — ONYO la siku isiyorekodiwa", parents=[common])
     p_fresh.add_argument("--json", action="store_true")

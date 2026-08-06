@@ -81,10 +81,14 @@ class MT5TickSource:
         credentials: MT5Credentials | None = None,
         symbol_suffix: str = "",
         timeout_ms: int | None = None,
+        fetch_retries: int = 2,
+        retry_delay_s: float = 3.0,
     ) -> None:
         self.credentials = credentials or MT5Credentials()
         self.symbol_suffix = symbol_suffix
         self.timeout_ms = timeout_ms
+        self.fetch_retries = max(0, int(fetch_retries))
+        self.retry_delay_s = float(retry_delay_s)
         self._mt5: Any | None = None
 
     # ---------- muunganisho ----------
@@ -153,21 +157,45 @@ class MT5TickSource:
         return f"{symbol}{self.symbol_suffix}"
 
     def fetch_ticks(self, symbol: str, start: datetime, end: datetime) -> pd.DataFrame:
+        """Ticks za [start, end). Jaribio la kwanza linaweza kuanzisha upakuaji.
+
+        MT5 haihifadhi history yote kwenye terminal. Ombi la kwanza la kipindi
+        kisichokuwepo **linaanzisha upakuaji** kutoka broker na linarudi
+        `(-1, 'Terminal: Call failed')`. Ombi la pili baada ya sekunde chache
+        mara nyingi linafanikiwa. Kwa hiyo tunajaribu tena — lakini kwa idadi
+        iliyowekwa (`recorder.mt5.fetch_retries`), si milele: broker asipokuwa
+        na kina hicho, kufeli ni JIBU (mpaka wa history), si hitilafu ya kurudia.
+        """
+        import time as _time
+
         mt5 = self._module()
         broker_symbol = self.broker_symbol(symbol)
         if not mt5.symbol_select(broker_symbol, True):
             raise SourceError(f"{broker_symbol}: symbol_select imeshindikana: {mt5.last_error()}")
-        ticks = mt5.copy_ticks_range(
-            broker_symbol,
-            start.astimezone(timezone.utc),
-            end.astimezone(timezone.utc),
-            mt5.COPY_TICKS_ALL,
-        )
-        if ticks is None:
-            raise SourceError(f"{broker_symbol}: copy_ticks_range: {mt5.last_error()}")
-        if len(ticks) == 0:
-            return _empty_frame(self.extra_columns)
-        return self._to_canonical(pd.DataFrame(ticks))
+
+        last_error: Any = None
+        for attempt in range(self.fetch_retries + 1):
+            ticks = mt5.copy_ticks_range(
+                broker_symbol,
+                start.astimezone(timezone.utc),
+                end.astimezone(timezone.utc),
+                mt5.COPY_TICKS_ALL,
+            )
+            if ticks is not None:
+                if len(ticks) == 0:
+                    return _empty_frame(self.extra_columns)
+                return self._to_canonical(pd.DataFrame(ticks))
+            last_error = mt5.last_error()
+            if attempt < self.fetch_retries:
+                LOG.debug(
+                    "%s %s: jaribio %d limeshindikana (%s) — upakuaji unaweza kuwa unaendelea",
+                    broker_symbol,
+                    start.date(),
+                    attempt + 1,
+                    last_error,
+                )
+                _time.sleep(self.retry_delay_s)
+        raise SourceError(f"{broker_symbol}: copy_ticks_range: {last_error}")
 
     def _to_canonical(self, raw: pd.DataFrame) -> pd.DataFrame:
         volume = (

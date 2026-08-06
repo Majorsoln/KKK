@@ -62,6 +62,8 @@ recorder:
   mt5:                                  # sifa za kuingia zinatoka ENVIRONMENT, si config
     symbol_suffix:       ""            # mf. ".raw" kwa baadhi ya brokers
     timeout_ms:          15000         # MT5 default ni 60s kimya; hii inafelisha mapema na sababu
+    fetch_retries:       2             # ombi la kwanza la history isiyopo huanzisha upakuaji
+    retry_delay_s:       3             # subiri kabla ya jaribio lingine
     login_env:           "ELITEFX_MT5_LOGIN"
     password_env:        "ELITEFX_MT5_PASSWORD"
     server_env:          "ELITEFX_MT5_SERVER"

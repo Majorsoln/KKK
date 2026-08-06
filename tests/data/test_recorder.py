@@ -396,3 +396,39 @@ def test_backfill_siku_isiyo_na_ticks_haiandikwi_kama_tupu(cfg, l0_root):
     assert outcome.no_ticks == [f"EURUSD {day.isoformat()}"]
     assert outcome.ok  # si kufeli — ni taarifa
     assert not rec.partition_path("EURUSD", day).exists()
+
+
+def test_backfill_inasimama_baada_ya_kufeli_mfululizo(cfg, l0_root):
+    """Circuit breaker: broker asipokuwa na history, kufeli ni JIBU si hali ya kurudia."""
+    from datetime import date
+
+    from src.data.backfill import backfill_missing
+    from src.data.mt5_source import ReplayTickSource, SourceError
+    from src.data.recorder import RecorderSettings, TickRecorder
+
+    class _AlwaysFails(ReplayTickSource):
+        def __init__(self) -> None:
+            super().__init__({})
+            self.calls = 0
+
+        def fetch_ticks(self, symbol, start, end):
+            self.calls += 1
+            raise SourceError("copy_ticks_range: (-1, 'Terminal: Call failed')")
+
+    source = _AlwaysFails()
+    settings = RecorderSettings.from_config(cfg)
+    settings.broker_id = "test-broker"
+    settings.symbols = ["EURUSD"]
+    rec = TickRecorder(source, cfg, settings=settings)
+
+    outcome = backfill_missing(
+        rec,
+        start=date(2026, 5, 1),
+        end=date(2026, 7, 31),
+        symbols=["EURUSD"],
+        max_consecutive_failures=3,
+    )
+    assert source.calls == 3, "kazi ilipaswa kusimama baada ya kufeli 3 mfululizo"
+    assert outcome.stopped_early
+    assert "probe-history" in outcome.stopped_early
+    assert not outcome.ok

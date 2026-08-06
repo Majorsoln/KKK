@@ -197,8 +197,19 @@ python -m src.data.cli backfill --from <YYYY-MM-DD>
 `--dry-run` inaonyesha bila kuvuta. Ikiwa kubwa: `--max-days 200` na kurudia
 (inaendelea pale ilipoishia — ukweli ni disk, si state).
 
-`no_ticks` **si kufeli**: ni broker kutokuwa na ticks za siku hiyo. Idadi yake ndiyo
-inayoonyesha **kina cha history ya broker**.
+`no_ticks` **si kufeli**: ni broker kutokuwa na ticks za siku hiyo.
+
+**Kabla ya backfill ndefu, pima kina cha history kwanza** — vinginevyo unaweza kutumia saa
+nyingi kwenye maombi yanayofeli (kila kufeli ni ~sekunde 100 za timeout ya MT5):
+```cmd
+python -m src.data.cli probe-history --symbol EURUSD --from 2026-01-01
+```
+Binary search inajibu kwa maombi <10 badala ya mamia. Kisha backfill kuanzia siku
+iliyorudishwa (`earliest_available`).
+
+Backfill ina **circuit breaker**: kufeli 5 mfululizo kunasimamisha kazi
+(`--max-consecutive-failures`), kwa sababu kufeli mfululizo ni jibu (mpaka wa history),
+si hali ya kurudia.
 
 ### 6.4 Anzisha recorder
 ```cmd
@@ -229,6 +240,8 @@ python -c "import pyarrow.parquet as pq,glob; f=sorted(glob.glob(r'research\data
 | `Set-Variable: A positional parameter...` | `set VAR=x` ndani ya PowerShell | tumia `$env:VAR = "x"` |
 | `broker_id haijawekwa` — recorder inakataa | guard ya §2.2 | jaza `recorder.broker_id` |
 | `UKIUKAJI WA PROVENANCE` | broker/server imebadilika | §5 hapo juu |
+| `copy_ticks_range: (-1, 'Terminal: Call failed')` | MT5 haina history hiyo kwenye terminal; ombi la kwanza linaanzisha upakuaji | `fetch_retries` (2) inajaribu tena. Ikiendelea kufeli mfululizo, ni **mpaka wa history ya broker** — tumia `probe-history` |
+| backfill inafeli kila siku, ~100s kila moja | kina cha history hakitoshi | circuit breaker inasimamisha baada ya kufeli 5 mfululizo; pima kwanza kwa `probe-history` |
 | `verify-l0: manifest haipo` | `hash-l0` haijakamilika | endesha `hash-l0` hadi mwisho |
 | `verify-l0 ... missing=N` | partitions zilifutwa kwa idhini | `hash-l0 --prune-missing --reason "..."` |
 | git inafungua **vim** kwenye merge | editor default | `Esc` → `:wq` → Enter; kisha `git config --global core.editor notepad` |
