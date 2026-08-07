@@ -179,15 +179,25 @@ vya data.yaml + ulinganisho A<->B.
 ### T2 — R1 (LABEL AUDIT) ▶ `INASUBIRI T1`
 **PROMPT:**
 ```
-Tekeleza TERM T2 (rejista DF-09..DF-11, K1-07, RS-04): L4 grid labels (5x5) kwa path ya
-TICKS — touch kwa bei ya kufungia (BUY: bid / SELL: ask), gap-honest; timeout = darasa la
-3 NA terminal return inarekodiwa; fill bootstrap (stop/limit kwa ticks; market = prior
-0.98); quality buckets (R_net). Ripoti ya R1: base rates dhidi ya jiometri
-(p ~ sl/(sl+tp)), utulivu kwa miaka, timeout share, M1-vs-tick disagreement,
-curve ya utulivu wa label. TRAIN+VAL PEKEE — takwimu za holdout MARUFUKU (G2).
+Tekeleza TERM T2 (rejista DF-09..DF-11, DF-20, DF-21, K1-07, RS-04):
+KWANZA — sheria ya SETUP (§4.3, DF-20): decision points kwa SETUP-v1 kutoka config/data.yaml
+§setups; kutuna kwa RATE (~5%) pekee, KABLA labels hazijaonekana; control sample 10%
+(is_control=true, haiingii training); setup_rule_id ndani ya dataset_id; sentinel inaipima.
+Hakuna label inayohesabiwa kabla PD hajasaini sheria (pre-registration, RS-01).
+KISHA — L4 grid labels (5x5) kwa path ya TICKS: touch kwa bei ya kufungia (BUY: bid /
+SELL: ask), gap-honest, TIE-BREAK = SL kwanza gap ikifunika zote mbili (§5.2, DF-21);
+L-A quantile kwa MID (§5.1); timeout = darasa la 3 NA terminal return inarekodiwa; fill
+bootstrap (stop/limit kwa ticks; market = prior 0.98); quality buckets (R_net).
+Ripoti ya R1: base rates kwa fomula p_tp/(p_tp+p_sl) ~ sl/(sl+tp) (BILA timeout, RS-04),
+utulivu kwa miaka, timeout share, mzunguko wa tie-break (>1% -> PD), setup-vs-control,
+quantiles mid-vs-trade kwa XAUUSD/GBPJPY, M1-vs-tick disagreement, curve ya utulivu.
+TRAIN+VAL PEKEE — takwimu za holdout MARUFUKU (G2).
 ```
 **WEWE (PD):**
-- **KUPITIA:** ripoti ya R1 — hasa base rate vs jiometri na utulivu kwa miaka.
+- **KUSAINI KWANZA:** sheria ya setup (§4.3 + config §setups) KABLA ya label yoyote — hii
+  ndiyo pre-registration; bila hiyo kila namba ya R1+ ni ya baada ya ukweli.
+- **KUPITIA:** ripoti ya R1 — hasa base rate vs jiometri (fomula mpya), setup-vs-control
+  (je filter inatupa trades bora?), na mzunguko wa tie-break.
 - **KUFANYA:** ikifeli — amua horizon/grid mpya (fahamu: hiyo ni dataset mpya, si tweak).
 - **SAHIHI YA EXIT:** R1 PASS/LESSON.
 
@@ -354,6 +364,8 @@ za vigezo vya kustaafu (data.yaml §monitoring). Ripoti ya shadow -> PD kwa uamu
 | DF-13 | §6.2 | F6 ni ya kusoma tu — cost ya RCE; news kwa muda pekee | AUD | T3 |
 | DF-14 | §7 + SPLIT_PLAN | splits kwa tarehe za config; purge + embargo bars 36; pooled kwa wakati; random split MARUFUKU | UT + **CI** (splitter anasoma config pekee) | T1+ |
 | DF-15 | §8 | kila dataset ina manifest + dataset_id; namba bila dataset_id haiingii engine | **CI**: ripoti bila dataset_id inakataliwa | T1+ |
+| DF-20 | §4.3 | sheria ya SETUP: mechanical, point-in-time, pre-registered; `setup_rule_id` ndani ya dataset_id; kutuna kwa RATE pekee kabla ya labels; **control sample 10%** ya bars zisizo setup inapata labels (`is_control`) — filter inapimwa, si kudhaniwa; R1 haianzi bila sahihi ya PD | UT + sentinel + PROC (pre-reg) + RPT (R1/R7 setup-vs-control) | T2 |
+| DF-21 | §5.1–§5.2 | mikataba ya bei ya label: L-A entry/exit = **mid** (S1: inapendekeza, haihukumu; spread inaingia path na RCE, si mara 3); barrier **tie-break = SL kwanza** gap ikifunika zote mbili; timestamp moja → mpangilio wa kufika (stable sort); R1 inaripoti mzunguko wa tie-break na mid-vs-trade quantile diff | UT (kesi za gap/tie) + RPT | T2 |
 | DF-19 | SETUP §7b | scripts za mzunguko wa kila siku (`catchup`/`record`/`status`); sifa za mashine ziko `env.local.bat` isiyopushwa; template inabaki tupu | **UT**: G13 (`test_repo_guards.py`) | T0 |
 | DF-18 | §2.2 | recorder inajitibu: kalenda dhidi ya DISK (si state) → siku zilizorukwa zinazibwa; `backfill` CLI + reconcile on-start/kila polls N; siku isiyo na ticks HAIANDIKWI tupu | UT: `test_backfill_*` (state iliyopotea + siku ya kati iliyorukwa) | T0 |
 | DF-17 | §9 | `research/` ndani ya repo: reports+src zinapushwa, `research/data/` haipushwi kamwe; engine hairudii code ya utafiti | **UT/CI**: `tests/test_repo_guards.py` (G11 · G12) — imethibitishwa kwa jaribio hasi | T0 |
@@ -364,7 +376,10 @@ za vigezo vya kustaafu (data.yaml §monitoring). Ripoti ya shadow -> PD kwa uamu
 | RS-01 | §0/§3 | pre-registration: vigezo vime-commit KABLA ya kukimbiza; kubadilisha baada ya namba = kufuta awamu | **CI**: git history inathibitisha mpangilio | zote |
 | RS-02 | §1 | mishale migumu: R2 haianzi kabla R1 PASS, n.k. | PROC (rejista ya awamu) | zote |
 | RS-03 | R0 | vizingiti vya data audit + ulinganisho A↔B + kalenda kwa data | RPT | T1 |
-| RS-04 | R1 | sanity ya jiometri (random walk p ≈ sl/(sl+tp)); utulivu kwa miaka; timeout ≤ 0.35 | RPT + UT | T2 |
+| RS-04 | R1 | sanity ya jiometri kwa fomula sahihi: `p_tp/(p_tp+p_sl) ≈ sl/(sl+tp)` (BILA timeout — `p_tp_first` peke yake haiwezi kufikia jiometri kwa timeout 35%); spread inasogeza chini kidogo kwa utaratibu; utulivu kwa miaka; timeout ≤ 0.35 | RPT + UT | T2 |
+| RS-15 | R2 | takwimu za screening: decision point moja = uzito mmoja (si rows za grid); SE kutoka **block bootstrap** (blocks za muda, symbols zote pamoja — symbols 12 si huru, effective N ~9k si 38k); kizingiti halisi = max(`ic_min`, p99 ya null ya bootstrap) | UT + RPT | T3 |
+| RS-16 | R6 | `E[R\|timeout]` per cell ni **out-of-fold** (S6); R6 inaripoti sehemu ya signals zinazochukulika chini ya bajeti ya RCE (positions zinapishana — EV ya mfumo ni ya zinazochukulika) | UT + RPT | T5 |
+| RS-17 | §5A | pretraining ni **walk-forward** kwa kila fold (data ≤ val_start − embargo; warm-start OK); GBM baseline inapimwa protocol ile ile — R4 hailinganishi vitu viwili tofauti | PROC + RPT | T4/P |
 | RS-05 | R2 | purged folds hata kwenye screening; permutation + **FDR (BH, q=0.10)**; per-symbol IC hairuhusiwi kuamua | UT + **CI** (FDR kwenye schema ya output) | T3 |
 | RS-06 | R3 | clustering \|ρ\|≥0.80 → mwakilishi mmoja; si PCA | RPT | T3 |
 | RS-07 | R4 | B0/B1/B2; B > B0 na CI isiyogusa sifuri AU SIMAMA; EV_R ya B2 = kizingiti cha kudumu | RPT + PROC (GO/NO-GO ya PD) | T4 |
@@ -376,7 +391,8 @@ za vigezo vya kustaafu (data.yaml §monitoring). Ripoti ya shadow -> PD kwa uamu
 | RS-13 | §3 | LESSON inaandikwa kwa undani sawa na PASS | PROC | zote |
 | RS-14 | SPLIT §3 | RESERVE (2026-05+) haionwi kabisa hadi mzunguko ujao | **CI** (access guard ile ile) | zote |
 
-**Jumla: vipengele 59.** `100% = 59/59 VERIFIED` (au LESSON iliyoandikwa pale eneo lilipofeli
+**Jumla: vipengele 64** (59 za awali + DF-20, DF-21, RS-15, RS-16, RS-17 — mapitio ya ushauri
+wa nje, PD 2026-08-07). `100% = 64/64 VERIFIED` (au LESSON iliyoandikwa pale eneo lilipofeli
 kwa vigezo — LESSON ni jibu halali; kificho ni pale tu eneo linaruka bila kupimwa).
 
 ### 3.5 LEDGER YA HADHI (hii ndiyo safu ya hadhi ya §3 — inasasishwa kila wiki)
@@ -509,6 +525,25 @@ inahesabu ticks zilizo ndani ya dirisha na kusema ni ipi.
 
 **Kinachofuata:** `audit.bat` kwa symbols zote 12 (~saa 2 kwa `check-l1`) → PD kupitia
 `reports/quality/` → sahihi ya exit ya T1.
+
+---
+
+**MAPITIO YA USHAURI WA NJE (PD 2026-08-07 — "nimekubali, fanya maamuzi").** Ushauri wa nje
+ulileta mapengo matano; uchambuzi huru uliyathibitisha manne, ukapima moja upya, na kuongeza
+mawili ambayo hayakuonwa. Maamuzi (yote yameandikwa kwenye spec + config, vipengele DF-20,
+DF-21, RS-15, RS-16, RS-17):
+
+| # | Uamuzi | Ulikubaliana na ushauri? |
+|---|---|---|
+| 1 | Sheria ya setup: §4.3 mpya + config §setups + **control sample 10%** | Ndiyo — na zaidi: filter ni model ya hatua ya kwanza, kwa hiyo inapimwa (control), si kuandikwa tu |
+| 2 | Pretraining: **walk-forward kwa kila fold** + GBM baseline protocol ile ile | Ndiyo kwa tatizo; suluhisho tofauti — si "pretrain 5 huru" wala "kubali upendeleo", bali walk-forward + warm-start (safi NA nafuu) |
+| 3 | Tie-break: **SL kwanza**; timestamp moja = mpangilio wa kufika (stable sort ilishawekwa) | Ndiyo; nusu ya kesi ilikuwa imekwisha tatuliwa — na R1 inapima mzunguko, si sheria tu |
+| 4 | L-A entry: **MID**, si trade-price | **Hapana** — ushauri ulisema ask/bid; mid ni sahihi kwa S1 (L-A inapendekeza, haihukumu; spread inaingia path na RCE, si mara 3). R1 inapima tofauti kwa namba |
+| 5 | Effective N: block bootstrap + uzito kwa decision point + `ic_min` kama floor | Ndiyo kwa hitimisho; chanzo kikuu ni kingine — si kupishana kwa wakati (~17%) bali **symbols 12 zisizo huru** (effective N ~9k → 0.02 ni ~2σ) |
+| +A | R6 inaripoti sehemu ya signals zinazochukulika chini ya bajeti ya RCE | Halikuonwa na ushauri — positions zinapishana, EV ya mfumo ni ya zinazochukulika |
+| +B | Sanity ya R1 kwa fomula `p_tp/(p_tp+p_sl)`, si `p_tp_first` | Halikuonwa — kwa timeout 35%, fomula ya awali ingeonyesha "hitilafu" kila mara |
+
+Yote ni ya **T2+**; T1 haiguswi na hata moja. RCE haijaguswa.
 
 **TRACK E:** `src/rce/` imejengwa kwa spec ILE ILE (haijaguswa). Kilichobaki kwa `VERIFIED`:
 namba halisi za Dukascopy kwenye `config/broker_costs.yaml` (commission round-turn), na

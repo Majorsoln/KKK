@@ -228,11 +228,24 @@ unaweza kujifunzwa kutoka data isiyo na labels za trade:
 
 ```
 HATUA 1 — PRETRAIN (self-supervised, HAKUNA trade label):
-   corpus:  bars zote za TRAIN+VAL (~770k H1 pooled; M1/ticks kwa encoders za chini)
+   corpus:  bars za TRAIN+VAL (~770k H1 pooled; M1/ticks kwa encoders za chini)
    malengo: next-bar direction · masked-bar reconstruction · contrastive
             (sequences za regime moja karibu, tofauti mbali)
    ⚠ corpus inaishia trainval_end (2024-03-31). Kupretrain kwenye kipindi cha HOLDOUT
      ni uvujaji — marufuku kabisa.
+   ⚠ PROTOCOL (PD 2026-08-07): pretraining ni WALK-FORWARD, si full-sample.
+     Encoder ni model iliyofit (sheria 8 ya §6.1 ya data standard + S6): kupretrain
+     kwenye TRAIN+VAL nzima kunavujisha distribution ya validation folds kwenye
+     representations — hasa `next_bar_direction`, ambayo ni karibu shabaha ile ile
+     ya trade label ikijifunzwa kwenye bars za validation. Purged K-fold na global
+     pretrain haviendani kimantiki; walk-forward (§7 ya data standard) na pretrain
+     ya kila fold vinaendana — na ndivyo mfumo utakavyoishi live.
+     Kwa kila fold ya walk-forward: pretrain kwa data ≤ val_start − embargo PEKEE;
+     warm-start kutoka encoder ya fold iliyotangulia inaruhusiwa (data mpya tu ndiyo
+     inayoongezeka), kwa hiyo gharama ya ziada ni ndogo.
+     GBM baseline ya R4 inapimwa kwenye PROTOCOL ILE ILE ya walk-forward — kulinganisha
+     deep (walk-forward) na GBM (K-fold) ni kubadilisha vitu viwili kwa wakati mmoja,
+     na lango la GO/NO-GO lisingekuwa na maana.
 
 HATUA 2 — FINE-TUNE (heads ndogo kwenye trade labels):
    encoder iliyoganda/nusu-ganda + heads: quantile · barrier(3) · quality

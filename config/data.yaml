@@ -108,6 +108,20 @@ features:
   families:            [F1, F2, F3, F4, F5, F6, F7]
   training_mode:       "pooled"         # symbols zote pamoja; per-symbol ni calibration pekee
 
+# ---------- DECISION POINTS: SHERIA YA SETUP (spec §4.3 — PD 2026-08-07) ----------
+setups:
+  rule_id:             "SETUP-v1"       # inaingia dataset_id — kubadilisha = dataset MPYA
+  spread_gate_mult:    1.5              # spread_p50 ya bar <= hii x median ya symbol/mwezi
+  atr_band_pct:        [0.20, 0.95]     # ATR14 ndani ya percentile band ya rolling
+  atr_band_window_months: 6
+  trigger:
+    kind:              "momentum_impulse"
+    lookback_bars:     4                # |close - close[k]| ...
+    min_atr_mult:      1.0              # ... >= hii x ATR14
+  target_rate:         0.05             # kutuna kufikia RATE inaruhusiwa KABLA ya labels (§4.3)
+  control_sample_frac: 0.10             # bars zisizo setup zinazopata labels (is_control=true)
+  control_seed:        20260807         # nasibu inayozalishika upya
+
 # ---------- L4: LABELS (spec §5) ----------
 labels:
   horizon_bars:        24               # bars za H1
@@ -117,9 +131,14 @@ labels:
   quantile:
     quantiles:         [0.10, 0.50, 0.90]
     units:             "atr"            # SI pips (hoja ya S3)
+    entry_price:       "mid"            # §5.1 (PD 2026-08-07): L-A inapendekeza, haihukumu (S1);
+    exit_price:        "mid"            # spread inaingia path (§5.2) na RCE — si mara tatu
   barrier:
     sl_atr:            [0.5, 0.75, 1.0, 1.5, 2.0]   # GRID = input ya model, si derived (anti-S1)
     tp_atr:            [0.5, 1.0, 1.5, 2.0, 3.0]
+    tie_break:         "sl_first"       # §5.2 (PD 2026-08-07): gap ikifunika zote mbili -> SL;
+                                        # live stop inatekelezwa upande mbaya kwanza. R1 inaripoti
+                                        # mzunguko; > 1% ya labels -> inapanda kwa PD
     timeout_class:     true             # darasa la tatu, halitupwi kimya
     timeout_record_return: true         # terminal return ya timeout -> E[R|timeout] (EV madarasa 3)
     max_timeout_frac:  0.35
@@ -156,7 +175,13 @@ splits:
 # ---------- VIZINGITI VYA UTAFITI (RESEARCH_PLAN_R0) ----------
 research:
   screening:                            # R2
-    ic_min:             0.02            # pooled pekee (~38k labels, SE~0.005); per-symbol = kelele
+    ic_min:             0.02            # FLOOR pekee; kizingiti halisi = max(hii, p99 ya null
+                                        # ya bootstrap). Symbols 12 si huru (USD kwenye 7) —
+                                        # effective N ~9k si 38k, hivyo 0.02 ni ~2sigma si 4
+    ic_weighting:       "per_decision_point"   # kamwe si rows za grid (zinahusiana x25)
+    block_bootstrap:                    # SE kutoka DATA (PD 2026-08-07)
+      block_days:       10              # blocks za muda, symbols ZOTE pamoja ndani ya block
+      n_boot:           1000
     ic_sign_stability:  0.60
     permutation_test:   true            # feature isiyoshinda toleo lake la bahati -> LESSON
     fdr_method:         "benjamini_hochberg"   # multiple testing kwa candidates ~770
@@ -181,6 +206,12 @@ research:
 pretraining:
   enabled:            true
   corpus_end:         "2024-03-31"      # = trainval_end; kupretrain kwenye HOLDOUT = uvujaji
+  protocol:           "walk_forward"    # §5A (PD 2026-08-07): pretrain kwa data <= val_start -
+                                        # embargo kwa kila fold; warm-start inaruhusiwa. Encoder
+                                        # ni model iliyofit (sheria 8 + S6) — full-sample
+                                        # pretrain inavujisha distribution ya validation
+  baseline_same_protocol: true          # GBM ya R4 inapimwa walk-forward ILE ILE — vinginevyo
+                                        # lango la GO/NO-GO linalinganisha vitu viwili tofauti
   objectives:         [next_bar_direction, masked_bar, contrastive_regime]
   fine_tune:          "heads_only"      # encoder ganda/nusu-ganda; heads kwenye trade labels
   gate:               "R4_baseline"     # model iliyopretrainiwa inashindana kama kila mtu

@@ -97,13 +97,24 @@ Faili zote zinaandikwa `research/reports/quality/` na `scripts\audit.bat` (SETUP
 | Kipimo | Kizingiti |
 |---|---|
 | labels za L-B kwa kila kisanduku cha grid | ≥ `min_labels_per_cell` (200) |
-| base rate ya `p_tp_first` | inalingana na jiometri (tp/sl) ± kiasi kinachoelezeka |
+| base rate (sanity ya jiometri — fomula hapa chini) | inalingana na jiometri ± kiasi kinachoelezeka |
 | utulivu wa base rate kwa miaka | hakuna mwaka nje ya ±2σ bila maelezo |
 | M1-vs-H1 disagreement | asilimia ya labels zinazobadilika ikitumika OHLC ya H1 **iripotiwe** |
 | timeout share | ≤ `max_timeout_frac` (0.35) |
+| mzunguko wa tie-break (§5.2) | **iripotiwe**; > 1% ya labels → inapanda kwa PD |
+| setup dhidi ya control sample (§4.3) | base rates zinalinganishwa — filter inayotupa trades bora kuliko inazochukua ni LESSON |
+| quantiles mid vs trade-price (§5.1) | tofauti kwa XAUUSD/GBPJPY **iripotiwe** — uamuzi wa mid unapimwa kwa namba |
 
-**Kipimo cha msingi (sanity ya jiometri):** kwa random walk, `p_tp_first ≈ sl ÷ (sl + tp)`. Labels
-zetu zikitofautiana **sana** na hii bila sababu, kuna hitilafu ya path au ya barrier.
+**Kipimo cha msingi (sanity ya jiometri, imesahihishwa PD 2026-08-07):** kwa random walk,
+jiometri inatabiri `sl ÷ (sl + tp)` — lakini kwa **mshindi kati ya TP na SL**, si kwa
+`p_tp_first` moja kwa moja. Kwa horizon ya bars 24, hadi 35% ya labels ni timeout — theluthi ya
+matokeo imechukuliwa na darasa la tatu, kwa hiyo `p_tp_first` peke yake HAIWEZI kufikia namba ya
+jiometri, na kuilinganisha nayo kungeonyesha "hitilafu" kila mara. Kinacholinganishwa ni:
+```
+p_tp ÷ (p_tp + p_sl)  ≈  sl ÷ (sl + tp)        ← bila timeout (conditional on resolution)
+```
+Kumbuka pia: barriers zinapimwa kwa bei ya trade (§5.2), kwa hiyo spread inasogeza namba hii
+**chini kidogo** kwa utaratibu — tofauti ndogo ya kudumu ni spread, si hitilafu ya path.
 
 **Deliverable:** curve ya utulivu (label dhidi ya horizon na upana wa barrier) — inaonyesha kama
 label ni imara au ni artifact ya kigezo kimoja.
@@ -133,9 +144,23 @@ Feature isiyoshinda toleo lake la bahati nasibu **haipo**.
 **FDR control ni ya lazima (PD 2026-08-04):** permutation test inalinda feature MOJA; haitulindi
 tunapopima features mia kadhaa kwa pamoja — kwa bajeti ya ~770 candidates, kizingiti cha 2σ
 kinaruhusu false positives kadhaa kwa bahati tu. Kwa hiyo p-values za screening zinapita
-**Benjamini–Hochberg kwa `fdr_q` (0.10)** kabla ya feature yoyote kuwa `screened`. Kumbuka pia:
-IC inapimwa kwa **pooled** labels (~38k, SE≈0.005 → `ic_min` 0.02 ≈ 4σ); maamuzi ya per-symbol
-kwa labels ~3,200 (SE≈0.018) **hayafanyiki** kwa kizingiti hiki — kelele.
+**Benjamini–Hochberg kwa `fdr_q` (0.10)** kabla ya feature yoyote kuwa `screened`.
+
+**Uzito na SE (imesahihishwa PD 2026-08-07):** takwimu zote za screening zinahesabiwa kwa
+**decision point moja = uzito mmoja** — kamwe si kwa rows za grid (960k rows za §0.1
+zinahusiana kwa makusudi; kuzihesabu kama sampuli ni kujidanganya mara 25). Na `SE ≈ 1/√N`
+kwa N=38k ni ya sampuli huru — yetu si huru kwa njia MBILI: (1) labels zinapishana kwa wakati
+(nafasi ya setups ~bars 20, horizon 24); (2) **symbols 12 si huru** — USD iko kwenye 7, EUR
+kwenye 4, na labels za timestamp moja kwenye pairs zinazoshiriki sarafu zinahusiana. Kwa
+uhusiano wa wastani ρ≈0.3 kati ya symbols, effective N ni ~9k, si 38k — `ic_min` 0.02 ni
+~2σ, si 4σ kama ilivyodhaniwa awali. Kwa hiyo:
+```
+SE inatoka BLOCK BOOTSTRAP: blocks za muda (block_days, config) zikichukuliwa pamoja
+kwa symbols ZOTE (cluster ya wakati inashika uhusiano wa symbols na wa kupishana).
+Kizingiti halisi = max( ic_min , p99 ya null ya bootstrap )   ← inatoka kwenye DATA,
+sheria ile ile ya §3 ya data standard: vizingiti havitoki mezani.
+```
+Maamuzi ya per-symbol kwa labels ~3,200 **hayafanyiki** kwa kizingiti hiki — kelele.
 
 **Deliverable:** jedwali la features zote na hadhi `candidate → screened | LESSON`.
 
@@ -206,11 +231,20 @@ wala sizing. Bila hii, lango la EV ni pambo.
 ```
 EV_signal   = p_tp×TP − p_sl×SL + p_timeout×E[R|timeout]     ← madarasa 3 (§2.1 ya KAIROS-1)
               probabilities kutoka R5 (calibrated) · E[R|timeout] kutoka timeout labels zenyewe
+              ⚠ E[R|timeout] per cell ni OUT-OF-FOLD (S6, PD 2026-08-07): mean ya in-sample
+                ya cell inalisha EV ile ile inayohukumu — ni stacking ndogo, sheria ile ile.
 cost_pips   kutoka RCE (§3 ya RISK_COST_ENGINE) — spread_effective + slip cap + comm + swap
 P(fill)     kutoka L-C (§5.3 ya standard)
 EV_final    = P(fill) × EV_signal                      ← S5: hakuna opportunity cost
 EV_R        = EV_final ÷ SL
 ```
+
+**Ukiri wa portfolio (PD 2026-08-07):** EV hapa ni ya **kila signal peke yake**. Setups
+zinafika ~kila bars 20 na horizon ni bars 24 — positions ZITAPISHANA, na bajeti ya siku ya RCE
+ni yenye kikomo. Live hutachukua trades zote zilizo na label. OPM/queue inabaki nje ya wigo
+(§5b ya KAIROS-1) — lakini upendeleo huu unakiriwa na **unapimwa**: R6 inaripoti *sehemu ya
+signals zinazochukulika chini ya bajeti ya RCE* (simulation ya kupitisha signals kwenye budget
+ya siku, kwa mpangilio wa wakati). EV ya mfumo ni ya signals zinazochukulika, si ya zote.
 **Provenance ya gharama (§2.2 ya standard):** spread ya kihistoria ni ya aggregator; kwa hiyo
 stress ya cost ×1.5 hapa si anasa — ndiyo bima ya pengo la aggregator↔broker hadi feed ya broker
 iliyorekodiwa itoe ulinganisho halisi.

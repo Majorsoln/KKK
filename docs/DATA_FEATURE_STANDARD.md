@@ -38,7 +38,7 @@ DATA  →  LABELS  →  FEATURES  →  MODELS
 ```
 H1 bars kwa mwaka  ≈ 24 × 5 × 52          = 6,240
 Miaka 10.3 (2016-01 → 2026-04), symbol 1   ≈ 64,000 bars
-Setups zinazostahili (≈5% ya bars)         ≈ 3,200 labels
+Setups zinazostahili (≈5% ya bars; §4.3)   ≈ 3,200 labels
 Pooled, symbols 12                         ≈ 38,000 labels → ≈ 770 features (bajeti @50)
   kati yake TRAIN+VAL (80%)                ≈ 30,800  ·  HOLDOUT ≈ 7,800
 Barrier grid ×25                           ≈ 960,000 rows (zinahusiana — si sample huru)
@@ -237,6 +237,39 @@ Ikibadilika hata moja → uvujaji umegunduliwa → build inasimama.
 ```
 Test hii inakimbia kwa kila build ya L3. Si hiari.
 
+### 4.3 DECISION POINTS — SHERIA YA SETUP (PD 2026-08-07)
+
+Bajeti ya §0.1 inasimama juu ya "setups ≈ 5% ya bars" — lakini hadi leo hakuna hati
+iliyosema **bar ipi inastahili**. Pengo hili ni darasa la TATU la uvujaji: si la wakati
+(sentinel §4.2 inalikamata) wala la stacking (S6), bali **la uchaguzi** — sheria ya setup
+ikitengenezwa au kutunwa baada ya kuona matokeo ya labels, kila namba ya R1+ ni ya baada ya
+ukweli, na hakuna kinga ya kiufundi inayoliona. Kinga pekee ni utaratibu huu:
+
+**SETUP-v1** — bar ya H1 iliyofungwa inakuwa decision point ikiwa **zote tatu** zinatimia
+(zote ni mechanical, point-in-time, kutoka bars zilizofungwa pekee):
+
+```
+1. GHARAMA     spread_p50 ya bar ≤ spread_gate_mult × median ya spread ya symbol/mwezi
+               (soko lisilolipika si setup — RCE ingelikataa hata hivyo)
+2. VOLATILITY  ATR14 ya H1 ndani ya percentile band ya rolling (dirisha miezi 6)
+               (soko lililokufa halina TP inayofikika; la wazimu lina slippage isiyo na cap)
+3. TRIGGER     |close − close[k]| ≥ min_atr_mult × ATR14   (impulse ya mwendo, scale-free)
+```
+
+**Sheria tano za utaratibu:**
+1. Vigezo vyote viko `config/data.yaml §setups`; `setup_rule_id` inaingia kwenye
+   `dataset_id` — kubadilisha sheria = dataset MPYA, si tweak.
+2. Kutuna vigezo ili kufikia **rate** (~5%) inaruhusiwa KABLA ya labels kuonekana — rate
+   haitumii matokeo. Kutuna kwa outcome yoyote ya label = selection leakage, marufuku (RS-01).
+3. **CONTROL SAMPLE:** 10% ya bars zisizo setup, kwa nasibu (seed kwenye config), zinapata
+   labels PIA zikiwa na `is_control=true`. Bila control, hatutajua kamwe kama filter inatupa
+   trades bora kuliko inazochukua — filter ni MODEL ya hatua ya kwanza, na hii ndiyo njia
+   pekee ya kuipima (R1 inalinganisha base rates; R7 inailinganisha kwa EV). Control
+   **haiingii training** — ni kipimo cha filter tu.
+4. Filter inapimwa na sentinel §4.2 kama feature nyingine yoyote (ni function ya bars
+   zilizofungwa — shuffle ya baadaye isibadilishe uamuzi wa setup).
+5. **R1 haianzi** kabla sheria hii haijasainiwa na PD (pre-registration, RS-01).
+
 ---
 
 ## 5. L4 — LABELS (nne, kila moja kwa model yake)
@@ -251,8 +284,19 @@ label, si dhana.
 ```
 y = log(close[t+H] ÷ entry) ÷ ATR[t]        # terminal return, units za ATR
 H = horizon (bars za H1, config)
+entry = MID ya wakati wa uamuzi · close[t+H] = MID          (PD 2026-08-07)
 ```
 Units za ATR (si pips) — inalinganisha symbols na volatility regimes (hoja ile ile ya S3).
+
+**Kwa nini MID, si bei ya trade:** L-A **inapendekeza**, haihukumu — anayehukumu ni Barrier
+head, na yeye anafundishwa kwa path ya bei ya trade (§5.2). Huo ndio mgawanyo wa S1 ukifanya
+kazi: quantile ikipendekeza cell yenye matumaini kupita kiasi kwa symbol pana, Barrier head
+inaikataa — hasara ni ya ufanisi, si ya usahihi. Zaidi: spread inaingia **mara moja kwenye
+path** (§5.2 — je barrier ilifikwa?) na **mara moja kwenye malipo** (RCE §3 — inagharimu
+nini?). Kuiingiza pia kwenye L-A ni kuihesabu mara tatu kwenye maeneo yanayogusana. L-A ni
+kipimo cha **mwendo wa soko** — mid ndiyo bei isiyo na upande. R1 inaripoti tofauti ya
+quantiles mid-dhidi-ya-trade-price kwa symbols pana (XAUUSD, GBPJPY) ili uamuzi huu upimwe
+kwa namba, si kwa hoja.
 
 ### 5.2 L-B — BARRIER (p_tp_first) — **grid, si derived**
 Anti-circularity (S1) inasema head inayoweka mipaka isihukumu. Kwa hiyo Barrier Model **hailishwi**
@@ -273,6 +317,16 @@ grid iliyojifunza kwa uhuru. Mduara umekatika.
 
 **Gap-honest:** stop = **touch** (si close). Gap ikiruka barrier, label inasoma touch kwenye bei
 ya kwanza baada ya gap — ndivyo live itakavyokuwa.
+
+**TIE-BREAK (PD 2026-08-07):** bei ya kwanza baada ya gap ikifunika SL **na** TP kwa pamoja
+(gap ya wikendi/habari inayoruka barriers zote mbili) → **SL inahesabiwa kwanza.** Sababu si
+"tahadhari" — ni uhalisia wa utekelezaji: live, bei inayoruka mipaka yote miwili inakutana na
+stop order upande mbaya kabla ya chochote kingine. Upendeleo unaobaki unashusha EV, hauipandishi
+— upande salama wa kukosea. Tick moja haiwezi kugusa zote mbili (BUY: SL na TP zote kwa bid —
+ingehitaji SL > TP); ticks zenye **timestamp ile ile** (Toleo B ni ms) zinabaki kwa mpangilio wa
+kufika — kila sort ya tabaka hili ni stable (§4), kwa hiyo "ya kwanza" ina maana moja kila run.
+**R1 inaripoti mara ngapi tie-break ilitumika**; ikizidi 1% ya labels, inapanda kwa PD — sheria
+isiyopimwa mzunguko wake ni dhana.
 
 ### 5.3 L-C — FILL (P(fill))
 Utekelezaji wa S4 kwa data ya kihistoria:
