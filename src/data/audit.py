@@ -91,8 +91,7 @@ def _judgement_fingerprint(cfg, calendar: SessionCalendar | None, symbol: str | 
     key = str(symbol or "?").upper()
     payload = {
         "config_hash": getattr(cfg, "config_hash", ""),
-        "months": (calendar.symbol_months.get(key) if calendar else None),
-        "sessions": (calendar.symbol_sessions.get(key) if calendar else None),
+        "expect": (calendar.symbol_expect.get(key) if calendar else None),
         "non_full_days": (calendar.partial_days() if calendar else []),
     }
     return hashlib.sha256(
@@ -361,9 +360,9 @@ def compare_variants(cfg, root: Path, calendar: SessionCalendar | None = None) -
     if calendar is not None:
         summary["median_minutes_by_symbol"] = {
             symbol: round(
-                float(pd.Series(list(months.values())).median()) if months else 0.0, 1
+                float(pd.Series([v[0] for v in rows.values()]).median()) if rows else 0.0, 1
             )
-            for symbol, months in sorted(calendar.symbol_months.items())
+            for symbol, rows in sorted(calendar.symbol_expect.items())
         }
     return summary
 

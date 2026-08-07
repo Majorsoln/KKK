@@ -160,7 +160,8 @@ def test_cache_ya_l1_inatupwa_kalenda_ikibadilika(cfg, l0_tree, tmp_path):
     )
 
     pana = build_session_calendar(cfg, l0_tree).calendar  # symbols zote → kalenda mpya
-    pana.symbol_months["EURUSD"]["2026-08"] = 1.0  # matarajio yamebadilika
+    for values in pana.symbol_expect["EURUSD"].values():  # matarajio yamebadilika
+        values[0] = 1.0
     second = run_quality_audit(cfg, l0_tree, calendar=pana, symbols=["EURUSD"], cache_path=cache)
     assert cache.read_text(encoding="utf-8").count("\n") > lines_after_first, (
         "kalenda mpya → kila partition inahukumiwa upya"

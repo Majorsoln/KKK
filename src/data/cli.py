@@ -482,7 +482,27 @@ def cmd_quality_stats(args: argparse.Namespace) -> int:
         print(f"quality_report.json haipo: {path} — endesha `check-l1` kwanza.", file=sys.stderr)
         return 2
 
-    study = threshold_study(json.loads(path.read_text(encoding="utf-8")))
+    report = json.loads(path.read_text(encoding="utf-8"))
+
+    if args.reason:
+        # Orodha ya partitions zilizofeli kwa sababu moja — pamoja na `detail`,
+        # ambayo ndiyo inayosema ni NINI hasa (mf. "zilizorudi nyuma=0
+        # duplicates=4"). Bila hii, `bad_timestamps: 16` ni namba isiyo na jibu.
+        shown = 0
+        for part in report.get("partitions", []):
+            for check in part.get("checks", []):
+                if check.get("reason") != args.reason:
+                    continue
+                shown += 1
+                if shown <= args.limit:
+                    print(
+                        f"{part.get('symbol')} · {Path(part['partition']).name} · "
+                        f"{check['name']}={check.get('value')} · {check.get('detail', '')}"
+                    )
+        print(f"jumla: {shown} partitions zenye `{args.reason}`")
+        return 0 if shown == 0 else 1
+
+    study = threshold_study(report)
     print(render_threshold_study(study))
     target = out_dir / "threshold_study.json"
     target.parent.mkdir(parents=True, exist_ok=True)
@@ -790,6 +810,12 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p_stats.add_argument("--report", help="quality_report.json (default: out-dir)")
     p_stats.add_argument("--out-dir")
+    p_stats.add_argument(
+        "--reason",
+        help="badala ya mgawanyo, orodhesha partitions zilizofeli kwa sababu hii "
+        "(mf. bad_timestamps, quote_violation, intrasession_gap)",
+    )
+    p_stats.add_argument("--limit", type=int, default=40, help="mistari ya kuonyesha na --reason")
     p_stats.set_defaults(func=cmd_quality_stats)
 
     p_var = subparsers.add_parser(

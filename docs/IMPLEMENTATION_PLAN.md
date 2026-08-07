@@ -428,19 +428,29 @@ L1 ilifelisha 1,735/2,767 — na **sehemu kubwa ilikuwa kipimo kibaya, si data m
 | Sababu | Idadi | Uamuzi |
 |---|---|---|
 | `stale_feed` | 1,374 | **kosa la kipimo.** Kizingiti cha spec ni cha **bars** (`high == low`), nilikitumia kwa **ticks**. Dakika tulivu ya Asia ina ticks 40 zenye quote ile ile — si feed iliyoganda. Sasa: L0 inapima **muda** (`max_stale_seconds`), L2 inapima bars (`max_flat_bars`) |
-| `low_coverage` | 647 | kizingiti `0.995` dhidi ya median — kinasubiri `quality-stats` |
-| `session_mismatch` | 548 | uvumilivu `dakika 15` dhidi ya median ya mwezi — kinasubiri `quality-stats` |
+| `low_coverage` | 647 | **kosa la kipimo — IJUMAA.** `quality-stats`: p1/p5 = `0.875` = `21/24`. Soko linafunga 21:00 Ijumaa; nilikuwa naipima kwa wastani wa Jumatatu–Alhamisi |
+| `session_mismatch` | 548 | **kosa lile lile.** p90/p95/p99 = `180.0` dakika kamili = saa 3 za close ya Ijumaa. Kufeli 549/2,767 = 19.8% ≈ sehemu ya Ijumaa kwenye siku za trading (20%) |
 | `bad_timestamps` | 16 | **matokeo halisi** — yanahitaji uchunguzi |
 | `intrasession_gap` | 14 | **matokeo halisi** — yanahitaji uchunguzi |
 | `quote_violation` | 2 | **matokeo halisi** — yanahitaji uchunguzi |
 
-Somo lililoandikwa kwenye spec §3: **vizingiti vinatoka kwenye mgawanyo wa data, si mezani.**
-Amri mpya `quality-stats` inasoma `quality_report.json` iliyoshaandikwa (bila kusoma parquet
-tena) na kuonyesha, kwa kila ukaguzi, thamani zilivyotawanyika + **kizingiti gani kingefelisha
-ngapi**. PD anachagua kutoka hapo.
+Mgawanyo ndio uliotoa jibu, si nadharia: `session_match` haikuwa imetawanyika bali ilikuwa na
+**rundo mbili** — p50 = `0.08` dakika na p90–p99 = `180.0` dakika kamili. Namba kamili kama hiyo
+si kelele ya data; ni sheria ya soko. Vivyo hivyo `coverage` p1/p5 = `0.875` = `21/24` haswa.
 
-**Kinachofuata:** `quality-stats` kwenye ripoti ya symbols mbili → PD kuchagua vizingiti →
-`audit.bat` kwa symbols zote 12 → PD kupitia `reports/quality/`.
+Marekebisho: matarajio ya checks 1 na 6 sasa yanatoka kwa median ya **majirani wa siku ile ile ya
+wiki**, kwa kila symbol, na **siku yenyewe haiingii** kwenye matarajio yake (vinginevyo siku
+iliyoharibika ingejiwekea kizingiti chake). Tests mbili zinalinda hili:
+`test_ijumaa_inapimwa_kwa_ijumaa_nyingine_si_kwa_wiki_nzima` na
+`test_siku_haiwezi_kujiwekea_kizingiti_chake`.
+
+Somo lililoandikwa kwenye spec §3: **vizingiti vinatoka kwenye mgawanyo wa data, si mezani.**
+Amri `quality-stats` inasoma `quality_report.json` iliyoshaandikwa (bila kusoma parquet tena) na
+kuonyesha, kwa kila ukaguzi, thamani zilivyotawanyika + **kizingiti gani kingefelisha ngapi**;
+`--reason <sababu>` inaorodhesha partitions zilizofeli pamoja na `detail` yake. PD anachagua.
+
+**Kinachofuata:** `check-l1` tena kwa symbols mbili (kupima marekebisho ya Ijumaa + kipimo kipya
+cha `stale_feed`) → PD kuchagua vizingiti vilivyobaki → `audit.bat` kwa symbols zote 12.
 
 **TRACK E:** `src/rce/` imejengwa kwa spec ILE ILE (haijaguswa). Kilichobaki kwa `VERIFIED`:
 namba halisi za Dukascopy kwenye `config/broker_costs.yaml` (commission round-turn), na

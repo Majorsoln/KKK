@@ -178,9 +178,15 @@ kikaguliwe kabla ya kuondoa partition hata moja.
 
 **Kila ukaguzi unaotegemea kalenda unafanyika kwa SIKU, si kwa faili** (checks 1, 3, 6). Partition
 ya mwezi (Toleo B) ina siku ~22; kuikagua kama kipande kimoja kungeita usiku kati ya sessions
-`intrasession_gap` na kulinganisha mipaka ya session na siku ya kwanza pekee. Matarajio yote
-(dakika, mipaka ya session) ni ya **kila symbol**, si ya symbols zote pamoja — XAUUSD haifanyi
-biashara saa zile zile za EURUSD.
+`intrasession_gap` na kulinganisha mipaka ya session na siku ya kwanza pekee.
+
+**Matarajio (checks 1 na 6) ni ya kila symbol NA kila siku ya wiki.** Kwa symbol: XAUUSD haifanyi
+biashara saa zile zile za EURUSD. Kwa siku ya wiki: soko linafunga **21:00 UTC Ijumaa** wakati
+Jumatatu–Alhamisi zinaendelea hadi usiku wa manane, kwa hiyo Ijumaa ina `21/24 = 87.5%` ya dakika
+na close yake iko **dakika 180** mapema. Ijumaa ni asilimia 20 ya siku zote za trading; kuipima
+kwa wastani wa wiki nzima kunaifelisha kila wiki kwa kipimo kibaya pekee. Matarajio yanatoka kwa
+median ya **majirani wa siku ile ile ya wiki**, na siku yenyewe **haiingii** — vinginevyo siku
+iliyoharibika ingejiwekea kizingiti chake na kupita daima.
 
 **Sera ya NaN:** hakuna imputation ya kubuni. Bar isiyokamilika inabeba `is_valid=false` na
 **haitumiki** kama decision point; inaweza kutumika kama history kwa window ndefu **kama** feature

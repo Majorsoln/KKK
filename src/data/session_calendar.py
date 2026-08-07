@@ -57,18 +57,25 @@ class SessionDay:
 class SessionCalendar:
     """Kalenda ya siku zote zilizoonekana kwenye data.
 
-    `symbol_months` ndiyo **matarajio** ya check 1 ya §3: kwa kila symbol na kila
-    mwezi, wastani (median) wa dakika zenye quotes kwenye siku KAMILI za mwezi
-    huo. Median, si mean, kwa sababu siku moja iliyoharibika isipotoshe kizingiti
-    chake yenyewe. Kwa mwezi, si mwaka, ili DST na misimu visihesabiwe kama
-    upungufu wa data.
+    `symbol_expect` ndiyo **matarajio** ya checks 1 na 6 za §3: kwa kila symbol
+    na kila siku, `[dakika, session_open, session_close]` zinazotarajiwa.
+
+    Zinatoka kwa median ya **siku za jirani zenye SIKU ILE ILE YA WIKI**. Sababu
+    ni kipimo, si nadharia: Ijumaa soko linafunga 21:00 UTC wakati Jumatatu–
+    Alhamisi zinaendelea hadi usiku wa manane. Kwa hiyo Ijumaa ina asilimia 87.5
+    ya dakika za siku nyingine (`21/24`) na close yake iko **dakika 180** mapema.
+    Kuipima Ijumaa kwa wastani wa wiki nzima kunaifelisha kila wiki — na Ijumaa
+    ni asilimia 20 ya siku zote za trading.
+
+    Median ya majirani, si ya mwezi mzima, ili DST ifuatwe: mabadiliko ya saa
+    yanaathiri majirani wachache, na siku ya mabadiliko yenyewe inaonekana kama
+    hatua ya saa 1 (inaandikwa, haifelishi — ona `check_session_match`).
     """
 
     days: dict[str, SessionDay] = field(default_factory=dict)
     built_at: str = ""
     source: str = ""
-    symbol_months: dict[str, dict[str, float]] = field(default_factory=dict)
-    symbol_sessions: dict[str, dict[str, list[float]]] = field(default_factory=dict)
+    symbol_expect: dict[str, dict[str, list[float]]] = field(default_factory=dict)
 
     # ---------- maswali ----------
 
@@ -91,6 +98,12 @@ class SessionCalendar:
         entry = self.days.get(key)
         return entry.ticks if entry else 0
 
+    def _expect(self, symbol: str | None, day: date | str) -> list[float] | None:
+        if not symbol:
+            return None
+        key = day if isinstance(day, str) else day.isoformat()
+        return self.symbol_expect.get(symbol.upper(), {}).get(key)
+
     def expected_minutes(self, symbol: str | None, day: date | str) -> int:
         """Dakika zinazotarajiwa kuwa na quotes kwa symbol/siku (check 1 ya §3).
 
@@ -98,35 +111,28 @@ class SessionCalendar:
         siku za `partial` (sikukuu za nusu-siku): kuzipima dhidi ya siku kamili
         kungezalisha FAIL za uwongo kila Desemba.
         """
-        if not symbol:
-            return 0
         key = day if isinstance(day, str) else day.isoformat()
         if self.kind_of(key) != KIND_FULL:
             return 0
-        months = self.symbol_months.get(symbol.upper(), {})
-        return int(round(months.get(key[:7], 0.0)))
+        expect = self._expect(symbol, key)
+        return int(round(expect[0])) if expect else 0
 
     def expected_session(
         self, symbol: str | None, day: date | str
     ) -> tuple[datetime, datetime] | None:
-        """Mipaka ya session inayotarajiwa kwa symbol/siku — **kwa symbol**.
+        """Mipaka ya session inayotarajiwa kwa symbol/siku (check 6 ya §3).
 
-        Median ya mwezi, si mipaka ya siku yenyewe: kutumia siku yenyewe kama
-        kipimo chake kungefanya check 6 ipite daima. Na kwa symbol, si kwa
-        symbols zote pamoja: XAUUSD haifanyi biashara saa zile zile za EURUSD,
-        kwa hiyo mipaka ya pamoja ingeifelisha XAUUSD kila siku.
+        Si mipaka ya siku yenyewe — hiyo ingefanya check 6 ipite daima. Ni
+        median ya siku za jirani zenye siku ile ile ya wiki, kwa symbol ile ile.
         """
-        if not symbol:
-            return None
         key = day if isinstance(day, str) else day.isoformat()
-        months = self.symbol_sessions.get(symbol.upper(), {})
-        bounds = months.get(key[:7])
-        if not bounds:
+        expect = self._expect(symbol, key)
+        if not expect:
             return None
         midnight = utc_midnight(date.fromisoformat(key))
         return (
-            midnight + timedelta(minutes=float(bounds[0])),
-            midnight + timedelta(minutes=float(bounds[1])),
+            midnight + timedelta(minutes=float(expect[1])),
+            midnight + timedelta(minutes=float(expect[2])),
         )
 
     # ---------- I/O ----------
@@ -139,13 +145,9 @@ class SessionCalendar:
                 KIND_FULL: len(self.full_days()),
                 KIND_PARTIAL: len(self.partial_days()),
             },
-            "symbol_months": {
-                sym: {month: round(value, 1) for month, value in sorted(months.items())}
-                for sym, months in sorted(self.symbol_months.items())
-            },
-            "symbol_sessions": {
-                sym: {month: [round(v, 1) for v in bounds] for month, bounds in sorted(months.items())}
-                for sym, months in sorted(self.symbol_sessions.items())
+            "symbol_expect": {
+                sym: {day: [round(v, 1) for v in values] for day, values in sorted(rows.items())}
+                for sym, rows in sorted(self.symbol_expect.items())
             },
             "days": {k: v.to_json() for k, v in sorted(self.days.items())},
         }
@@ -163,13 +165,9 @@ class SessionCalendar:
             days={k: SessionDay(**v) for k, v in payload.get("days", {}).items()},
             built_at=payload.get("built_at", ""),
             source=payload.get("source", ""),
-            symbol_months={
-                sym: {m: float(v) for m, v in months.items()}
-                for sym, months in payload.get("symbol_months", {}).items()
-            },
-            symbol_sessions={
-                sym: {m: [float(x) for x in bounds] for m, bounds in months.items()}
-                for sym, months in payload.get("symbol_sessions", {}).items()
+            symbol_expect={
+                sym: {d: [float(x) for x in values] for d, values in rows.items()}
+                for sym, rows in payload.get("symbol_expect", {}).items()
             },
         )
 
@@ -331,49 +329,68 @@ def build_calendar(
             minutes=int(slot["minutes"]),
         )
 
-    # Matarajio ya coverage: median ya dakika za siku KAMILI, kwa symbol/mwezi.
-    minutes_by_symbol_month: dict[str, dict[str, list[int]]] = defaultdict(
-        lambda: defaultdict(list)
-    )
+    # Uchunguzi wa siku KAMILI pekee, kwa kila symbol: [dakika, open, close].
+    observed: dict[str, dict[date, list[float]]] = defaultdict(dict)
     for (symbol, day), minutes in per_symbol_day.items():
-        if days.get(day.isoformat(), SessionDay(day="", kind=KIND_CLOSED)).kind == KIND_FULL:
-            minutes_by_symbol_month[symbol][day.isoformat()[:7]].append(minutes)
-    symbol_months = {
-        symbol: {
-            month: float(statistics.median(values)) for month, values in months.items() if values
-        }
-        for symbol, months in minutes_by_symbol_month.items()
-    }
-
-    # Mipaka ya session kwa symbol/mwezi (dakika kutoka usiku wa manane, UTC).
-    bounds_by_symbol_month: dict[str, dict[str, list[list[float]]]] = defaultdict(
-        lambda: defaultdict(list)
-    )
-    for (symbol, day), (first, last) in per_symbol_bounds.items():
         if days.get(day.isoformat(), SessionDay(day="", kind=KIND_CLOSED)).kind != KIND_FULL:
             continue
-        bounds_by_symbol_month[symbol][day.isoformat()[:7]].append(
-            [_minute_of_day(first), _minute_of_day(last)]
-        )
-    symbol_sessions = {
-        symbol: {
-            month: [
-                float(statistics.median([b[0] for b in pairs])),
-                float(statistics.median([b[1] for b in pairs])),
-            ]
-            for month, pairs in months.items()
-            if pairs
-        }
-        for symbol, months in bounds_by_symbol_month.items()
+        bounds = per_symbol_bounds.get((symbol, day))
+        if not bounds:
+            continue
+        observed[symbol][day] = [
+            float(minutes),
+            _minute_of_day(bounds[0]),
+            _minute_of_day(bounds[1]),
+        ]
+
+    symbol_expect = {
+        symbol: _weekday_expectations(rows) for symbol, rows in observed.items()
     }
 
     return SessionCalendar(
         days=days,
         built_at=datetime.now(timezone.utc).isoformat(timespec="seconds"),
         source=source,
-        symbol_months=symbol_months,
-        symbol_sessions=symbol_sessions,
+        symbol_expect=symbol_expect,
     )
+
+
+# Majirani wangapi wa siku ile ile ya wiki yanahitajika kutoa matarajio.
+NEIGHBOURS = 5
+MIN_SAMPLES = 2
+
+
+def _weekday_expectations(rows: dict[date, list[float]]) -> dict[str, list[float]]:
+    """Matarajio ya kila siku kutoka **majirani wa siku ile ile ya wiki**.
+
+    Siku yenyewe **haiingii** kwenye matarajio yake — vinginevyo siku
+    iliyoharibika ingejiwekea kizingiti chake na kupita daima.
+
+    Majirani wa siku ile ile ya wiki wakiwa pungufu ya `MIN_SAMPLES` (mfano
+    mwanzoni mwa data, au symbol yenye siku chache), tunarudi kwa majirani wa
+    siku yoyote. Ni sahihi kidogo kuliko kutokuwa na kipimo kabisa.
+    """
+    ordered = sorted(rows)
+    by_weekday: dict[int, list[date]] = defaultdict(list)
+    for day in ordered:
+        by_weekday[day.weekday()].append(day)
+
+    out: dict[str, list[float]] = {}
+    for index, day in enumerate(ordered):
+        same = [d for d in by_weekday[day.weekday()] if d != day]
+        pool = _nearest(same, day, NEIGHBOURS)
+        if len(pool) < MIN_SAMPLES:
+            pool = _nearest([d for d in ordered if d != day], day, NEIGHBOURS)
+        if not pool:
+            continue
+        out[day.isoformat()] = [
+            float(statistics.median([rows[d][slot] for d in pool])) for slot in (0, 1, 2)
+        ]
+    return out
+
+
+def _nearest(candidates: list[date], day: date, count: int) -> list[date]:
+    return sorted(candidates, key=lambda d: abs((d - day).days))[:count]
 
 
 def _minute_of_day(stamp: datetime) -> float:

@@ -172,6 +172,63 @@ def test_kalenda_inanasa_siku_ya_nusu_bila_kuiorodhesha():
     assert "2026-12-24" in cal.partial_days()
 
 
+def _wiki_za_fx(weeks: int = 8, symbol: str = "EURUSD") -> list[DayObservation]:
+    """Wiki halisi za FX: Jumatatu–Alhamisi hadi usiku wa manane, Ijumaa 21:00."""
+    obs: list[DayObservation] = []
+    monday = date(2026, 1, 5)  # Jumatatu
+    for week in range(weeks):
+        for offset in range(5):
+            day = monday + timedelta(days=week * 7 + offset)
+            ijumaa = offset == 4
+            minutes = 21 * 60 if ijumaa else 24 * 60
+            start = datetime(day.year, day.month, day.day, tzinfo=timezone.utc)
+            obs.append(
+                DayObservation(
+                    day=day,
+                    ticks=minutes * 40,
+                    first_ts=start,
+                    last_ts=start + timedelta(minutes=minutes - 1),
+                    symbol=symbol,
+                    minutes=minutes,
+                )
+            )
+    return obs
+
+
+def test_ijumaa_inapimwa_kwa_ijumaa_nyingine_si_kwa_wiki_nzima():
+    """Soko linafunga 21:00 Ijumaa: dakika 87.5% na close dakika 180 mapema.
+
+    Kupima Ijumaa kwa wastani wa Jumatatu–Alhamisi kunaifelisha kila wiki —
+    yaani asilimia 20 ya siku zote za trading, kwa kipimo kibaya pekee.
+    """
+    cal = build_calendar(_wiki_za_fx())
+    ijumaa = date(2026, 2, 6)
+    jumatatu = date(2026, 2, 2)
+    assert ijumaa.weekday() == 4 and jumatatu.weekday() == 0
+
+    assert cal.expected_minutes("EURUSD", ijumaa) == 21 * 60
+    assert cal.expected_minutes("EURUSD", jumatatu) == 24 * 60
+
+    _, close = cal.expected_session("EURUSD", ijumaa)
+    assert close.hour == 20 and close.minute == 59, "close ya Ijumaa, si ya Alhamisi"
+
+    # Kwa matarajio haya, Ijumaa ya kawaida inapita checks zote mbili.
+    assert check_coverage(21 * 60, cal.expected_minutes("EURUSD", ijumaa), 0.995).passed
+
+
+def test_siku_haiwezi_kujiwekea_kizingiti_chake():
+    """Siku iliyokatika ikiingia kwenye matarajio yake, ingepita daima."""
+    obs = _wiki_za_fx()
+    mbaya = date(2026, 2, 4)  # Jumatano iliyokatika nusu
+    for item in obs:
+        if item.day == mbaya:
+            item.minutes = 12 * 60
+            item.ticks = 12 * 60 * 40
+    cal = build_calendar(obs)
+    assert cal.expected_minutes("EURUSD", mbaya) == 24 * 60, "majirani, si yenyewe"
+    assert not check_coverage(12 * 60, cal.expected_minutes("EURUSD", mbaya), 0.995).passed
+
+
 def test_kalenda_ya_data_dhidi_ya_ya_kudhaniwa():
     from src.data.calendar import TradingCalendar
 
