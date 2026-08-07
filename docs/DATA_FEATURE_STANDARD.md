@@ -159,10 +159,10 @@ Kila partition inapita ukaguzi huu. Ikifeli → **haitumiki kwa training**, na r
 | # | Ukaguzi | Sheria | FAIL reason |
 |---|---|---|---|
 | 1 | **coverage** | bars zilizopo ÷ bars zinazotarajiwa (session calendar) ≥ `min_coverage` — L0 (ticks): **dakika zenye quote** dhidi ya median ya siku kamili za symbol/mwezi | `low_coverage` |
-| 2 | **monotonicity** | timestamps zinapanda, hakuna duplicate | `bad_timestamps` |
+| 2 | **monotonicity** | timestamps zinapanda; **kurudi nyuma = 0 daima**; duplicate ≤ `max_duplicate_frac` (MT5 inatoa quotes mbili kwenye µs moja) | `bad_timestamps` |
 | 3 | **gaps** | L0 (ticks): pengo ≤ `max_gap_seconds` · L2 (bars): ≤ `max_gap_bars` | `intrasession_gap` |
 | 4 | **OHLC sanity** | `low ≤ min(open,close) ≤ max(open,close) ≤ high` — **inakaguliwa L2**, kwa sababu ticks hazina OHLC (§4) | `ohlc_violation` |
-| 5 | **quote sanity** | `bid < ask`, `spread > 0`, `spread ≤ max_plausible` | `quote_violation` |
+| 5 | **quote sanity** | `bid < ask`, `spread > 0`, `spread ≤ max_plausible` — `crossed` na `zero_spread` zinahesabiwa **kando** | `quote_violation` |
 | 6 | **DST/session** | mabadiliko ya saa yanalingana na kalenda ya broker — mipaka ni median ya **symbol/mwezi**; hatua ya saa 1 kamili inaandikwa kama DST, si FAIL | `session_mismatch` |
 | 7 | **clock drift** | tofauti ya server↔UTC ni thabiti | `clock_drift` |
 | 8 | **flat bars** | mfululizo wa bars zenye `high==low` ≤ `max_flat_bars` — **inakaguliwa L2** · L0 (ticks): quote ile ile kwa `max_stale_seconds` | `stale_feed` |
@@ -187,6 +187,11 @@ na close yake iko **dakika 180** mapema. Ijumaa ni asilimia 20 ya siku zote za t
 kwa wastani wa wiki nzima kunaifelisha kila wiki kwa kipimo kibaya pekee. Matarajio yanatoka kwa
 median ya **majirani wa siku ile ile ya wiki**, na siku yenyewe **haiingii** — vinginevyo siku
 iliyoharibika ingejiwekea kizingiti chake na kupita daima.
+
+**Ticks zenye timestamp ile ile haziondolewi — zinapangwa kwa mpangilio wa kufika.** Labels za
+touch (§5) zinatatuliwa kwa mfuatano wa ticks, kwa hiyo mpangilio wa ticks zinazoshiriki kipimo
+kimoja cha muda ni sehemu ya jibu. Kila `sort` kwenye tabaka hili ni **stable**; kuzifuta
+kungepoteza quotes halisi, na kuzipanga upya kungefanya dataset isizalishike upya (§8).
 
 **Sera ya NaN:** hakuna imputation ya kubuni. Bar isiyokamilika inabeba `is_valid=false` na
 **haitumiki** kama decision point; inaweza kutumika kama history kwa window ndefu **kama** feature

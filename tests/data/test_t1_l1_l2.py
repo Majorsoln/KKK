@@ -76,6 +76,31 @@ def test_check2_monotonicity_inanasa_duplicate_na_kurudi_nyuma():
     assert not result.passed and result.reason == FAIL_BAD_TIMESTAMPS
 
 
+def test_check2_duplicate_chache_za_tick_feed_hazifelishi():
+    """MT5 inatoa quotes mbili kwenye µs moja — ni kawaida, si kasoro."""
+    frame = _ticks(datetime(2026, 8, 3, tzinfo=timezone.utc), 10_000, step_s=1.0)
+    frame.loc[5000, "timestamp"] = frame.loc[4999, "timestamp"]  # duplicate MOJA
+    assert check_monotonicity(frame, max_duplicate_frac=0.001).passed
+    assert not check_monotonicity(frame, max_duplicate_frac=0.0).passed
+
+
+def test_check2_kurudi_nyuma_hakuvumiliwi_hata_kwa_kikomo_kikubwa():
+    frame = _ticks(datetime(2026, 8, 3, tzinfo=timezone.utc), 10_000, step_s=1.0)
+    frame.loc[5000, "timestamp"] = frame.loc[10, "timestamp"]
+    result = check_monotonicity(frame, max_duplicate_frac=0.5)
+    assert not result.passed and result.reason == FAIL_BAD_TIMESTAMPS
+
+
+def test_check5_zero_spread_inatofautishwa_na_crossed():
+    """`bid == ask` na `bid > ask` zote zinafeli, lakini si kasoro moja."""
+    frame = _ticks(datetime(2026, 8, 3, tzinfo=timezone.utc), 5)
+    sifuri = frame.copy()
+    sifuri.loc[2, "ask"] = sifuri.loc[2, "bid"]
+    result = check_quote_sanity(sifuri, max_spread_pips=50.0, pip=0.0001)
+    assert not result.passed
+    assert "zero_spread=1" in result.detail and "crossed=0" in result.detail
+
+
 def test_check3_gaps():
     frame = _ticks(datetime(2026, 8, 3, tzinfo=timezone.utc), 10, step_s=1.0)
     assert check_gaps(frame, max_gap_seconds=60).passed

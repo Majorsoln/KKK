@@ -77,6 +77,9 @@ quality:
   max_gap_seconds:     3600             # pengo ndani ya session (L0 ni TICKS, si bars)
   max_gap_bars:        3                # pengo ndani ya session kwa bars za L2
   session_tolerance_minutes: 15         # mipaka ya session dhidi ya kalenda (DST inanaswa hapa)
+  max_duplicate_frac:  0.001            # ticks zenye timestamp ILE ILE. MT5 inatoa µs/ms; quotes
+                                        # mbili kutua kipimo kimoja ni la lazima kitakwimu, si
+                                        # kasoro. KURUDI NYUMA hakuvumiliwi kamwe (kikomo ni 0).
   partial_day_frac:    0.25             # siku yenye ticks < hii x wastani wa mwezi = `partial`
   max_stale_seconds:   1800             # L0: quote ILE ILE kwa muda huu -> feed imeganda
                                         # (kuhesabu ticks ni kipimo kisicho na maana:

@@ -91,7 +91,11 @@ def build_bars(ticks: pd.DataFrame, timeframe: str, symbol: str) -> pd.DataFrame
     frame["mid"] = (frame["bid"] + frame["ask"]) / 2.0
     frame["spread_pips"] = (frame["ask"] - frame["bid"]) / pip
     frame["vol"] = frame["bid_vol"].fillna(0.0) + frame["ask_vol"].fillna(0.0)
-    frame = frame.set_index("timestamp").sort_index()
+    # `kind="stable"`: ticks zenye timestamp ILE ILE (MT5 inatoa nyingi kama
+    # hizo) zinabaki kwa mpangilio wa kufika. Bila hii, `open`/`close` ya bar
+    # ingeweza kubadilika kati ya run na run — dataset isiyoweza kuzalishwa
+    # upya (§8).
+    frame = frame.set_index("timestamp").sort_index(kind="stable")
 
     grouped = frame.resample(TIMEFRAME_RULES[timeframe], label="left", closed="left")
     bars = pd.DataFrame(

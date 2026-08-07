@@ -120,19 +120,37 @@ def check_coverage(rows: int, expected_rows: int, min_coverage: float) -> CheckR
     )
 
 
-def check_monotonicity(frame: pd.DataFrame) -> CheckResult:
-    """2 — timestamps zinapanda, hakuna duplicate."""
+def check_monotonicity(frame: pd.DataFrame, max_duplicate_frac: float = 0.0) -> CheckResult:
+    """2 — timestamps zinapanda; duplicate chache za tick feed zinavumiliwa.
+
+    **Kurudi nyuma hakuvumiliwi kamwe** — hakuna feed inayoweza kuzalisha tick
+    ya zamani baada ya mpya; hiyo ni saa iliyoharibika au faili lililochanganywa.
+
+    **Duplicate ni jambo lingine kabisa.** MT5 inatoa timestamps za µs/ms; quotes
+    mbili zinaweza kutua ndani ya kipimo kile kile. Kwenye ticks bilioni 3.4
+    hilo ni la lazima kitakwimu, si kasoro. Kizuizi ni **sehemu** yake
+    (`max_duplicate_frac`), si sifuri kamili.
+
+    Kinachohitajika kwa duplicate si kuzifuta bali **mpangilio thabiti**: labels
+    za touch (§5) zinatatuliwa kwa mfuatano wa ticks, kwa hiyo ticks zenye
+    timestamp ile ile lazima zibaki kwa mpangilio wa kufika. Ndiyo maana kila
+    sort kwenye tabaka hili ni stable (`kind="stable"`/`mergesort`).
+    """
     ts = frame["timestamp"]
-    non_monotonic = int((ts.diff() < pd.Timedelta(0)).sum())
+    backwards = int((ts.diff() < pd.Timedelta(0)).sum())
     duplicates = int(ts.duplicated().sum())
-    passed = non_monotonic == 0 and duplicates == 0
+    frac = duplicates / len(frame) if len(frame) else 0.0
+    passed = backwards == 0 and frac <= max_duplicate_frac
     return CheckResult(
         name="monotonicity",
         passed=passed,
         reason="" if passed else FAIL_BAD_TIMESTAMPS,
-        value=float(non_monotonic + duplicates),
+        value=float(backwards + duplicates),
         threshold=0.0,
-        detail=f"zilizorudi nyuma={non_monotonic} duplicates={duplicates}",
+        detail=(
+            f"zilizorudi nyuma={backwards} duplicates={duplicates} "
+            f"({frac:.6f} ya ticks; kikomo {max_duplicate_frac})"
+        ),
     )
 
 
@@ -154,13 +172,22 @@ def check_gaps(frame: pd.DataFrame, max_gap_seconds: float) -> CheckResult:
 
 
 def check_quote_sanity(frame: pd.DataFrame, max_spread_pips: float, pip: float) -> CheckResult:
-    """5 — `bid < ask`, `spread > 0`, `spread ≤ max_plausible`."""
+    """5 — `bid < ask`, `spread > 0`, `spread ≤ max_plausible`.
+
+    `crossed` (`bid > ask`) na `zero_spread` (`bid == ask`) zinahesabiwa
+    **kando**. Zote mbili zinafelisha — quote yoyote kati yao haiwezi kutumika
+    kwa RCE (§3.1 inatumia spread kama gharama) wala kwa labels za touch (§5,
+    `touch_side: trade_price`). Lakini si kitu kimoja: `crossed` ni feed
+    iliyoharibika, `zero_spread` mara nyingi ni bei ya `mid` iliyoingizwa
+    mahali pa bid/ask. Ripoti inatofautisha ili suluhisho lisiwe la kubahatisha.
+    """
     bid, ask = frame["bid"], frame["ask"]
-    crossed = int((bid >= ask).sum())
+    crossed = int((bid > ask).sum())
+    zero_spread = int((bid == ask).sum())
     spread_pips = (ask - bid) / pip
     too_wide = int((spread_pips > max_spread_pips).sum())
     non_positive = int((bid <= 0).sum() + (ask <= 0).sum())
-    bad = crossed + too_wide + non_positive
+    bad = crossed + zero_spread + too_wide + non_positive
     return CheckResult(
         name="quote_sanity",
         passed=bad == 0,
@@ -168,8 +195,8 @@ def check_quote_sanity(frame: pd.DataFrame, max_spread_pips: float, pip: float) 
         value=float(bad),
         threshold=0.0,
         detail=(
-            f"crossed={crossed} spread>{max_spread_pips}pips={too_wide} "
-            f"bei<=0={non_positive}"
+            f"crossed={crossed} zero_spread={zero_spread} "
+            f"spread>{max_spread_pips}pips={too_wide} bei<=0={non_positive}"
         ),
     )
 
@@ -343,7 +370,7 @@ def check_partition(
 
     result.checks = [
         _worst_by_day(frame, _coverage),
-        check_monotonicity(frame),
+        check_monotonicity(frame, float(cfg.get("quality.max_duplicate_frac", 0.0))),
         _worst_by_day(frame, lambda day, group: check_gaps(group, max_gap)),
         check_quote_sanity(frame, max_spread, pip),
         _worst_by_day(frame, _session),

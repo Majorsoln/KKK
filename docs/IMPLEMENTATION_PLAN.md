@@ -430,9 +430,9 @@ L1 ilifelisha 1,735/2,767 — na **sehemu kubwa ilikuwa kipimo kibaya, si data m
 | `stale_feed` | 1,374 | **kosa la kipimo.** Kizingiti cha spec ni cha **bars** (`high == low`), nilikitumia kwa **ticks**. Dakika tulivu ya Asia ina ticks 40 zenye quote ile ile — si feed iliyoganda. Sasa: L0 inapima **muda** (`max_stale_seconds`), L2 inapima bars (`max_flat_bars`) |
 | `low_coverage` | 647 | **kosa la kipimo — IJUMAA.** `quality-stats`: p1/p5 = `0.875` = `21/24`. Soko linafunga 21:00 Ijumaa; nilikuwa naipima kwa wastani wa Jumatatu–Alhamisi |
 | `session_mismatch` | 548 | **kosa lile lile.** p90/p95/p99 = `180.0` dakika kamili = saa 3 za close ya Ijumaa. Kufeli 549/2,767 = 19.8% ≈ sehemu ya Ijumaa kwenye siku za trading (20%) |
-| `bad_timestamps` | 16 | **matokeo halisi** — yanahitaji uchunguzi |
-| `intrasession_gap` | 14 | **matokeo halisi** — yanahitaji uchunguzi |
-| `quote_violation` | 2 | **matokeo halisi** — yanahitaji uchunguzi |
+| `bad_timestamps` | 16 | `--reason`: **zote ni duplicates (1–4), kurudi nyuma = 0**. MT5 inatoa quotes mbili kwenye µs moja — la lazima kitakwimu kwenye ticks bilioni 3.4, si kasoro. Sasa: kurudi nyuma = 0 daima; duplicate ≤ `max_duplicate_frac` |
+| `intrasession_gap` | 14 | **matokeo halisi (0.5%).** Sita ni mapengo ya ~saa 14 (siku za sikukuu zilizosalia `full`); nne ni saa 1 haswa. Kizingiti kinabaki 3600s |
+| `quote_violation` | 2 | **matokeo halisi** — `crossed=1361` na `crossed=228` kwenye EURUSD/2024. `crossed` na `zero_spread` sasa zinahesabiwa kando ili suluhisho lisiwe la kubahatisha |
 
 Mgawanyo ndio uliotoa jibu, si nadharia: `session_match` haikuwa imetawanyika bali ilikuwa na
 **rundo mbili** — p50 = `0.08` dakika na p90–p99 = `180.0` dakika kamili. Namba kamili kama hiyo
