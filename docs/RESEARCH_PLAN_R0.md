@@ -60,16 +60,17 @@ kwa hiyo inakwenda sambamba — lakini models zake zinaingia R4+ kwa lango lile 
 **Swali:** je data tuliyonayo (ticks 2016–2026, symbols 12, matoleo 2 ya schema) inatosha
 kujenga chochote?
 
-| Kipimo | Kizingiti |
-|---|---|
-| coverage kwa symbol/mwaka | ≥ `min_coverage` (0.995) |
-| partitions zilizofeli §3 ya standard | 0 zinazoingia L2 |
-| gaps ndani ya session | ≤ `max_gap_bars` |
-| ukamilifu wa bid **na** ask | 100% ya bars zinazotumika |
-| miaka inayotumika | ≥ `min_years` (10) |
-| **normalization ya Toleo A/B** (§2.1 ya standard) | schema moja; Toleo B inapita checks zote |
-| **ulinganisho A↔B** (spread/sessions kwenye pair zinazofanana) | tofauti zinaelezeka |
-| **ulinganisho aggregator↔broker** kwa siku 4 zinazopishana (2026-04-27 … 04-30) | spread/ticks zinalingana kwa kiasi kinachoelezeka — kama hazilingani, provenance ya gharama si moja |
+| Kipimo | Kizingiti | Kinapimwa na (T1) |
+|---|---|---|
+| coverage kwa symbol/mwaka | ≥ `min_coverage` (0.995) | `check-l1` → `quality_report.json` (`by_symbol_year`) |
+| partitions zilizofeli §3 ya standard | 0 zinazoingia L2 | `check-l1` (`fail_action: exclude`) |
+| gaps ndani ya session | L0: ≤ `max_gap_seconds` · L2: ≤ `max_gap_bars` | `check-l1` · `build-l2` (`bars.check_bar_gaps`) |
+| ukamilifu wa bid **na** ask | 100% ya bars zinazotumika | `check-l1` check 5 (`crossed`/`zero_spread`/`bei<=0` kando) |
+| miaka inayotumika | ≥ `min_years` (10) | `quality_report.json` → `coverage_by_symbol.*.meets_min_years` |
+| **normalization ya Toleo A/B** (§2.1 ya standard) | schema moja; Toleo B inapita checks zote | `compare-variants` → `canonical_schema_identical` |
+| **ulinganisho A↔B** (spread/sessions kwenye pair zinazofanana) | tofauti zinaelezeka | `compare-variants` + `calendar_vs_assumed.json` → `by_variant` |
+| **ulinganisho aggregator↔broker** kwa siku 4 zinazopishana (2026-04-27 … 04-30) | spread/ticks zinalingana kwa kiasi kinachoelezeka — kama hazilingani, provenance ya gharama si moja | `compare-provenance` → `provenance_comparison.json` |
+| **vizingiti vyenyewe** | vinatoka kwenye mgawanyo wa data, si mezani | `quality-stats` → `threshold_study.json` |
 
 **Kazi mbili za ziada za R0 (PD 2026-08-04):**
 1. **Kurekodi feed ya broker wa live/demo kuanzia sasa** (§2.2 ya standard — provenance).
@@ -79,6 +80,11 @@ kujenga chochote?
 
 **Deliverable:** `quality_report.json` kwa kila symbol/mwaka + kalenda ya sessions
 iliyothibitishwa kwa data (si kudhaniwa) + schema moja ya kawaida L1.
+
+Faili zote zinaandikwa `research/reports/quality/` na `scripts\audit.bat` (SETUP §3.1):
+`session_calendar.json` · `calendar_vs_assumed.json` · `quality_report.json` ·
+`threshold_study.json` · `variant_comparison.json` · `provenance_comparison.json` ·
+`splits.json`.
 
 **Ikifeli:** (a) omba data ndefu/safi kwa broker, au (b) punguza symbols hadi zenye ubora, na
 **rekodi** kwamba wigo umepungua. Kamwe usiendelee na partition iliyofeli "kwa sababu ni ndogo".

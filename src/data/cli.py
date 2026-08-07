@@ -19,6 +19,7 @@ T1 — ukaguzi wa R0 (mfuatano huu, si mwingine):
     python -m src.data.cli check-l1           # DF-05 — checks za ubora + quality_report.json
     python -m src.data.cli quality-stats      # DF-05 — vizingiti kutoka DATA (haisomi parquet)
     python -m src.data.cli compare-variants   # RS-03 — Toleo A ↔ Toleo B baada ya normalization
+    python -m src.data.cli compare-provenance # R0   — aggregator ↔ broker, siku zinazopishana
     python -m src.data.cli build-l2           # DF-06 — bars za TF 7 kutoka ticks
     python -m src.data.cli sentinel           # DF-08 / G1 — sentinel ya uvujaji
     python -m src.data.cli splits             # DF-14 / G2 — mpango wa splits + holdout guard
@@ -425,7 +426,10 @@ def cmd_build_calendar(args: argparse.Namespace) -> int:
     )
     calendar_path = build.calendar.save(out_dir / "session_calendar.json")
     diff_path = out_dir / "calendar_vs_assumed.json"
-    diff_path.write_text(json.dumps(build.comparison, indent=2) + "\n", encoding="utf-8")
+    diff_path.write_text(
+        json.dumps({**build.comparison, "by_variant": build.by_variant}, indent=2) + "\n",
+        encoding="utf-8",
+    )
 
     print(build.render())
     print(f"kalenda : {calendar_path}")
@@ -531,6 +535,51 @@ def cmd_compare_variants(args: argparse.Namespace) -> int:
     print(f"schema ya kawaida inalingana A↔B: {'NDIYO' if identical else 'HAPANA'}")
     print(f"ripoti: {path}")
     return 0 if identical else 1
+
+
+def cmd_compare_provenance(args: argparse.Namespace) -> int:
+    """R0 — aggregator ↔ broker kwa siku zinazopishana (spec §2.2 sharti 2)."""
+    cfg = _load(args)
+    from .audit import compare_provenance
+
+    root = Path(args.l0_root).expanduser() if args.l0_root else cfg.l0_root
+    out_dir = _quality_dir(args, cfg)
+    on_progress, started = _progress_printer(args.progress_every)
+
+    summary = compare_provenance(
+        cfg, root, symbols=_symbol_list(args), on_progress=on_progress
+    )
+    path = out_dir / "provenance_comparison.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")
+
+    if not summary["comparisons"]:
+        print(
+            "hakuna siku zinazopishana kati ya aggregator na broker — "
+            "ulinganisho wa §2.2 hauwezekani bado.",
+            file=sys.stderr,
+        )
+        print(f"ripoti: {path}")
+        return 1
+
+    ratio = summary["spread_p50_ratio"]
+    print(
+        f"siku zinazopishana: {len(summary['overlap_days'])} · "
+        f"symbols {len(summary['symbols'])} · linganisho {summary['comparisons']}"
+    )
+    print(
+        f"spread_p50 broker/aggregator: median={ratio['median']} "
+        f"(min={ratio['min']} max={ratio['max']})"
+    )
+    print("  >1 = broker ni ghali zaidi kuliko data tuliyofundishia (EV ingekuwa ya matumaini)")
+    for row in summary["rows"][:12]:
+        print(
+            f"  {row['symbol']} {row['day']}: agg={row['aggregator']['spread_p50']} "
+            f"broker={row['broker']['spread_p50']} pips · "
+            f"uwiano={row['spread_p50_ratio']} · ticks x{row['tick_ratio']}"
+        )
+    print(f"ripoti: {path} · {time.monotonic() - started:.0f}s")
+    return 0
 
 
 def cmd_build_l2(args: argparse.Namespace) -> int:
@@ -826,6 +875,17 @@ def build_parser() -> argparse.ArgumentParser:
     p_var.add_argument("--l0-root")
     p_var.add_argument("--out-dir")
     p_var.set_defaults(func=cmd_compare_variants)
+
+    p_prov = subparsers.add_parser(
+        "compare-provenance",
+        help="R0 — aggregator ↔ broker kwa siku zinazopishana (§2.2)",
+        parents=[common],
+    )
+    p_prov.add_argument("--l0-root")
+    p_prov.add_argument("--out-dir")
+    p_prov.add_argument("--symbols")
+    p_prov.add_argument("--progress-every", type=int, default=5)
+    p_prov.set_defaults(func=cmd_compare_provenance)
 
     p_l2 = subparsers.add_parser(
         "build-l2", help="DF-06 — bars za TF 7 kutoka ticks (§4)", parents=[common]

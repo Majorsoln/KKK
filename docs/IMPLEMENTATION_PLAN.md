@@ -90,8 +90,11 @@ kamwe si kwa tarehe. Mfuatano ndio mgumu; kasi inafuata ubora, si kinyume.
 > **KUPITIA**, **KUFANYA** au **KUSHIRIKI**. Term inayofuata haianzishwi kabla ya sahihi yako ya
 > exit ya iliyotangulia. Safu ya **HALI** inasasishwa hapa kila term inapofunguliwa au kufungwa.
 
-**▶ HALI YA SASA (2026-08-06): T0 IMEFUNGWA** — DF-01..04, DF-17, DF-18 ziko `VERIFIED` kwa
-data halisi (ledger §3.5). **T1 (R0) na TRACK E: TAYARI KUANZA.** Nyingine: zinasubiri mfuatano.
+**▶ HALI YA SASA (2026-08-07).** T0 `IMEFUNGWA` — DF-01..04, DF-17, DF-18 ziko `VERIFIED` kwa
+data halisi (ledger §3.5). **T1 (R0): code imekamilika** (DF-05..08, DF-14, RS-03 ziko
+`IMPLEMENTED`; malango G1 na G2 yanakimbia kila build); kipimo cha data halisi kinaendelea, na
+`VERIFIED` inasubiri sahihi ya PD baada ya `audit.bat` kwa symbols zote 12. **TRACK E:**
+`IMPLEMENTED`, inasubiri namba halisi za broker (T7). Nyingine: zinasubiri mfuatano.
 
 ---
 
@@ -141,7 +144,7 @@ Mwisho: tests zote RCE-* kijani kwenye CI + rejista imesasishwa.
 
 ---
 
-### T1 — R0 (DATA AUDIT) ▶ `TAYARI KUANZA`
+### T1 — R0 (DATA AUDIT) ▶ `CODE IMEKAMILIKA · KIPIMO CHA DATA HALISI KINAENDELEA` (ledger §3.5)
 **PROMPT:**
 ```
 Tekeleza TERM T1 (rejista DF-05..DF-08, DF-14, RS-03): L1 checks 8 + quality_report.json
@@ -152,11 +155,24 @@ config/data.yaml pekee (G2 holdout guard inaanza HAPA). Ripoti: R0 dhidi ya vizi
 vya data.yaml + ulinganisho A<->B.
 ```
 **WEWE (PD):**
-- **KUSOMA:** `quality_report.json` (muhtasari) + ripoti ya ulinganisho A↔B.
-- **KUFANYA:** thibitisha `broker_server_tz` na kalenda kwa broker halisi; amua hatma ya
-  partitions zilizofeli (default: exclude + rekodi wigo uliopungua).
-- **KUPITIA:** uthibitisho kwamba sentinel inafelisha build ya uvujaji wa makusudi (demo ya G1).
-- **SAHIHI YA EXIT:** R0 PASS/LESSON kwa kila symbol.
+- **KUENDESHA:** `scripts\audit.bat` (SETUP §3.1) — hatua 6, haigusi MT5.
+- **KUSOMA** (zote ziko `research/reports/quality/`):
+
+  | Faili | Swali linalojibiwa |
+  |---|---|
+  | `quality_report.json` | data ni safi kiasi gani, kwa symbol/mwaka, dhidi ya vizingiti vyote |
+  | `threshold_study.json` | kizingiti kilichotumika ni sahihi, au kinafelisha data nzuri? |
+  | `calendar_vs_assumed.json` | kalenda tuliyodhani ilikuwa na makosa mangapi; Toleo A ↔ B |
+  | `variant_comparison.json` | matoleo mawili ya schema yanatoa data moja? |
+  | `provenance_comparison.json` | **spread ya broker ni pana kiasi gani kuliko ya aggregator?** |
+
+- **KUFANYA:** (1) thibitisha `broker_server_tz` na kalenda kwa broker halisi; (2) chagua
+  vizingiti kutoka `threshold_study.json` na uviandike `config/data.yaml` → `quality:`;
+  (3) amua hatma ya partitions zilizofeli (default: exclude + rekodi wigo uliopungua).
+- **KUPITIA:** uthibitisho kwamba sentinel inafelisha build ya uvujaji wa makusudi (demo ya G1) —
+  `pytest -k sentinel` ina test inayodai jina la feature iliyovuja.
+- **SAHIHI YA EXIT:** R0 PASS/LESSON kwa kila symbol. Vipengele vinavyopanda `VERIFIED`:
+  DF-05, DF-06, DF-07, DF-08, DF-14, RS-03.
 
 ---
 
@@ -378,9 +394,9 @@ kwa vigezo — LESSON ni jibu halali; kificho ni pale tu eneo linaruka bila kupi
 | DF-18 | `VERIFIED` | 2026-08-06 | **data halisi:** backfill 2026-04-27 → 08-05 ilijaza siku 840 zilizokosekana kwa kutumia disk kama ukweli; kufeli 8 za ukingo zilirekebishwa kwa kurudia | — |
 | RCE-01..13 | `IMPLEMENTED` | 2026-08-06 | `src/rce/{budget,cost,sizing,gate,engine}.py` · `tests/rce/` (39 tests). **Golden**: jedwali la bajeti §2 (safu 4) · mfano wa §6 (lots 0.16 / $34.88 / deviation 3pt) · modes 3 za swap + triple WED · gate checks 6 kwa mpangilio · §5b (module haina hali inayodumu) | namba halisi za broker kwenye `broker_costs.yaml` (commission); kuunganishwa na MT5 (T7) |
 | DF-19 | `IMPLEMENTED` | 2026-08-06 | `scripts/{setup,catchup,record,status}.bat` + `env.example.bat`; lango G13 (`test_repo_guards.py`) | kuendeshwa kwa scripts kwenye mashine ya PD |
-| RS-03 | `IMPLEMENTED` | 2026-08-07 | `src/data/session_calendar.py` + `audit.py`; kalenda inatoka kwenye DATA (siku `full`/`partial` zinagunduliwa kwa median ya mwezi, hakuna orodha ya sikukuu ya mkono) + `calendar_vs_assumed.json` + `variant_comparison.json`; `build-calendar` / `compare-variants` | kukimbizwa kwenye L0 halisi (partitions 25,486) na PD kupitia siku zinazotofautiana |
-| DF-05 | `IMPLEMENTED` | 2026-08-07 | `src/data/quality.py` (checks 7 za L0; ya 4 iko L2) + `quality_report.json` kwa symbol/mwaka + sababu za FAIL; `check-l1`; tests 12 | `quality_report.json` ya L0 halisi + uamuzi wa PD kuhusu partitions zinazofeli |
-| DF-06 | `IMPLEMENTED` | 2026-08-07 | `src/data/bars.py` + `audit.build_l2`: TF 7 kutoka TICKS, spread stats kwa kila bar, bar bila tick HAIANDIKWI; ujenzi kwa vipande unathibitishwa kutoa bars zile zile (`test_l2_kwa_vipande...`) | L2 ya symbols 12 kujengwa + OHLC sanity kupita kwenye data halisi |
+| RS-03 | `IMPLEMENTED` | 2026-08-07 | `src/data/session_calendar.py` + `audit.py`; kalenda inatoka kwenye DATA (hakuna orodha ya sikukuu ya mkono), matarajio kwa symbol **na siku ya wiki**; `calendar_vs_assumed.json` ikiwa na kalenda kwa **kila toleo la schema kando** (kazi ya 2 ya R0); `variant_comparison.json`; `provenance_comparison.json` (aggregator↔broker, §2.2 sharti 2); `threshold_study.json` | kukimbizwa kwenye L0 halisi (partitions 25,486) na PD kupitia siku zinazotofautiana |
+| DF-05 | `IMPLEMENTED` | 2026-08-07 | `src/data/quality.py` (checks 7 za L0; ya 4 na ya 8 ziko L2) + `quality_report.json` kwa symbol/mwaka, **vizingiti vyote** vilivyotumika, na wigo wa miaka dhidi ya `min_years`; `check-l1` + `quality-stats`; tests 20 | `quality_report.json` ya L0 halisi + uamuzi wa PD kuhusu partitions zinazofeli |
+| DF-06 | `IMPLEMENTED` | 2026-08-07 | `src/data/bars.py` + `audit.build_l2`: TF 7 kutoka TICKS, spread stats + **`n_m1_bars`** kwa kila bar, bar bila tick HAIANDIKWI, sort ni **stable** (duplicate timestamps zinabaki kwa mpangilio wa kufika); checks za L2: OHLC (§3 ya 4), `flat_bars` (§3 ya 8), `bar_gaps` (§3 ya 3); ujenzi kwa vipande unathibitishwa kutoa bars zile zile | L2 ya symbols 12 kujengwa + checks za L2 kupita kwenye data halisi |
 | DF-07 | `IMPLEMENTED` | 2026-08-07 | `src/data/asof.py`; mfano wa §4.1 ni test (`test_asof_mfano_wa_spec`: D1 ya jana, H4 ya 08:00, M15 ya 09:45) + test juu ya L2 iliyoandikwa diski | matumizi kwenye L3 (T2) |
 | DF-08 | `IMPLEMENTED` | 2026-08-07 | `src/data/sentinel.py` + **lango G1 kwenye CI** (`sentinel --synthetic`, inakimbia bila storage); inataja **jina la feature iliyovuja**, si "imefeli" tu | kuunganishwa na build halisi ya L3 (T2) |
 | DF-14 | `IMPLEMENTED` | 2026-08-07 | `src/data/splits.py` + **lango G2 kwenye CI** (`splits`); tarehe zote kutoka `config/data.yaml`; `random_split: true` inakataliwa; purge inapandishwa juu (siku 2 kwa embargo ya bars 36) | kutumika na datasets halisi (T2) |
@@ -449,8 +465,21 @@ Amri `quality-stats` inasoma `quality_report.json` iliyoshaandikwa (bila kusoma 
 kuonyesha, kwa kila ukaguzi, thamani zilivyotawanyika + **kizingiti gani kingefelisha ngapi**;
 `--reason <sababu>` inaorodhesha partitions zilizofeli pamoja na `detail` yake. PD anachagua.
 
+**Ukaguzi wa T1 dhidi ya prompt yake yenyewe (2026-08-07).** Kila kifungu cha prompt na cha
+vigezo vya R0 (`RESEARCH_PLAN_R0.md` §R0) kimekaguliwa; mapungufu sita yaliyokutwa yamezibwa:
+
+| Kilichokosekana | Kilipoandikwa | Kimezibwa na |
+|---|---|---|
+| `n_m1_bars` kwa kila bar | spec §4 + `bars.per_bar_stats` | `bars.build_bars` — dakika zenye quote ndani ya bar. `n_ticks` peke yake ingesema bar ya ticks 3,600 zilizojaa dakika 10 ni kamili |
+| gaps za L2 (`max_gap_bars`) | §3 check 3 · R0 | `bars.check_bar_gaps` — bars zisizokuwepo **ndani ya siku**; usiku si pengo |
+| **ulinganisho aggregator↔broker** | R0 · spec §2.2 sharti 2 | `compare-provenance` — spread p50/p95, ticks, dakika, kwa siku zinazopishana |
+| kalenda kwa **kila toleo la schema kando** | R0 kazi ya 2 | `calendar_vs_assumed.json` → `by_variant` (symbols, wigo wa siku, session median) |
+| `min_years` (miaka ≥ 10) | R0 | `quality_report.json` → `coverage_by_symbol.*.meets_min_years` |
+| vizingiti **vyote** kwenye ripoti | prompt: "R0 dhidi ya vizingiti vya `data.yaml`" | `new_report` sasa inachukua block nzima ya `quality:`, si vitano vilivyochaguliwa |
+
 **Kinachofuata:** `check-l1` tena kwa symbols mbili (kupima marekebisho ya Ijumaa + kipimo kipya
-cha `stale_feed`) → PD kuchagua vizingiti vilivyobaki → `audit.bat` kwa symbols zote 12.
+cha `stale_feed`) → PD kuchagua vizingiti vilivyobaki → `audit.bat` kwa symbols zote 12
+(sasa hatua 6, ikiwemo `compare-provenance`).
 
 **TRACK E:** `src/rce/` imejengwa kwa spec ILE ILE (haijaguswa). Kilichobaki kwa `VERIFIED`:
 namba halisi za Dukascopy kwenye `config/broker_costs.yaml` (commission round-turn), na

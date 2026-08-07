@@ -97,11 +97,19 @@ Haigusi MT5 — ni salama hata `record.bat` ikiwa inaendelea. Hatua tano, kwa **
 
 | # | Amri iliyo ndani | Inatoa nini |
 |---|---|---|
-| 1 | `build-calendar` | `reports\quality\session_calendar.json` + `calendar_vs_assumed.json` |
-| 2 | `check-l1` | `reports\quality\quality_report.json` (checks kwa symbol/mwaka + sababu za FAIL) |
-| 3 | `compare-variants` | `reports\quality\variant_comparison.json` (Toleo A ↔ B) |
-| 4 | `build-l2` | `data\L2_bars\symbol=<SYM>\tf=<TF>\bars.parquet` (TF 7) |
-| 5 | `sentinel` + `splits` | malango G1 na G2; `reports\quality\splits.json` |
+| 1 | `build-calendar` | `session_calendar.json` + `calendar_vs_assumed.json` (pamoja na kalenda kwa **kila toleo la schema kando**) |
+| 2 | `check-l1` | `quality_report.json` — checks kwa symbol/mwaka, vizingiti **vyote** vilivyotumika, wigo wa miaka dhidi ya `min_years` |
+| 2b | `quality-stats` | `threshold_study.json` — mgawanyo halisi + kizingiti gani kingefelisha ngapi |
+| 3a | `compare-variants` | `variant_comparison.json` (Toleo A ↔ B baada ya normalization) |
+| 3b | `compare-provenance` | `provenance_comparison.json` — **spread ya broker dhidi ya ya aggregator** kwa siku zinazopishana |
+| 4 | `build-l2` | `data\L2_bars\symbol=<SYM>\tf=<TF>\bars.parquet` (TF 7 + `n_m1_bars`) |
+| 5 | `sentinel` + `splits` | malango G1 na G2; `splits.json` |
+
+Hatua **3b** ndiyo yenye uzito mkubwa zaidi kwa fedha: models zinafunzwa kwa data ya aggregator
+lakini zitafanya biashara kwa feed ya broker, na **spread ndiyo gharama** (§3.1 ya RCE). Uwiano
+`broker/aggregator` ukiwa juu ya 1, kila EV iliyohesabiwa kwa data ya kihistoria ni ya matumaini
+kwa kiasi hicho. Siku zinazopishana (2026-04-27…04-30) ndizo pekee zinazoruhusu ulinganisho wa
+haki — siku ile ile, symbol ile ile, soko lile lile.
 
 Baada ya hatua ya 2, **kabla ya kuondoa partition yoyote**:
 ```cmd

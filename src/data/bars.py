@@ -53,6 +53,7 @@ BAR_COLUMNS: tuple[str, ...] = (
     "spread_p95",
     "spread_max",
     "n_ticks",
+    "n_m1_bars",
     "is_valid",
 )
 
@@ -91,6 +92,10 @@ def build_bars(ticks: pd.DataFrame, timeframe: str, symbol: str) -> pd.DataFrame
     frame["mid"] = (frame["bid"] + frame["ask"]) / 2.0
     frame["spread_pips"] = (frame["ask"] - frame["bid"]) / pip
     frame["vol"] = frame["bid_vol"].fillna(0.0) + frame["ask_vol"].fillna(0.0)
+    # `n_m1_bars` (spec §4): dakika ngapi ndani ya bar zilikuwa na quote. Ndicho
+    # kipimo cha ukamilifu WA KILA BAR: bar ya H1 yenye n_m1_bars=12 ilikuwa
+    # kimya dakika 48, hata kama ilipokea ticks 5,000 kwenye dakika hizo 12.
+    frame["minute"] = frame["timestamp"].dt.floor("min")
     # `kind="stable"`: ticks zenye timestamp ILE ILE (MT5 inatoa nyingi kama
     # hizo) zinabaki kwa mpangilio wa kufika. Bila hii, `open`/`close` ya bar
     # ingeweza kubadilika kati ya run na run — dataset isiyoweza kuzalishwa
@@ -110,6 +115,7 @@ def build_bars(ticks: pd.DataFrame, timeframe: str, symbol: str) -> pd.DataFrame
             "spread_p95": grouped["spread_pips"].quantile(0.95),
             "spread_max": grouped["spread_pips"].max(),
             "n_ticks": grouped["mid"].count(),
+            "n_m1_bars": grouped["minute"].nunique(),
         }
     )
     # Bar bila tick hata moja HAIPO — si bar tupu. Data ya kubuni ni marufuku (§3).
@@ -122,6 +128,7 @@ def build_bars(ticks: pd.DataFrame, timeframe: str, symbol: str) -> pd.DataFrame
 def _empty_bars() -> pd.DataFrame:
     empty = pd.DataFrame({name: pd.Series(dtype="float64") for name in BAR_COLUMNS})
     empty["n_ticks"] = pd.Series(dtype="int64")
+    empty["n_m1_bars"] = pd.Series(dtype="int64")
     empty["is_valid"] = pd.Series(dtype="bool")
     empty.index = pd.DatetimeIndex([], tz="UTC", name="timestamp")
     return empty
@@ -150,6 +157,36 @@ def check_ohlc_sanity(bars: pd.DataFrame) -> CheckResult:
         value=float(violations),
         threshold=0.0,
         detail=f"bars {violations} kati ya {len(bars)} zimekiuka",
+    )
+
+
+def check_bar_gaps(bars: pd.DataFrame, timeframe: str, max_gap_bars: int) -> CheckResult:
+    """Ukaguzi wa 3 wa §3 kwa upande wa L2: `pengo ≤ max_gap_bars`.
+
+    Pengo linahesabiwa **ndani ya siku** — usiku kati ya sessions na wikendi ni
+    kalenda, si mapengo (§3). Bar isiyokuwepo ni dakika zilizokosa quote kabisa;
+    mfululizo mrefu wa bars zisizokuwepo ndani ya siku moja ni pengo la kweli.
+    """
+    from .asof import TIMEFRAME_DURATION
+    from .quality import FAIL_INTRASESSION_GAP
+
+    if len(bars) < 2:
+        return CheckResult(name="bar_gaps", passed=True, detail="bars chache mno kupima")
+    step = TIMEFRAME_DURATION[timeframe]
+    worst = 0
+    for _, group in bars.groupby(bars.index.date):
+        if len(group) < 2:
+            continue
+        missing = (group.index.to_series().diff().dropna() / step) - 1
+        worst = max(worst, int(missing.max()) if len(missing) else 0)
+    passed = worst <= max_gap_bars
+    return CheckResult(
+        name="bar_gaps",
+        passed=passed,
+        reason="" if passed else FAIL_INTRASESSION_GAP,
+        value=float(worst),
+        threshold=float(max_gap_bars),
+        detail=f"bars {worst} mfululizo zisizokuwepo ndani ya siku moja",
     )
 
 

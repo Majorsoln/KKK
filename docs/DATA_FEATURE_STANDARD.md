@@ -211,6 +211,16 @@ spread_mean · spread_p50 · spread_p95 · spread_max      ← malighafi ya RCE 
 n_ticks · n_m1_bars · is_valid
 ```
 
+`n_m1_bars` = **dakika zenye quote ndani ya bar**, na ndicho kipimo cha ukamilifu wa bar.
+`n_ticks` peke yake kingedanganya: bar ya H1 yenye ticks 3,600 zote zilizojaa dakika 10 za
+kwanza ingeonekana kamili zaidi kuliko bar yenye ticks 600 zilizosambaa dakika 60 zote.
+
+Ticks zenye timestamp ile ile hazipangwi upya: kila `sort` hapa ni **stable**, kwa hiyo
+`open`/`close` ya bar ni ile ile kila run (§8 — kuzalisha upya).
+
+Checks za §3 zinazohitaji bars zinafanyika **hapa**: ya 4 (OHLC sanity), ya 8 (mfululizo wa
+`high == low`), na upande wa L2 wa ya 3 (`≤ max_gap_bars`, ukihesabiwa **ndani ya siku**).
+
 ### 4.1 AS-OF RULE (kinga kuu dhidi ya uvujaji)
 ```
 Wakati wa uamuzi t (= close ya bar ya H1):

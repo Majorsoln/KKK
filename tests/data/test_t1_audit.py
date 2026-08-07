@@ -269,6 +269,59 @@ def test_asof_inafanya_kazi_juu_ya_l2_iliyoandikwa(cfg, l0_tree, tmp_path):
     assert_no_future_bars(bars, t)
 
 
+def test_ripoti_inabeba_vizingiti_vyote_na_wigo_wa_miaka(cfg, l0_tree):
+    """R0 inaulizwa 'dhidi ya vizingiti vya data.yaml' — vyote lazima vionekane."""
+    calendar = build_session_calendar(cfg, l0_tree).calendar
+    payload = run_quality_audit(cfg, l0_tree, calendar=calendar).to_json()
+
+    for key in ("min_coverage", "max_gap_seconds", "max_stale_seconds", "max_duplicate_frac"):
+        assert key in payload["thresholds"], f"{key} haionekani kwenye ripoti"
+
+    eurusd = payload["coverage_by_symbol"]["EURUSD"]
+    assert eurusd["trading_days"] == len(DAYS)
+    assert eurusd["min_years"] == 10
+    assert eurusd["meets_min_years"] is False, "siku 4 si miaka 10 — ripoti iseme wazi"
+
+
+# ===========================================================================
+# R0 — aggregator ↔ broker (spec §2.2 sharti 2)
+# ===========================================================================
+
+
+def test_ulinganisho_wa_provenance_unapima_siku_zinazopishana(cfg, l0_root):
+    """Spread ya broker dhidi ya ya aggregator, siku ile ile, symbol ile ile."""
+    from src.data.audit import compare_provenance
+
+    day = DAYS[0]
+    agg = _day_ticks(day, FULL_MINUTES, 1.0900, 0.0001)  # spread pip 1.0
+    a_path = l0_root / "provenance=aggregator" / "symbol=EURUSD" / "2026" / f"{day}.parquet"
+    a_path.parent.mkdir(parents=True, exist_ok=True)
+    agg.to_parquet(a_path, index=False)
+
+    brk = _day_ticks(day, FULL_MINUTES, 1.0900, 0.0001)
+    brk["ask"] = brk["bid"] + 0.00016  # broker ni pana: pips 1.6
+    b_path = l0_root / "provenance=broker" / "symbol=EURUSD" / f"date={day}" / "ticks.parquet"
+    b_path.parent.mkdir(parents=True, exist_ok=True)
+    brk.to_parquet(b_path, index=False)
+
+    summary = compare_provenance(cfg, l0_root, symbols=["EURUSD"])
+    assert summary["overlap_days"] == [day.isoformat()]
+    assert summary["comparisons"] == 1
+    row = summary["rows"][0]
+    assert row["aggregator"]["spread_p50"] == pytest.approx(1.0, abs=0.01)
+    assert row["broker"]["spread_p50"] == pytest.approx(1.6, abs=0.01)
+    assert summary["spread_p50_ratio"]["median"] == pytest.approx(1.6, abs=0.02), (
+        "broker ni ghali kwa 60% — EV iliyohesabiwa kwa data ya aggregator ni ya matumaini"
+    )
+
+
+def test_bila_siku_zinazopishana_ulinganisho_hausemi_umefanikiwa(cfg, l0_tree):
+    from src.data.audit import compare_provenance
+
+    summary = compare_provenance(cfg, l0_tree)
+    assert summary["comparisons"] == 0 and summary["overlap_days"] == []
+
+
 # ===========================================================================
 # Kuchagua partitions
 # ===========================================================================

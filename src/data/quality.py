@@ -433,6 +433,7 @@ class QualityReport:
     config_hash: str = ""
     thresholds: dict[str, Any] = field(default_factory=dict)
     calendar_comparison: dict[str, Any] = field(default_factory=dict)
+    coverage_by_symbol: dict[str, Any] = field(default_factory=dict)
 
     @property
     def passed(self) -> list[PartitionQuality]:
@@ -472,6 +473,7 @@ class QualityReport:
             },
             "fail_reasons": self.reason_counts(),
             "by_symbol_year": self.by_symbol_year(),
+            "coverage_by_symbol": self.coverage_by_symbol,
             "calendar_comparison": self.calendar_comparison,
             "partitions": [p.to_json() for p in self.partitions],
         }
@@ -620,14 +622,11 @@ def render_threshold_study(study: dict[str, Any]) -> str:
 
 
 def new_report(cfg) -> QualityReport:
+    # Vizingiti VYOTE vya `quality:`, si vilivyochaguliwa. R0 inaulizwa "dhidi ya
+    # vizingiti vya data.yaml" — ripoti isiyoonyesha kizingiti kimoja
+    # kilichotumika ni ripoti isiyoweza kukaguliwa.
     return QualityReport(
         built_at=datetime.now(timezone.utc).isoformat(timespec="seconds"),
         config_hash=getattr(cfg, "config_hash", ""),
-        thresholds={
-            "min_coverage": cfg.get("quality.min_coverage", 0.995),
-            "max_gap_seconds": cfg.get("quality.max_gap_seconds", 3600),
-            "max_flat_bars": cfg.get("quality.max_flat_bars", 10),
-            "session_tolerance_minutes": cfg.get("quality.session_tolerance_minutes", 15),
-            "fail_action": cfg.get("quality.fail_action", "exclude"),
-        },
+        thresholds=dict(cfg.get("quality", {}) or {}),
     )

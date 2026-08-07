@@ -303,6 +303,54 @@ def test_bar_bila_tick_haipo_si_bar_tupu():
     assert len(bars) == 2, "saa ya 01:00 haina ticks — haipaswi kuwepo"
 
 
+def test_n_m1_bars_inapima_ukamilifu_wa_kila_bar():
+    """Spec §4: bar inabeba `n_m1_bars`. Ticks nyingi si sawa na bar kamili."""
+    kamili = _ticks(datetime(2026, 8, 3, tzinfo=timezone.utc), 3600, step_s=1.0)
+    bars = build_bars(kamili, "H1", "EURUSD")
+    assert bars["n_m1_bars"].iloc[0] == 60, "dakika zote 60 zina quote"
+
+    # Ticks 3,600 zile zile lakini zote ndani ya dakika 10 za kwanza.
+    finyu = _ticks(datetime(2026, 8, 3, tzinfo=timezone.utc), 3600, step_s=1 / 6)
+    bar = build_bars(finyu, "H1", "EURUSD").iloc[0]
+    assert bar["n_ticks"] == 3600 and bar["n_m1_bars"] == 10, (
+        "n_ticks pekee ingesema bar hii ni kamili kama ile ya juu"
+    )
+
+
+def test_check3_ya_bars_inahesabu_bars_zisizokuwepo():
+    """Ukaguzi wa 3 kwa upande wa L2: `pengo ≤ max_gap_bars` (§3)."""
+    from src.data.bars import check_bar_gaps
+
+    ticks = pd.concat(
+        [
+            _ticks(datetime(2026, 8, 3, 0, 0, tzinfo=timezone.utc), 300, step_s=1),
+            _ticks(datetime(2026, 8, 3, 1, 0, tzinfo=timezone.utc), 300, step_s=1),
+            # Saa 5 za ukimya ndani ya siku ile ile.
+            _ticks(datetime(2026, 8, 3, 7, 0, tzinfo=timezone.utc), 300, step_s=1),
+        ],
+        ignore_index=True,
+    )
+    bars = build_bars(ticks, "H1", "EURUSD")
+    assert check_bar_gaps(bars, "H1", max_gap_bars=10).passed
+    result = check_bar_gaps(bars, "H1", max_gap_bars=3)
+    assert not result.passed and result.value == 5
+
+
+def test_check3_ya_bars_hairipoti_usiku_kama_pengo():
+    """Usiku kati ya sessions ni kalenda, si pengo (§3)."""
+    from src.data.bars import check_bar_gaps
+
+    ticks = pd.concat(
+        [
+            _ticks(datetime(2026, 8, 3, 8, 0, tzinfo=timezone.utc), 300, step_s=1),
+            _ticks(datetime(2026, 8, 4, 8, 0, tzinfo=timezone.utc), 300, step_s=1),
+        ],
+        ignore_index=True,
+    )
+    bars = build_bars(ticks, "H1", "EURUSD")
+    assert check_bar_gaps(bars, "H1", max_gap_bars=0).passed, "siku mbili, si pengo la saa 24"
+
+
 def test_check4_ohlc_sanity_inafanyika_l2():
     ticks = _ticks(datetime(2026, 8, 3, tzinfo=timezone.utc), 600, step_s=1)
     bars = build_bars(ticks, "M5", "EURUSD")

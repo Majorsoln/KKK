@@ -18,7 +18,7 @@ from __future__ import annotations
 import json
 from collections import defaultdict
 from dataclasses import dataclass, field
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Callable, Iterable, Sequence
 
@@ -138,6 +138,7 @@ class CalendarBuild:
     partitions: int = 0
     reused: int = 0
     failed: list[dict[str, str]] = field(default_factory=list)
+    by_variant: dict[str, Any] = field(default_factory=dict)
 
     def render(self) -> str:
         cal = self.calendar
@@ -149,6 +150,12 @@ class CalendarBuild:
             f"  siku tulizodhani zimefungwa lakini zina data: {len(self.comparison['active_but_excluded'])}",
             f"  siku za nusu (sikukuu zilizogunduliwa na data): {len(self.comparison['partial_days'])}",
         ]
+        for name, entry in sorted(self.by_variant.items()):
+            lines.append(
+                f"  Toleo {name}: symbols {len(entry['symbols'])} · siku {entry['days']} "
+                f"({entry['first_day']} → {entry['last_day']}) · "
+                f"session median {entry['session_open']}–{entry['session_close']} UTC"
+            )
         for failure in self.failed:
             lines.append(f"  ! {failure['partition']}: {failure['error']}")
         return "\n".join(lines)
@@ -203,7 +210,48 @@ def build_session_calendar(
         partitions=len(partitions),
         reused=reused,
         failed=failed,
+        by_variant=_calendar_by_variant(cfg, calendar),
     )
+
+
+def _calendar_by_variant(cfg, calendar: SessionCalendar) -> dict[str, Any]:
+    """Kalenda ikithibitishwa kwa **kila toleo la schema kando** (R0, kazi ya 2).
+
+    Toleo B linatoka chanzo tofauti (EURCHF/GBPJPY/XAUUSD). Kama mipaka ya
+    session au wigo wa siku unatofautiana na Toleo A, hiyo ni dalili ya chanzo
+    tofauti — na inagusa kila feature ya symbols hizo. Kalenda ya pamoja
+    ingeificha.
+    """
+    out: dict[str, Any] = {}
+    for symbol, rows in calendar.symbol_expect.items():
+        variant = cfg.variant_of_symbol(symbol) or "A"
+        slot = out.setdefault(
+            variant, {"symbols": [], "days": set(), "opens": [], "closes": []}
+        )
+        slot["symbols"].append(symbol)
+        slot["days"].update(rows)
+        slot["opens"].extend(v[1] for v in rows.values())
+        slot["closes"].extend(v[2] for v in rows.values())
+
+    summary: dict[str, Any] = {}
+    for variant, slot in out.items():
+        days = sorted(slot["days"])
+        summary[variant] = {
+            "symbols": sorted(slot["symbols"]),
+            "days": len(days),
+            "first_day": days[0] if days else None,
+            "last_day": days[-1] if days else None,
+            "session_open": _hhmm(slot["opens"]),
+            "session_close": _hhmm(slot["closes"]),
+        }
+    return summary
+
+
+def _hhmm(minutes: list[float]) -> str | None:
+    if not minutes:
+        return None
+    value = float(pd.Series(minutes).median())
+    return f"{int(value) // 60:02d}:{int(value) % 60:02d}"
 
 
 # --------------------------------------------------------------------------
@@ -266,7 +314,39 @@ def run_quality_audit(
         from .calendar import TradingCalendar
 
         report.calendar_comparison = compare_with_assumed(calendar, TradingCalendar())
+    report.coverage_by_symbol = _coverage_by_symbol(cfg, report, calendar)
     return report
+
+
+def _coverage_by_symbol(cfg, report: QualityReport, calendar: SessionCalendar | None):
+    """Muhtasari wa R0 kwa symbol: miaka, siku, na sehemu iliyopita — dhidi ya `min_years`."""
+    min_years = float(cfg.get("source.min_years", 0) or 0)
+    days_by_symbol: dict[str, list[str]] = defaultdict(list)
+    if calendar is not None:
+        for symbol, rows in calendar.symbol_expect.items():
+            days_by_symbol[symbol] = sorted(rows)
+
+    out: dict[str, Any] = {}
+    for symbol in sorted({str(p.symbol) for p in report.partitions if p.symbol}):
+        parts = [p for p in report.partitions if p.symbol == symbol]
+        days = days_by_symbol.get(symbol.upper(), [])
+        years = (
+            (date.fromisoformat(days[-1]) - date.fromisoformat(days[0])).days / 365.25
+            if len(days) > 1
+            else 0.0
+        )
+        out[symbol] = {
+            "partitions": len(parts),
+            "passed": sum(1 for p in parts if p.passed),
+            "pass_rate": round(sum(1 for p in parts if p.passed) / len(parts), 4) if parts else 0.0,
+            "trading_days": len(days),
+            "first_day": days[0] if days else None,
+            "last_day": days[-1] if days else None,
+            "years": round(years, 2),
+            "min_years": min_years,
+            "meets_min_years": years >= min_years if min_years else None,
+        }
+    return out
 
 
 def _quality_from_json(payload: dict[str, Any]):
@@ -371,6 +451,119 @@ def compare_variants(cfg, root: Path, calendar: SessionCalendar | None = None) -
 
 
 # --------------------------------------------------------------------------
+# R0 — ULINGANISHO AGGREGATOR ↔ BROKER (spec §2.2 sharti 2)
+# --------------------------------------------------------------------------
+
+
+def compare_provenance(
+    cfg,
+    root: Path,
+    symbols: Sequence[str] | None = None,
+    on_progress: ProgressFn | None = None,
+) -> dict[str, Any]:
+    """Chanzo cha kihistoria dhidi ya feed ya broker kwa siku ZINAZOPISHANA.
+
+    Hili ndilo swali linalofungua au kufunga attestation nzima ya gharama: models
+    zinafunzwa kwa data ya aggregator, lakini zitafanya biashara kwa feed ya
+    broker. **Spread ndiyo gharama** (§3.1 ya RCE). Kama spread ya broker ni
+    pana kwa utaratibu kuliko ya aggregator, kila EV iliyohesabiwa kwa data ya
+    kihistoria ni ya matumaini — na kiasi cha upendeleo ndicho tunachopima hapa.
+
+    Siku zinazopishana ndizo pekee zinazoruhusu ulinganisho wa haki: siku ile
+    ile, symbol ile ile, soko lile lile. Ukilinganisha vipindi tofauti,
+    unapima soko lililobadilika, si feed.
+    """
+    from .quality import _pip_size
+    from .schema import read_quotes
+
+    by_key: dict[tuple[str, str, date], list[Path]] = defaultdict(list)
+    for provenance in ("aggregator", "broker"):
+        for path in select_partitions(cfg, root, symbols, provenance=provenance):
+            symbol = symbol_from_path(path, cfg)
+            if not symbol:
+                continue
+            for day in _days_of_partition(cfg, path):
+                by_key[(provenance, symbol.upper(), day)].append(path)
+
+    overlap = sorted(
+        {
+            (symbol, day)
+            for (provenance, symbol, day) in by_key
+            if provenance == "aggregator" and ("broker", symbol, day) in by_key
+        }
+    )
+
+    rows: list[dict[str, Any]] = []
+    for index, (symbol, day) in enumerate(overlap, start=1):
+        pip = _pip_size(symbol)
+        stats: dict[str, dict[str, float]] = {}
+        for provenance in ("aggregator", "broker"):
+            frames = [read_quotes(p, cfg) for p in by_key[(provenance, symbol, day)]]
+            frame = pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
+            if not frame.empty:
+                frame = frame[frame["timestamp"].dt.date == day]
+            if frame.empty:
+                continue
+            spread = (frame["ask"] - frame["bid"]) / pip
+            stats[provenance] = {
+                "ticks": int(len(frame)),
+                "minutes": int(frame["timestamp"].dt.floor("min").nunique()),
+                "spread_p50": round(float(spread.median()), 4),
+                "spread_p95": round(float(spread.quantile(0.95)), 4),
+                "spread_mean": round(float(spread.mean()), 4),
+            }
+        if len(stats) == 2:
+            agg, brk = stats["aggregator"], stats["broker"]
+            rows.append(
+                {
+                    "symbol": symbol,
+                    "day": day.isoformat(),
+                    "aggregator": agg,
+                    "broker": brk,
+                    "spread_p50_diff_pips": round(brk["spread_p50"] - agg["spread_p50"], 4),
+                    "spread_p50_ratio": round(
+                        brk["spread_p50"] / agg["spread_p50"], 4
+                    )
+                    if agg["spread_p50"]
+                    else None,
+                    "tick_ratio": round(brk["ticks"] / agg["ticks"], 4) if agg["ticks"] else None,
+                }
+            )
+        if on_progress:
+            on_progress(index, len(overlap), f"{symbol} {day}")
+
+    ratios = [r["spread_p50_ratio"] for r in rows if r["spread_p50_ratio"]]
+    return {
+        "built_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "config_hash": getattr(cfg, "config_hash", ""),
+        "overlap_days": sorted({r["day"] for r in rows}),
+        "symbols": sorted({r["symbol"] for r in rows}),
+        "comparisons": len(rows),
+        "spread_p50_ratio": {
+            "median": round(float(pd.Series(ratios).median()), 4) if ratios else None,
+            "min": round(min(ratios), 4) if ratios else None,
+            "max": round(max(ratios), 4) if ratios else None,
+        },
+        "rows": rows,
+    }
+
+
+def _days_of_partition(cfg, path: Path) -> list[date]:
+    """Siku zilizomo kwenye partition — kutoka footer, bila kusoma ticks."""
+    from .schema import partition_metadata
+
+    try:
+        meta = partition_metadata(path, cfg)
+    except Exception:
+        return []
+    if not meta.get("first_ts") or not meta.get("last_ts"):
+        return []
+    first = pd.Timestamp(meta["first_ts"]).date()
+    last = pd.Timestamp(meta["last_ts"]).date()
+    return [first + timedelta(days=i) for i in range((last - first).days + 1)]
+
+
+# --------------------------------------------------------------------------
 # DF-06 — L2 bars kutoka L0 nzima
 # --------------------------------------------------------------------------
 
@@ -381,6 +574,9 @@ class BarsBuild:
     rows: dict[str, int] = field(default_factory=dict)
     ohlc_violations: dict[str, int] = field(default_factory=dict)
     longest_flat: dict[str, int] = field(default_factory=dict)
+    bar_gaps: dict[str, int] = field(default_factory=dict)
+    span: tuple[str, str] | None = None
+    years: float = 0.0
     ticks: int = 0
     chunks: int = 0
 
@@ -393,12 +589,34 @@ class BarsBuild:
         """TF zenye mfululizo wa bars `high == low` unaozidi kizingiti (§3 check 8)."""
         return {tf: value for tf, value in self.longest_flat.items() if value}
 
+    @property
+    def gap_offenders(self) -> dict[str, int]:
+        return {tf: value for tf, value in self.bar_gaps.items() if value}
+
+    def to_json(self) -> dict[str, Any]:
+        return {
+            "symbol": self.symbol,
+            "ticks": self.ticks,
+            "chunks": self.chunks,
+            "span": list(self.span) if self.span else None,
+            "years": round(self.years, 2),
+            "rows": self.rows,
+            "ohlc_violations": self.ohlc_violations,
+            "longest_flat": self.longest_flat,
+            "bar_gaps": self.bar_gaps,
+        }
+
     def render(self) -> str:
         bars = " · ".join(f"{tf}={rows}" for tf, rows in self.rows.items())
         status = "" if self.ok else f"  ! OHLC: {self.ohlc_violations}"
         if self.flat_offenders:
             status += f"  ! bars tulivu mfululizo: {self.flat_offenders}"
-        return f"{self.symbol}: ticks={self.ticks:,} vipande={self.chunks} | {bars}{status}"
+        if self.gap_offenders:
+            status += f"  ! mapengo ya bars: {self.gap_offenders}"
+        return (
+            f"{self.symbol}: ticks={self.ticks:,} miaka={self.years:.1f} "
+            f"vipande={self.chunks} | {bars}{status}"
+        )
 
 
 def _day_chunks(
@@ -449,7 +667,13 @@ def build_l2_for_symbol(
     on_progress: ProgressFn | None = None,
 ) -> BarsBuild:
     """Bars za TF zote kwa symbol moja, kwa vipande, kisha kuandikwa L2."""
-    from .bars import build_all_timeframes, check_flat_bars, check_ohlc_sanity, write_bars
+    from .bars import (
+        build_all_timeframes,
+        check_bar_gaps,
+        check_flat_bars,
+        check_ohlc_sanity,
+        write_bars,
+    )
     from .schema import read_partition
 
     paths = select_partitions(cfg, l0_root, [symbol])
@@ -481,6 +705,14 @@ def build_l2_for_symbol(
         result.ohlc_violations[tf] = int(sanity.value or 0) if not sanity.passed else 0
         flat = check_flat_bars(bars, int(cfg.get("quality.max_flat_bars", 10)))
         result.longest_flat[tf] = int(flat.value or 0) if not flat.passed else 0
+        gaps = check_bar_gaps(bars, tf, int(cfg.get("quality.max_gap_bars", 3)))
+        result.bar_gaps[tf] = int(gaps.value or 0) if not gaps.passed else 0
+        if tf == str(cfg.get("bars.decision_tf", "H1")) and not bars.empty:
+            # Wigo wa miaka unapimwa kwa TF ya uamuzi — ndiyo inayotumika kwa
+            # kila decision point, kwa hiyo ndiyo yenye maana kwa `min_years`.
+            first, last = bars.index[0], bars.index[-1]
+            result.span = (first.isoformat(), last.isoformat())
+            result.years = (last - first).days / 365.25
         write_bars(bars, l2_root, symbol, tf)
     return result
 
