@@ -158,17 +158,23 @@ Kila partition inapita ukaguzi huu. Ikifeli → **haitumiki kwa training**, na r
 
 | # | Ukaguzi | Sheria | FAIL reason |
 |---|---|---|---|
-| 1 | **coverage** | bars zilizopo ÷ bars zinazotarajiwa (session calendar) ≥ `min_coverage` | `low_coverage` |
+| 1 | **coverage** | bars zilizopo ÷ bars zinazotarajiwa (session calendar) ≥ `min_coverage` — L0 (ticks): **dakika zenye quote** dhidi ya median ya siku kamili za symbol/mwezi | `low_coverage` |
 | 2 | **monotonicity** | timestamps zinapanda, hakuna duplicate | `bad_timestamps` |
-| 3 | **gaps** | gap ndani ya session ≤ `max_gap_bars` | `intrasession_gap` |
-| 4 | **OHLC sanity** | `low ≤ min(open,close) ≤ max(open,close) ≤ high` | `ohlc_violation` |
+| 3 | **gaps** | L0 (ticks): pengo ≤ `max_gap_seconds` · L2 (bars): ≤ `max_gap_bars` | `intrasession_gap` |
+| 4 | **OHLC sanity** | `low ≤ min(open,close) ≤ max(open,close) ≤ high` — **inakaguliwa L2**, kwa sababu ticks hazina OHLC (§4) | `ohlc_violation` |
 | 5 | **quote sanity** | `bid < ask`, `spread > 0`, `spread ≤ max_plausible` | `quote_violation` |
-| 6 | **DST/session** | mabadiliko ya saa yanalingana na kalenda ya broker | `session_mismatch` |
+| 6 | **DST/session** | mabadiliko ya saa yanalingana na kalenda ya broker — mipaka ni median ya **symbol/mwezi**; hatua ya saa 1 kamili inaandikwa kama DST, si FAIL | `session_mismatch` |
 | 7 | **clock drift** | tofauti ya server↔UTC ni thabiti | `clock_drift` |
 | 8 | **flat bars** | mfululizo wa bars zenye `high==low` ≤ kikomo | `stale_feed` |
 
 **Weekend, holiday na rollover si "gaps"** — ni kalenda. Kalenda inatengenezwa kwa data yenyewe
 (bars zinazoonekana) na kuthibitishwa, si kudhaniwa.
+
+**Kila ukaguzi unaotegemea kalenda unafanyika kwa SIKU, si kwa faili** (checks 1, 3, 6). Partition
+ya mwezi (Toleo B) ina siku ~22; kuikagua kama kipande kimoja kungeita usiku kati ya sessions
+`intrasession_gap` na kulinganisha mipaka ya session na siku ya kwanza pekee. Matarajio yote
+(dakika, mipaka ya session) ni ya **kila symbol**, si ya symbols zote pamoja — XAUUSD haifanyi
+biashara saa zile zile za EURUSD.
 
 **Sera ya NaN:** hakuna imputation ya kubuni. Bar isiyokamilika inabeba `is_valid=false` na
 **haitumiki** kama decision point; inaweza kutumika kama history kwa window ndefu **kama** feature

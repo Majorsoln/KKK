@@ -1,0 +1,466 @@
+"""T1 — uendeshaji wa ukaguzi wa R0 juu ya L0 nzima (DF-05, DF-06, RS-03).
+
+Modules za T1 zina **sheria** (kalenda, checks, bars, as-of, sentinel, splits).
+Hapa ndipo sheria hizo zinapokutana na partitions 25,000 na ticks bilioni 3.4.
+Kwa hiyo mambo matatu ya vitendo yanashughulikiwa hapa, si kwenye sheria:
+
+1. **Gharama ya kusoma.** Kalenda inasoma column ya timestamp PEKEE; L1 pekee
+   ndiyo inasoma bid/ask. Kutochanganya haya ni tofauti ya dakika na masaa.
+2. **Kuendelea baada ya kukatika.** Kazi ya masaa lazima iweze kusimama na
+   kuendelea. Kila hatua ina cache ya JSONL yenye ufunguo wa partition.
+3. **Kumbukumbu.** Bars zinajengwa kwa vipande vinavyokatwa kwenye mipaka ya
+   SIKU za UTC — TF zote saba zinagawanyika sawasawa hapo, kwa hiyo matokeo ni
+   sawa kabisa na kujenga kila kitu kwa mkupuo mmoja.
+"""
+
+from __future__ import annotations
+
+import json
+from collections import defaultdict
+from dataclasses import dataclass, field
+from datetime import date, datetime, timezone
+from pathlib import Path
+from typing import Any, Callable, Iterable, Sequence
+
+import pandas as pd
+
+from .manifest import iter_partitions, symbol_from_path
+from .quality import QualityReport, _pip_size, check_partition, new_report
+from .session_calendar import (
+    DayObservation,
+    SessionCalendar,
+    build_calendar,
+    compare_with_assumed,
+    observe_timestamps,
+)
+
+ProgressFn = Callable[[int, int, str], None]
+
+
+# --------------------------------------------------------------------------
+# Kuchagua partitions
+# --------------------------------------------------------------------------
+
+
+def select_partitions(
+    cfg,
+    root: Path,
+    symbols: Sequence[str] | None = None,
+    provenance: str | None = None,
+) -> list[Path]:
+    """Partitions za L0 zilizochujwa kwa symbol/provenance, kwa mpangilio thabiti."""
+    from .manifest import provenance_from_path
+
+    wanted = {s.upper() for s in symbols} if symbols else None
+    out: list[Path] = []
+    for path in iter_partitions(Path(root)):
+        if wanted is not None:
+            symbol = symbol_from_path(path, cfg)
+            if not symbol or symbol.upper() not in wanted:
+                continue
+        if provenance and provenance_from_path(path, cfg) != provenance:
+            continue
+        out.append(path)
+    return out
+
+
+# --------------------------------------------------------------------------
+# Cache ya kuendelea (JSONL: mstari mmoja kwa partition)
+# --------------------------------------------------------------------------
+
+
+def _cache_key(path: Path) -> str:
+    stat = path.stat()
+    return f"{path}|{stat.st_size}|{int(stat.st_mtime)}"
+
+
+def _load_cache(path: Path) -> dict[str, Any]:
+    if not path.is_file():
+        return {}
+    out: dict[str, Any] = {}
+    with path.open("r", encoding="utf-8") as handle:
+        for line in handle:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                payload = json.loads(line)
+            except json.JSONDecodeError:  # mstari uliokatika wakati wa kuzimika
+                continue
+            out[payload["key"]] = payload["value"]
+    return out
+
+
+def _append_cache(path: Path, key: str, value: Any) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps({"key": key, "value": value}) + "\n")
+        handle.flush()
+
+
+# --------------------------------------------------------------------------
+# RS-03 — kalenda kutoka L0
+# --------------------------------------------------------------------------
+
+
+@dataclass
+class CalendarBuild:
+    calendar: SessionCalendar
+    comparison: dict[str, Any]
+    partitions: int = 0
+    reused: int = 0
+    failed: list[dict[str, str]] = field(default_factory=list)
+
+    def render(self) -> str:
+        cal = self.calendar
+        lines = [
+            f"kalenda: siku {len(cal.days)} "
+            f"(full {len(cal.full_days())} · partial {len(cal.partial_days())}) "
+            f"kutoka partitions {self.partitions} (zilizotumika tena: {self.reused})",
+            f"  siku tulizodhani zina data lakini hazina : {len(self.comparison['silent_but_expected'])}",
+            f"  siku tulizodhani zimefungwa lakini zina data: {len(self.comparison['active_but_excluded'])}",
+            f"  siku za nusu (sikukuu zilizogunduliwa na data): {len(self.comparison['partial_days'])}",
+        ]
+        for failure in self.failed:
+            lines.append(f"  ! {failure['partition']}: {failure['error']}")
+        return "\n".join(lines)
+
+
+def build_session_calendar(
+    cfg,
+    root: Path,
+    symbols: Sequence[str] | None = None,
+    cache_path: Path | None = None,
+    on_progress: ProgressFn | None = None,
+    limit: int | None = None,
+) -> CalendarBuild:
+    """Kalenda ya sessions kutoka DATA (spec §3), si kutoka orodha ya sikukuu."""
+    from .calendar import TradingCalendar
+
+    partitions = select_partitions(cfg, root, symbols)
+    if limit:
+        partitions = partitions[:limit]
+    cache = _load_cache(cache_path) if cache_path else {}
+
+    observations: list[DayObservation] = []
+    failed: list[dict[str, str]] = []
+    reused = 0
+    for index, path in enumerate(partitions, start=1):
+        key = _cache_key(path)
+        payload = cache.get(key)
+        if payload is None:
+            try:
+                payload = [obs.to_json() for obs in observe_timestamps(path, cfg)]
+            except Exception as exc:  # partition moja mbovu haisimamishi ukaguzi
+                failed.append({"partition": str(path), "error": f"{type(exc).__name__}: {exc}"})
+                if on_progress:
+                    on_progress(index, len(partitions), path.name)
+                continue
+            if cache_path:
+                _append_cache(cache_path, key, payload)
+        else:
+            reused += 1
+        observations.extend(DayObservation.from_json(item) for item in payload)
+        if on_progress:
+            on_progress(index, len(partitions), path.name)
+
+    calendar = build_calendar(
+        observations,
+        partial_frac=float(cfg.get("quality.partial_day_frac", 0.25)),
+        source=str(root),
+    )
+    return CalendarBuild(
+        calendar=calendar,
+        comparison=compare_with_assumed(calendar, TradingCalendar()),
+        partitions=len(partitions),
+        reused=reused,
+        failed=failed,
+    )
+
+
+# --------------------------------------------------------------------------
+# DF-05 — L1 quality audit
+# --------------------------------------------------------------------------
+
+
+def run_quality_audit(
+    cfg,
+    root: Path,
+    calendar: SessionCalendar | None = None,
+    symbols: Sequence[str] | None = None,
+    on_progress: ProgressFn | None = None,
+    limit: int | None = None,
+    cache_path: Path | None = None,
+) -> QualityReport:
+    """Checks 7 za L1 kwa kila partition (ya 4, OHLC, iko L2 — `bars.py`)."""
+    partitions = select_partitions(cfg, root, symbols)
+    if limit:
+        partitions = partitions[:limit]
+    cache = _load_cache(cache_path) if cache_path else {}
+
+    report = new_report(cfg)
+    for index, path in enumerate(partitions, start=1):
+        key = _cache_key(path)
+        payload = cache.get(key)
+        if payload is None:
+            try:
+                payload = check_partition(path, cfg, calendar=calendar).to_json()
+            except Exception as exc:
+                payload = {
+                    "partition": str(path),
+                    "symbol": symbol_from_path(path, cfg),
+                    "provenance": "?",
+                    "rows": 0,
+                    "passed": False,
+                    "fail_reasons": ["unreadable"],
+                    "checks": [
+                        {
+                            "name": "read",
+                            "passed": False,
+                            "reason": "unreadable",
+                            "detail": f"{type(exc).__name__}: {exc}",
+                        }
+                    ],
+                }
+            if cache_path:
+                _append_cache(cache_path, key, payload)
+        report.partitions.append(_quality_from_json(payload))
+        if on_progress:
+            on_progress(index, len(partitions), path.name)
+
+    if calendar is not None:
+        from .calendar import TradingCalendar
+
+        report.calendar_comparison = compare_with_assumed(calendar, TradingCalendar())
+    return report
+
+
+def _quality_from_json(payload: dict[str, Any]):
+    from .quality import CheckResult, PartitionQuality
+
+    return PartitionQuality(
+        partition=payload["partition"],
+        symbol=payload.get("symbol"),
+        provenance=payload.get("provenance", ""),
+        rows=int(payload.get("rows", 0)),
+        checks=[
+            CheckResult(
+                name=item.get("name", "?"),
+                passed=bool(item.get("passed")),
+                reason=item.get("reason", ""),
+                value=item.get("value"),
+                threshold=item.get("threshold"),
+                detail=item.get("detail", ""),
+            )
+            for item in payload.get("checks", [])
+        ],
+    )
+
+
+# --------------------------------------------------------------------------
+# RS-03 — ulinganisho wa Toleo A ↔ Toleo B (spec §2.1)
+# --------------------------------------------------------------------------
+
+
+def compare_variants(cfg, root: Path, calendar: SessionCalendar | None = None) -> dict[str, Any]:
+    """Toleo A dhidi ya Toleo B baada ya normalization (spec §2.1).
+
+    Swali si "je, columns zina majina tofauti" — hilo tunalijua. Swali ni: je,
+    baada ya normalization, **data yenyewe inalingana**? Toleo B lina precision
+    ya ms na A ina µs; kama B ina dakika chache zenye quote au spread pana zaidi
+    kwa utaratibu, hiyo si tofauti ya schema — ni tofauti ya feed, na inagusa
+    kila feature inayotumia symbols hizo.
+    """
+    from .schema import read_partition, variant_specs
+
+    specs = variant_specs(cfg)
+    partitions = select_partitions(cfg, root)
+    by_variant: dict[str, list[Path]] = defaultdict(list)
+    symbol_variant: dict[str, str] = {}
+    for path in partitions:
+        symbol = symbol_from_path(path, cfg)
+        if not symbol:
+            continue
+        variant = cfg.variant_of_symbol(symbol) or "A"
+        symbol_variant[symbol.upper()] = variant
+        by_variant[variant].append(path)
+
+    summary: dict[str, Any] = {
+        "built_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "config_hash": getattr(cfg, "config_hash", ""),
+        "variants": {},
+        "canonical_schema_identical": True,
+    }
+    canonical: dict[str, list[str]] = {}
+
+    for name, spec in specs.items():
+        paths = by_variant.get(name, [])
+        symbols = sorted(s for s, v in symbol_variant.items() if v == name)
+        entry: dict[str, Any] = {
+            "declared_columns": list(spec.columns),
+            "precision": spec.precision,
+            "symbols": symbols,
+            "partitions": len(paths),
+        }
+        if paths:
+            sample = paths[len(paths) // 2]
+            frame = read_partition(sample, cfg)
+            canonical[name] = list(frame.columns)
+            entry["sample_partition"] = str(sample)
+            entry["sample_symbol"] = symbol_from_path(sample, cfg)
+            entry["canonical_columns"] = list(frame.columns)
+            entry["timestamp_dtype"] = str(frame["timestamp"].dtype)
+            if not frame.empty:
+                spread_pips = (frame["ask"] - frame["bid"]) / _pip_size(
+                    symbol_from_path(sample, cfg)
+                )
+                entry["sample_stats"] = {
+                    "rows": int(len(frame)),
+                    "minutes_with_quotes": int(frame["timestamp"].dt.floor("min").nunique()),
+                    "spread_p50_pips": round(float(spread_pips.median()), 4),
+                    "spread_p95_pips": round(float(spread_pips.quantile(0.95)), 4),
+                    "first_ts": frame["timestamp"].min().isoformat(),
+                    "last_ts": frame["timestamp"].max().isoformat(),
+                }
+        summary["variants"][name] = entry
+
+    values = [tuple(v) for v in canonical.values()]
+    summary["canonical_schema_identical"] = len(set(values)) <= 1
+    if calendar is not None:
+        summary["median_minutes_by_symbol"] = {
+            symbol: round(
+                float(pd.Series(list(months.values())).median()) if months else 0.0, 1
+            )
+            for symbol, months in sorted(calendar.symbol_months.items())
+        }
+    return summary
+
+
+# --------------------------------------------------------------------------
+# DF-06 — L2 bars kutoka L0 nzima
+# --------------------------------------------------------------------------
+
+
+@dataclass
+class BarsBuild:
+    symbol: str
+    rows: dict[str, int] = field(default_factory=dict)
+    ohlc_violations: dict[str, int] = field(default_factory=dict)
+    ticks: int = 0
+    chunks: int = 0
+
+    @property
+    def ok(self) -> bool:
+        return not any(self.ohlc_violations.values())
+
+    def render(self) -> str:
+        bars = " · ".join(f"{tf}={rows}" for tf, rows in self.rows.items())
+        status = "" if self.ok else f"  ! OHLC: {self.ohlc_violations}"
+        return f"{self.symbol}: ticks={self.ticks:,} vipande={self.chunks} | {bars}{status}"
+
+
+def _day_chunks(
+    cfg, paths: Sequence[Path], max_rows: int
+) -> list[list[Path]]:
+    """Vipande vinavyokatwa kwenye mipaka ya SIKU za UTC pekee.
+
+    Sababu: TF zote saba (M5…D1) zinagawanyika sawasawa kwenye mpaka wa siku.
+    Kukata mahali pengine kungetengeneza bar mbili nusu badala ya bar moja.
+    """
+    from .schema import partition_metadata
+
+    spans: list[tuple[Path, date | None, date | None, int]] = []
+    for path in paths:
+        try:
+            meta = partition_metadata(path, cfg)
+            first = pd.Timestamp(meta["first_ts"]).date() if meta["first_ts"] else None
+            last = pd.Timestamp(meta["last_ts"]).date() if meta["last_ts"] else None
+            spans.append((path, first, last, int(meta["rows"])))
+        except Exception:
+            spans.append((path, None, None, 0))
+    spans.sort(key=lambda item: (item[1] or date.min, str(item[0])))
+
+    chunks: list[list[Path]] = []
+    current: list[Path] = []
+    rows = 0
+    previous_last: date | None = None
+    for path, first, last, count in spans:
+        starts_new_day = first is None or previous_last is None or first > previous_last
+        if current and rows >= max_rows and starts_new_day:
+            chunks.append(current)
+            current, rows = [], 0
+        current.append(path)
+        rows += count
+        previous_last = last if last is not None else previous_last
+    if current:
+        chunks.append(current)
+    return chunks
+
+
+def build_l2_for_symbol(
+    cfg,
+    symbol: str,
+    l0_root: Path,
+    l2_root: Path,
+    timeframes: Sequence[str],
+    max_rows_per_chunk: int = 20_000_000,
+    on_progress: ProgressFn | None = None,
+) -> BarsBuild:
+    """Bars za TF zote kwa symbol moja, kwa vipande, kisha kuandikwa L2."""
+    from .bars import build_all_timeframes, check_ohlc_sanity, write_bars
+    from .schema import read_partition
+
+    paths = select_partitions(cfg, l0_root, [symbol])
+    chunks = _day_chunks(cfg, paths, max_rows_per_chunk)
+    result = BarsBuild(symbol=symbol, chunks=len(chunks))
+    pieces: dict[str, list[pd.DataFrame]] = {tf: [] for tf in timeframes}
+
+    for index, chunk in enumerate(chunks, start=1):
+        frames = [read_partition(path, cfg) for path in chunk]
+        ticks = pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
+        if not ticks.empty:
+            ticks = ticks.sort_values("timestamp", kind="mergesort")
+            result.ticks += int(len(ticks))
+            for tf, bars in build_all_timeframes(ticks, symbol, timeframes).items():
+                if not bars.empty:
+                    pieces[tf].append(bars)
+        if on_progress:
+            on_progress(index, len(chunks), f"{symbol} kipande {index}")
+
+    for tf in timeframes:
+        bars = (
+            pd.concat(pieces[tf]).sort_index()
+            if pieces[tf]
+            else build_all_timeframes(pd.DataFrame(), symbol, [tf])[tf]
+        )
+        bars = bars[~bars.index.duplicated(keep="last")]
+        result.rows[tf] = int(len(bars))
+        sanity = check_ohlc_sanity(bars)
+        result.ohlc_violations[tf] = int(sanity.value or 0) if not sanity.passed else 0
+        write_bars(bars, l2_root, symbol, tf)
+    return result
+
+
+def build_l2(
+    cfg,
+    l0_root: Path,
+    l2_root: Path,
+    symbols: Sequence[str] | None = None,
+    timeframes: Iterable[str] | None = None,
+    max_rows_per_chunk: int = 20_000_000,
+    on_progress: ProgressFn | None = None,
+) -> list[BarsBuild]:
+    tfs = list(timeframes or cfg.get("bars.timeframes"))
+    targets = [s.upper() for s in (symbols or cfg.symbols)]
+    return [
+        build_l2_for_symbol(
+            cfg,
+            symbol,
+            l0_root,
+            l2_root,
+            tfs,
+            max_rows_per_chunk=max_rows_per_chunk,
+            on_progress=on_progress,
+        )
+        for symbol in targets
+    ]

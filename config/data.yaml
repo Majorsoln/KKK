@@ -35,6 +35,8 @@ storage:
   research_root:  "${ELITEFX_RESEARCH_ROOT}"                 # mf. C:\Users\Hp\project\elitefx-engine\research
   l0_root:        "${ELITEFX_RESEARCH_ROOT}/data/L0_raw"     # partitions za L0 (immutable)
   l0_manifest:    "${ELITEFX_RESEARCH_ROOT}/data/L0_raw/manifest_l0.json"   # SHA256 + provenance
+  l2_root:        "${ELITEFX_RESEARCH_ROOT}/data/L2_bars"    # bars za TF 7 (T1, DF-06)
+  reports_root:   "${ELITEFX_RESEARCH_ROOT}/reports"         # ripoti za R0..R9 (§9)
   holdout_root:   "${ELITEFX_HOLDOUT_ROOT}"                  # G2: ruhusa ya R8 pekee (§4.3, T1)
 
 # ---------- RECORDER WA FEED YA BROKER (spec §2.2 sharti 1; DF-03, DF-04) ----------
@@ -71,8 +73,11 @@ recorder:
 
 # ---------- L1: MALANGO YA UBORA (spec §3) ----------
 quality:
-  min_coverage:        0.995            # bars zilizopo / zinazotarajiwa (kalenda ya session)
-  max_gap_bars:        3                # gap ndani ya session, bars za M1
+  min_coverage:        0.995            # ticks zilizopo / zinazotarajiwa (kalenda ya session)
+  max_gap_seconds:     3600             # pengo ndani ya session (L0 ni TICKS, si bars)
+  max_gap_bars:        3                # pengo ndani ya session kwa bars za L2
+  session_tolerance_minutes: 15         # mipaka ya session dhidi ya kalenda (DST inanaswa hapa)
+  partial_day_frac:    0.25             # siku yenye ticks < hii x wastani wa mwezi = `partial`
   max_flat_bars:       10               # mfululizo wa high==low -> stale feed
   max_plausible_spread_pips:            # kikomo cha akili timamu, si cha trading
     default:   50.0

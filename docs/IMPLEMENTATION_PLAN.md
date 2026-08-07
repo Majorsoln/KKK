@@ -378,6 +378,12 @@ kwa vigezo — LESSON ni jibu halali; kificho ni pale tu eneo linaruka bila kupi
 | DF-18 | `VERIFIED` | 2026-08-06 | **data halisi:** backfill 2026-04-27 → 08-05 ilijaza siku 840 zilizokosekana kwa kutumia disk kama ukweli; kufeli 8 za ukingo zilirekebishwa kwa kurudia | — |
 | RCE-01..13 | `IMPLEMENTED` | 2026-08-06 | `src/rce/{budget,cost,sizing,gate,engine}.py` · `tests/rce/` (39 tests). **Golden**: jedwali la bajeti §2 (safu 4) · mfano wa §6 (lots 0.16 / $34.88 / deviation 3pt) · modes 3 za swap + triple WED · gate checks 6 kwa mpangilio · §5b (module haina hali inayodumu) | namba halisi za broker kwenye `broker_costs.yaml` (commission); kuunganishwa na MT5 (T7) |
 | DF-19 | `IMPLEMENTED` | 2026-08-06 | `scripts/{setup,catchup,record,status}.bat` + `env.example.bat`; lango G13 (`test_repo_guards.py`) | kuendeshwa kwa scripts kwenye mashine ya PD |
+| RS-03 | `IMPLEMENTED` | 2026-08-07 | `src/data/session_calendar.py` + `audit.py`; kalenda inatoka kwenye DATA (siku `full`/`partial` zinagunduliwa kwa median ya mwezi, hakuna orodha ya sikukuu ya mkono) + `calendar_vs_assumed.json` + `variant_comparison.json`; `build-calendar` / `compare-variants` | kukimbizwa kwenye L0 halisi (partitions 25,486) na PD kupitia siku zinazotofautiana |
+| DF-05 | `IMPLEMENTED` | 2026-08-07 | `src/data/quality.py` (checks 7 za L0; ya 4 iko L2) + `quality_report.json` kwa symbol/mwaka + sababu za FAIL; `check-l1`; tests 12 | `quality_report.json` ya L0 halisi + uamuzi wa PD kuhusu partitions zinazofeli |
+| DF-06 | `IMPLEMENTED` | 2026-08-07 | `src/data/bars.py` + `audit.build_l2`: TF 7 kutoka TICKS, spread stats kwa kila bar, bar bila tick HAIANDIKWI; ujenzi kwa vipande unathibitishwa kutoa bars zile zile (`test_l2_kwa_vipande...`) | L2 ya symbols 12 kujengwa + OHLC sanity kupita kwenye data halisi |
+| DF-07 | `IMPLEMENTED` | 2026-08-07 | `src/data/asof.py`; mfano wa §4.1 ni test (`test_asof_mfano_wa_spec`: D1 ya jana, H4 ya 08:00, M15 ya 09:45) + test juu ya L2 iliyoandikwa diski | matumizi kwenye L3 (T2) |
+| DF-08 | `IMPLEMENTED` | 2026-08-07 | `src/data/sentinel.py` + **lango G1 kwenye CI** (`sentinel --synthetic`, inakimbia bila storage); inataja **jina la feature iliyovuja**, si "imefeli" tu | kuunganishwa na build halisi ya L3 (T2) |
+| DF-14 | `IMPLEMENTED` | 2026-08-07 | `src/data/splits.py` + **lango G2 kwenye CI** (`splits`); tarehe zote kutoka `config/data.yaml`; `random_split: true` inakataliwa; purge inapandishwa juu (siku 2 kwa embargo ya bars 36) | kutumika na datasets halisi (T2) |
 
 **T0 IMEFUNGWA (PD 2026-08-06).** L0 ni **mfululizo 2016-01-04 → 2026-08-05**: aggregator
 (partitions 24,610, miaka 10.3) + broker (876, siku 73), zote zikiwa na SHA256 zilizothibitishwa
@@ -391,7 +397,29 @@ unit ya epoch kwenye statistics (tarehe zingesomeka 1970) · timeout + ushauri w
 badala ya siku za trading · circuit breaker ya backfill · `broker_id`/`broker_server` ·
 CRLF ya scripts za Windows.
 
-**Kinachofuata:** T1 (R0 — data audit). Prompt yake iko §2A.
+**T1 — code imekamilika, kipimo cha data halisi kinasubiri (2026-08-07).** Modules zote sita
+(`session_calendar`, `quality`, `bars`, `asof`, `sentinel`, `splits`) + `audit.py` inayoziendesha
+juu ya mti mzima wa L0. Tests 165 zinapita; malango G1 na G2 sasa yanakimbia kila build.
+
+**Yaliyogunduliwa T1 kabla ya data halisi** (tests za mfumo mzima, si za sheria moja moja):
+partition ya **mwezi** ilikuwa inahukumiwa kama kipande kimoja — usiku kati ya sessions
+ungehesabiwa `intrasession_gap` na mipaka ya session zingelinganishwa na siku ya kwanza pekee;
+sasa checks 1/3/6 zinafanyika kwa **kila siku** · matarajio ya coverage na session yalikuwa ya
+**symbols zote pamoja** — XAUUSD ingefeli kila siku kwa sababu haifanyi biashara saa za EURUSD;
+sasa ni kwa kila symbol · `year=` ya Hive pekee ilitambulika, kwa hiyo ripoti nzima ingekuwa
+`symbol/?` (data halisi ina folda ya mwaka isiyo ya Hive) · embargo ya bars 36 (saa 36) ilikatwa
+chini hadi siku 1, ikiacha nusu ya purge bila kufanya kazi; sasa inapandishwa hadi siku 2.
+
+**Maamuzi matatu ya §3 yanayohitaji sahihi ya PD** (yameandikwa kwenye spec, yanasubiri idhini):
+1. **check 1 (coverage)** kwenye L0 inapima **dakika zenye quote** dhidi ya median ya siku kamili
+   za symbol/mwezi. Kuhesabu ticks kungefanya kizingiti kisiwe na maana — idadi ya ticks kwa siku
+   inatofautiana mara mbili-tatu kwa kawaida kabisa.
+2. **check 4 (OHLC)** inafanyika **L2**, si L1: L0 ni ticks, na ticks hazina OHLC.
+3. **check 6 (session)** — hatua ya **saa 1 kamili** inaandikwa kama DST na **haifelishi** siku.
+   Vinginevyo tungetupa siku 24 nzuri kila mwaka (mabadiliko mawili ya saa × symbols).
+
+**Kinachofuata:** kukimbiza `build-calendar` → `check-l1` → `compare-variants` → `build-l2`
+kwenye L0 halisi (SETUP §3.1), kisha PD kupitia `reports/quality/`.
 
 **TRACK E:** `src/rce/` imejengwa kwa spec ILE ILE (haijaguswa). Kilichobaki kwa `VERIFIED`:
 namba halisi za Dukascopy kwenye `config/broker_costs.yaml` (commission round-turn), na

@@ -125,6 +125,15 @@ class DataConfig:
         return self.path_of("storage.l0_manifest")
 
     @property
+    def l2_root(self) -> Path:
+        return self.path_of("storage.l2_root")
+
+    @property
+    def quality_reports_dir(self) -> Path:
+        """`reports/quality/` — deliverables za R0 (spec §9)."""
+        return self.path_of("storage.reports_root") / "quality"
+
+    @property
     def recorder_symbols(self) -> list[str]:
         listed = self.get("recorder.symbols", None)
         return list(listed) if listed else self.symbols

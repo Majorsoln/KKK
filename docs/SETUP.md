@@ -8,6 +8,7 @@
 MARA MOJA        scripts\setup.bat
 KILA SIKU        scripts\catchup.bat   ->   scripts\record.bat
 WAKATI WOWOTE    scripts\status.bat
+UKAGUZI (T1)     scripts\audit.bat
 ```
 
 ---
@@ -84,13 +85,39 @@ wikendi au wiki hakupotezi chochote.
 
 `status.bat` ikirudisha `ALERT`, endesha `catchup.bat`. Kipimo ndicho kinachotawala, si hisia.
 
+### 3.1 UKAGUZI WA DATA (T1 / R0)
+
+```cmd
+scripts\audit.bat                    :: symbols zote
+scripts\audit.bat EURUSD,XAUUSD      :: symbols chache (jaribio la haraka)
+```
+
+Haigusi MT5 — ni salama hata `record.bat` ikiwa inaendelea. Hatua tano, kwa **mfuatano huu**
+(ya 2 inahitaji kalenda ya ya 1; ya 5 inahitaji bars za ya 4):
+
+| # | Amri iliyo ndani | Inatoa nini |
+|---|---|---|
+| 1 | `build-calendar` | `reports\quality\session_calendar.json` + `calendar_vs_assumed.json` |
+| 2 | `check-l1` | `reports\quality\quality_report.json` (checks kwa symbol/mwaka + sababu za FAIL) |
+| 3 | `compare-variants` | `reports\quality\variant_comparison.json` (Toleo A ↔ B) |
+| 4 | `build-l2` | `data\L2_bars\symbol=<SYM>\tf=<TF>\bars.parquet` (TF 7) |
+| 5 | `sentinel` + `splits` | malango G1 na G2; `reports\quality\splits.json` |
+
+**Ni kazi ya masaa** — inasoma L0 nzima. Ikikatika, iendeshe tena: hatua 1 na 2 zina cache
+(`_calendar_scan.jsonl`, `_l1_scan.jsonl`) inayozifanya zianzie zilipoishia. Kuanza upya kabisa:
+`--no-cache`.
+
+`check-l1` ikirudisha exit 1, hiyo **si hitilafu ya script** — ni partitions zilizofeli ubora.
+Zisome kwenye `quality_report.json` (`fail_reasons`), kisha ni uamuzi wa PD: kuziba kwa
+`catchup.bat`, au kuziacha nje ya training (`quality.fail_action: exclude`).
+
 ---
 
 ## 4. CONFIG — iko wapi na kwa nini
 
 | Faili | Ina nini | Nani anahariri |
 |---|---|---|
-| `config\data.yaml` | **vigezo vyote vya data/features/labels/utafiti** — symbols, storage, recorder, reconcile, splits, vizingiti vya R0–R9 | **PD** |
+| `config\data.yaml` | **vigezo vyote vya data/features/labels/utafiti** — symbols, storage, recorder, reconcile, **vizingiti vya ubora (`quality`)**, splits, vizingiti vya R0–R9 | **PD** |
 | `config\risk.yaml` | vigezo vyote vya risk/cost vya engine (RCE) | **PD** |
 | `scripts\env.local.bat` | sifa za **mashine hii** (njia ya MT5, storage root, login hiari) | mtumiaji wa mashine |
 
@@ -123,10 +150,14 @@ research\                       (ndani ya repo; `research\data\` HAIPUSHWI — l
 ├── data\L0_raw\
 │   ├── provenance=aggregator\symbol=<SYM>\year=\month=\[day=]\*.parquet
 │   └── provenance=broker\symbol=<SYM>\date=YYYY-MM-DD\ticks.parquet
-├── data\L1_clean … L5_datasets\     (T1 na kuendelea)
+├── data\L2_bars\symbol=<SYM>\tf=<TF>\bars.parquet     (T1 — `build-l2`)
+├── data\L1_clean · L3_features · L4_labels · L5_datasets\
 └── reports\quality · screening · ablation · calibration
 ```
 `reports\` na `research\src\` **zinapushwa** (ushahidi wa kila awamu); data **haipushwi**.
+
+L2 inaweza kujengwa upya wakati wowote kutoka L0 — ni **derived**, si chanzo. L0 pekee ndiyo
+isiyoweza kuzalishwa upya (§9).
 
 ---
 
@@ -142,6 +173,9 @@ research\                       (ndani ya repo; `research\data\` HAIPUSHWI — l
 | `verify-l0 … missing=N` | partitions zilifutwa kwa idhini → `hash-l0 --prune-missing --reason "..."` |
 | `verify-l0 … changed=N` **baada ya kuandika upya kwa idhini** | manifest ina hashes za zamani → `hash-l0 --allow-mutation --reason "..."` (tukio linaingia `mutation_log`) |
 | `verify-l0 … changed=N` **bila kuwa umeidhinisha kitu** | **SIMAMA.** L0 imebadilika kimya — chunguza kabla ya kufanya lolote (DF-01) |
+| `check-l1` exit 1 | si hitilafu — partitions zimefeli ubora; soma `quality_report.json` (§3.1) |
+| `coverage … haijahukumiwa` | kalenda haipo au haina symbol/mwezi huo → endesha `build-calendar` kwanza |
+| `sentinel: bars za L2 hazipo` | endesha `build-l2` kwanza (au `sentinel --synthetic` kupima code pekee) |
 | `env.local.bat haipo` | `copy scripts\env.example.bat scripts\env.local.bat` |
 | `ModuleNotFoundError: MetaTrader5` | endesha `scripts\setup.bat` (venv + extra `[mt5]`) |
 | `set VAR=x` inakataa (PowerShell) | tumia cmd, au `$env:VAR = "x"` |

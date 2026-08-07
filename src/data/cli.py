@@ -1,4 +1,6 @@
-"""CLI ya tabaka la data (T0).
+"""CLI ya tabaka la data (T0 + T1).
+
+T0 — L0 na recorder:
 
     python -m src.data.cli init-research      # §9 — muundo wa research storage
     python -m src.data.cli hash-l0            # DF-01 — SHA256 ya partitions ZOTE + manifest
@@ -10,6 +12,17 @@
     python -m src.data.cli check-freshness    # DF-04 — ONYO: siku ya trading bila data
     python -m src.data.cli inspect <faili>    # DF-02 — schema moja kutoka Toleo A/B
     python -m src.data.cli config-hash        # fingerprint ya config/data.yaml (§8)
+
+T1 — ukaguzi wa R0 (mfuatano huu, si mwingine):
+
+    python -m src.data.cli build-calendar     # RS-03 — kalenda ya sessions KUTOKA DATA
+    python -m src.data.cli check-l1           # DF-05 — checks za ubora + quality_report.json
+    python -m src.data.cli compare-variants   # RS-03 — Toleo A ↔ Toleo B baada ya normalization
+    python -m src.data.cli build-l2           # DF-06 — bars za TF 7 kutoka ticks
+    python -m src.data.cli sentinel           # DF-08 / G1 — sentinel ya uvujaji
+    python -m src.data.cli splits             # DF-14 / G2 — mpango wa splits + holdout guard
+
+`check-l1` inahitaji kalenda; `sentinel` inahitaji bars. Ndiyo maana mfuatano ni huo.
 
 Exit codes: 0 = sawa/skipped · 1 = ONYO au ukiukaji · 2 = hitilafu ya matumizi.
 """
@@ -360,6 +373,253 @@ def cmd_inspect(args: argparse.Namespace) -> int:
     return 0
 
 
+# ---------------------------- T1 (R0) -------------------------------------
+
+
+def _progress_printer(every: int) -> tuple:
+    """Maendeleo yenye ETA — kazi za T1 ni za masaa, si za sekunde."""
+    started = time.monotonic()
+    every = max(1, int(every))
+
+    def _print(done: int, total: int, key: str) -> None:
+        if done % every and done != total:
+            return
+        elapsed = time.monotonic() - started
+        rate = done / elapsed if elapsed > 0 else 0.0
+        eta = (total - done) / rate if rate > 0 else 0.0
+        print(
+            f"  [{done}/{total}] {done * 100 // max(total, 1)}% · {rate:.1f}/s · "
+            f"imebaki ~{eta / 60:.1f} min · {key}",
+            flush=True,
+        )
+
+    return _print, started
+
+
+def _quality_dir(args: argparse.Namespace, cfg: DataConfig) -> Path:
+    return Path(args.out_dir).expanduser() if args.out_dir else cfg.quality_reports_dir
+
+
+def _symbol_list(args: argparse.Namespace) -> list[str] | None:
+    raw = getattr(args, "symbols", None)
+    return [s.strip().upper() for s in raw.split(",") if s.strip()] if raw else None
+
+
+def cmd_build_calendar(args: argparse.Namespace) -> int:
+    """RS-03 — kalenda ya sessions KUTOKA KWENYE DATA (spec §3)."""
+    cfg = _load(args)
+    from .audit import build_session_calendar
+
+    root = Path(args.l0_root).expanduser() if args.l0_root else cfg.l0_root
+    out_dir = _quality_dir(args, cfg)
+    on_progress, started = _progress_printer(args.progress_every)
+
+    build = build_session_calendar(
+        cfg,
+        root=root,
+        symbols=_symbol_list(args),
+        cache_path=None if args.no_cache else out_dir / "_calendar_scan.jsonl",
+        on_progress=on_progress,
+        limit=args.limit,
+    )
+    calendar_path = build.calendar.save(out_dir / "session_calendar.json")
+    diff_path = out_dir / "calendar_vs_assumed.json"
+    diff_path.write_text(json.dumps(build.comparison, indent=2) + "\n", encoding="utf-8")
+
+    print(build.render())
+    print(f"kalenda : {calendar_path}")
+    print(f"tofauti : {diff_path} · {time.monotonic() - started:.0f}s")
+    return 0 if not build.failed else 1
+
+
+def cmd_check_l1(args: argparse.Namespace) -> int:
+    """DF-05 — checks za L1 + `quality_report.json` (spec §3)."""
+    cfg = _load(args)
+    from .audit import run_quality_audit
+    from .session_calendar import SessionCalendar
+
+    root = Path(args.l0_root).expanduser() if args.l0_root else cfg.l0_root
+    out_dir = _quality_dir(args, cfg)
+    calendar_path = (
+        Path(args.calendar).expanduser() if args.calendar else out_dir / "session_calendar.json"
+    )
+    if calendar_path.is_file():
+        calendar = SessionCalendar.load(calendar_path)
+        print(f"kalenda : {calendar_path} (siku {len(calendar.days)})")
+    else:
+        calendar = None
+        print(
+            f"kalenda : HAIPO ({calendar_path}) — coverage na session HAZITAHUKUMIWA. "
+            "Kimbiza `build-calendar` kwanza.",
+            file=sys.stderr,
+        )
+
+    on_progress, started = _progress_printer(args.progress_every)
+    report = run_quality_audit(
+        cfg,
+        root=root,
+        calendar=calendar,
+        symbols=_symbol_list(args),
+        on_progress=on_progress,
+        limit=args.limit,
+        cache_path=None if args.no_cache else out_dir / "_l1_scan.jsonl",
+    )
+    path = report.save(out_dir / "quality_report.json")
+    print(report.render())
+    print(f"ripoti  : {path} · {time.monotonic() - started:.0f}s")
+    return 0 if not report.failed else 1
+
+
+def cmd_compare_variants(args: argparse.Namespace) -> int:
+    """RS-03 — Toleo A ↔ Toleo B baada ya normalization (spec §2.1)."""
+    cfg = _load(args)
+    from .audit import compare_variants
+    from .session_calendar import SessionCalendar
+
+    root = Path(args.l0_root).expanduser() if args.l0_root else cfg.l0_root
+    out_dir = _quality_dir(args, cfg)
+    calendar_path = out_dir / "session_calendar.json"
+    calendar = SessionCalendar.load(calendar_path) if calendar_path.is_file() else None
+
+    summary = compare_variants(cfg, root, calendar=calendar)
+    path = out_dir / "variant_comparison.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")
+    print(json.dumps(summary.get("variants", {}), indent=2))
+    identical = summary.get("canonical_schema_identical")
+    print(f"schema ya kawaida inalingana A↔B: {'NDIYO' if identical else 'HAPANA'}")
+    print(f"ripoti: {path}")
+    return 0 if identical else 1
+
+
+def cmd_build_l2(args: argparse.Namespace) -> int:
+    """DF-06 — bars za TF 7 kutoka ticks (spec §4)."""
+    cfg = _load(args)
+    from .audit import build_l2
+
+    l0_root = Path(args.l0_root).expanduser() if args.l0_root else cfg.l0_root
+    l2_root = Path(args.l2_root).expanduser() if args.l2_root else cfg.l2_root
+    on_progress, started = _progress_printer(args.progress_every)
+
+    builds = build_l2(
+        cfg,
+        l0_root=l0_root,
+        l2_root=l2_root,
+        symbols=_symbol_list(args),
+        timeframes=[t.strip() for t in args.timeframes.split(",")] if args.timeframes else None,
+        max_rows_per_chunk=args.max_rows_per_chunk,
+        on_progress=on_progress,
+    )
+    for build in builds:
+        print(build.render())
+    print(f"L2: {l2_root} · {time.monotonic() - started:.0f}s")
+    return 0 if all(b.ok for b in builds) else 1
+
+
+def cmd_sentinel(args: argparse.Namespace) -> int:
+    """DF-08 / lango G1 — sentinel ya uvujaji (spec §4.2)."""
+    cfg = _load(args)
+    import pandas as pd
+
+    from .asof import decision_points
+    from .sentinel import run_sentinel
+
+    timeframes = [t.strip() for t in args.timeframes.split(",")] if args.timeframes else ["H1", "H4", "D1"]
+
+    if args.synthetic:
+        from .bars import build_all_timeframes
+
+        count = 3600 * 24 * 3
+        stamps = pd.date_range("2026-08-01", periods=count, freq="1s", tz="UTC")
+        bid = 1.10 + (pd.Series(range(count)) % 500) * 0.00001
+        ticks = pd.DataFrame(
+            {
+                "timestamp": stamps.astype("datetime64[us, UTC]"),
+                "bid": bid.values,
+                "ask": (bid + 0.0001).values,
+                "bid_vol": 1.0,
+                "ask_vol": 1.0,
+            }
+        )
+        bars_by_tf = build_all_timeframes(ticks, "EURUSD", timeframes)
+        label = "synthetic"
+    else:
+        from .bars import read_bars
+
+        l2_root = Path(args.l2_root).expanduser() if args.l2_root else cfg.l2_root
+        symbol = (args.symbol or cfg.symbols[0]).upper()
+        try:
+            bars_by_tf = {tf: read_bars(l2_root, symbol, tf) for tf in timeframes}
+        except FileNotFoundError as exc:
+            print(f"sentinel: bars za L2 hazipo ({exc}). Kimbiza `build-l2`.", file=sys.stderr)
+            return 2
+        label = symbol
+
+    points = list(decision_points(bars_by_tf["H1"]))[-int(args.points) :]
+    result = run_sentinel(bars_by_tf, points, lambda bars, t: _reference_features(bars, t))
+    print(f"{label} · {result.summary()}")
+    for item in result.leaked[:10]:
+        print(f"  ! {item['feature']} @ {item['decision_time']}", file=sys.stderr)
+    return 0 if result.passed else 1
+
+
+def _reference_features(bars_by_tf, t):
+    """Features za kumbukumbu: zinasoma bar ya as-of PEKEE (spec §4.1).
+
+    Hizi si features za utafiti (hizo ni T2). Ni kipimo cha sentinel yenyewe:
+    zikibadilika data ya baadaye ikichanganywa, tatizo liko kwenye as-of, si
+    kwenye feature.
+    """
+    from .asof import asof_snapshot
+
+    out = {}
+    for tf, bar in asof_snapshot(bars_by_tf, t).items():
+        out[f"{tf}_close"] = float(bar["close"]) if bar is not None else None
+        out[f"{tf}_spread_p50"] = float(bar["spread_p50"]) if bar is not None else None
+    return out
+
+
+def cmd_splits(args: argparse.Namespace) -> int:
+    """DF-14 / lango G2 — mpango wa splits kutoka config PEKEE (spec §7)."""
+    cfg = _load(args)
+    from .splits import HoldoutViolation, SplitPlan
+
+    plan = SplitPlan.from_config(cfg)
+    print(plan.render())
+
+    # G2: hakuna fold ya TRAIN/VALIDATION inayogusa holdout wala RESERVE.
+    try:
+        for fold in plan.folds():
+            plan.assert_trainval_only([fold.val_start, fold.val_end], purpose=f"fold F{fold.index}")
+            for start, end in fold.train_ranges:
+                plan.assert_trainval_only([start, end], purpose=f"train ya F{fold.index}")
+    except HoldoutViolation as exc:
+        print(f"G2: FAIL — {exc}", file=sys.stderr)
+        return 1
+    print("G2: PASS — folds zote ziko ndani ya TRAIN+VALIDATION")
+
+    if args.out:
+        payload = {
+            "config_hash": cfg.config_hash,
+            "data_start": plan.data_start.isoformat(),
+            "trainval_end": plan.trainval_end.isoformat(),
+            "holdout_start": plan.holdout_start.isoformat(),
+            "embargo_bars": plan.embargo_bars,
+            "folds": [
+                {
+                    "index": f.index,
+                    "val_start": f.val_start.isoformat(),
+                    "val_end": f.val_end.isoformat(),
+                    "train_ranges": [[a.isoformat(), b.isoformat()] for a, b in f.train_ranges],
+                }
+                for f in plan.folds()
+            ],
+        }
+        Path(args.out).write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+        print(f"mpango: {args.out}")
+    return 0
+
+
 def cmd_config_hash(args: argparse.Namespace) -> int:
     cfg = _load(args)
     print(json.dumps({"config": str(cfg.path), "config_hash": cfg.config_hash}, indent=2))
@@ -472,6 +732,80 @@ def build_parser() -> argparse.ArgumentParser:
     p_inspect = subparsers.add_parser("inspect", help="DF-02 — schema moja kutoka Toleo A/B", parents=[common])
     p_inspect.add_argument("paths", nargs="+")
     p_inspect.set_defaults(func=cmd_inspect)
+
+    # ---------------------------- T1 (R0) ---------------------------------
+
+    p_cal = subparsers.add_parser(
+        "build-calendar",
+        help="RS-03 — kalenda ya sessions kutoka DATA (§3)",
+        parents=[common],
+    )
+    p_cal.add_argument("--l0-root")
+    p_cal.add_argument("--out-dir", help="default: storage.reports_root/quality")
+    p_cal.add_argument("--symbols", help="orodha ya symbols (comma)")
+    p_cal.add_argument("--limit", type=int, help="partitions chache kwa jaribio")
+    p_cal.add_argument("--no-cache", action="store_true", help="usitumie/usiandike cache ya scan")
+    p_cal.add_argument("--progress-every", type=int, default=100)
+    p_cal.set_defaults(func=cmd_build_calendar)
+
+    p_l1 = subparsers.add_parser(
+        "check-l1",
+        help="DF-05 — checks za ubora + quality_report.json (§3)",
+        parents=[common],
+    )
+    p_l1.add_argument("--l0-root")
+    p_l1.add_argument("--out-dir")
+    p_l1.add_argument("--calendar", help="session_calendar.json (default: out-dir)")
+    p_l1.add_argument("--symbols")
+    p_l1.add_argument("--limit", type=int)
+    p_l1.add_argument("--no-cache", action="store_true")
+    p_l1.add_argument("--progress-every", type=int, default=100)
+    p_l1.set_defaults(func=cmd_check_l1)
+
+    p_var = subparsers.add_parser(
+        "compare-variants",
+        help="RS-03 — Toleo A ↔ Toleo B baada ya normalization (§2.1)",
+        parents=[common],
+    )
+    p_var.add_argument("--l0-root")
+    p_var.add_argument("--out-dir")
+    p_var.set_defaults(func=cmd_compare_variants)
+
+    p_l2 = subparsers.add_parser(
+        "build-l2", help="DF-06 — bars za TF 7 kutoka ticks (§4)", parents=[common]
+    )
+    p_l2.add_argument("--l0-root")
+    p_l2.add_argument("--l2-root")
+    p_l2.add_argument("--symbols")
+    p_l2.add_argument("--timeframes", help="default: bars.timeframes ya config")
+    p_l2.add_argument(
+        "--max-rows-per-chunk",
+        type=int,
+        default=20_000_000,
+        help="ticks kwa kipande kimoja (kumbukumbu); mipaka ni ya SIKU za UTC",
+    )
+    p_l2.add_argument("--progress-every", type=int, default=1)
+    p_l2.set_defaults(func=cmd_build_l2)
+
+    p_sent = subparsers.add_parser(
+        "sentinel", help="DF-08 / G1 — sentinel ya uvujaji (§4.2)", parents=[common]
+    )
+    p_sent.add_argument("--l2-root")
+    p_sent.add_argument("--symbol")
+    p_sent.add_argument("--timeframes", help="default: H1,H4,D1")
+    p_sent.add_argument("--points", type=int, default=50, help="decision points za mwisho")
+    p_sent.add_argument(
+        "--synthetic",
+        action="store_true",
+        help="data ya kutengeneza badala ya L2 — lango la CI linalofanya kazi bila storage",
+    )
+    p_sent.set_defaults(func=cmd_sentinel)
+
+    p_split = subparsers.add_parser(
+        "splits", help="DF-14 / G2 — mpango wa splits + holdout guard (§7)", parents=[common]
+    )
+    p_split.add_argument("--out", help="andika mpango kama JSON")
+    p_split.set_defaults(func=cmd_splits)
 
     p_cfg = subparsers.add_parser("config-hash", help="fingerprint ya config/data.yaml", parents=[common])
     p_cfg.set_defaults(func=cmd_config_hash)
