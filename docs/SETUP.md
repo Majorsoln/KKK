@@ -9,6 +9,7 @@ MARA MOJA        scripts\setup.bat
 KILA SIKU        scripts\catchup.bat   ->   scripts\record.bat
 WAKATI WOWOTE    scripts\status.bat
 UKAGUZI (T1)     scripts\audit.bat
+SAHIHI YA PD     scripts\sign.bat      (§10)
 ```
 
 ---
@@ -237,6 +238,37 @@ Baada ya kuhamia: `scripts\setup.bat` → `scripts\catchup.bat`. Server mpya iki
 **broker tofauti**, recorder itasimama kwa `UKIUKAJI WA PROVENANCE` — hiyo ni kinga, si
 hitilafu. Suluhisho: `ELITEFX_RESEARCH_ROOT` tofauti kwa broker mpya (inayopendekezwa), au
 kufuta partitions za broker wa zamani kwa idhini ya PD.
+
+---
+
+## 10. SAHIHI YA PD
+
+**Mara moja:** fungua `docs\SIGNATURES.md`, badilisha mstari `**PD:**` uweke utambulisho wako
+halisi wa git. Uangalie kama unaujua:
+```cmd
+git config user.name && git config user.email
+```
+Usipouwa nao: `git config --global user.name "Jina Lako"` na `... user.email "barua@yako"`.
+
+**Kusaini:**
+```cmd
+scripts\sign.bat DF-05 VERIFIED --evidence research\reports\quality\quality_report.json ^
+                 --reason "partitions 25,498 · kufeli 0.6% · nimekagua sababu zote"
+git add docs\SIGNATURES.md
+git commit -m "sahihi: DF-05 VERIFIED"
+```
+**Commit ndiyo sahihi** — bila yake ni maandishi tu. Uamuzi nne: `VERIFIED` (inahitaji
+`--evidence`) · `LESSON` · `APPROVED` (pre-registration, kabla ya matokeo) · `REJECTED`.
+
+| Amri | Inajibu nini |
+|---|---|
+| `python -m src.governance.cli pending` | ni vipengele vipi vinasubiri sahihi yangu? |
+| `python -m src.governance.cli show` | nimesaini nini, lini, kwa sababu gani? |
+| `python -m src.governance.cli verify` | sahihi zote bado ni halali? (lango G14) |
+
+`verify` inafeli ikiwa faili la ushahidi limebadilika baada ya kusainiwa — ndiyo maana `--evidence`
+ni ya lazima kwa `VERIFIED`. Na sahihi ya `VERIFIED`/`APPROVED`/`LESSON` kutoka kwa mtu asiye PD
+inakataliwa: **hakuna anayeweza kusaini kwa niaba yako.**
 
 ---
 

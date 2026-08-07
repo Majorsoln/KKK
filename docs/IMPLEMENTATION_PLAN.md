@@ -29,6 +29,42 @@ Hadhi za kila kipengele cha rejista (mfuatano usiorukwa):
    iliyoandikwa kutoka kwenye maneno ya spec (§4.1) — code inayopita kwa "inaonekana sawa" haipo.
 3. **Hakuna `VERIFIED` bila ushahidi.** PD anaona test ikipita au ripoti — si maelezo ya mdomo.
 
+### 0.1 SAHIHI YA PD — inafanywaje (PD 2026-08-07)
+
+Hadi leo "sahihi ya PD" ilitajwa mara 15 kwenye hati hii bila kuelezwa **inafanywaje** —
+yaani `VERIFIED` haikuwa na maana ya kiufundi. Sasa inayo:
+
+```cmd
+scripts\sign.bat DF-05 VERIFIED --evidence research\reports\quality\quality_report.json ^
+                 --reason "partitions 25,498 · kufeli 0.6% · nimekagua sababu zote"
+git add docs\SIGNATURES.md
+git commit -m "sahihi: DF-05 VERIFIED"
+```
+
+**Commit ndiyo sahihi.** Si sanduku la kutia alama wala ujumbe wa gumzo. Mstari unaowekwa
+kwenye `docs/SIGNATURES.md` unafunga vitu vinne pamoja:
+
+| Kinachofungwa | Kinatoka wapi | Kinazuia nini |
+|---|---|---|
+| **NANI** | `git config user.name/email` ya mashine yako | mtu mwingine — mtekelezaji au model — kujipandisha hadhi |
+| **LINI** | muda wa commit + **mfuatano** wake kwenye historia | kudai pre-registration baada ya kuona matokeo (RS-01/G4) |
+| **NINI** | ID ya rejista + uamuzi | sahihi isiyo na kipengele halisi |
+| **KWA NINI** | `config_hash` + `code_rev` + **SHA256 ya faili la ushahidi** | kusaini ripoti kisha kuiandika upya, au kubadilisha vizingiti |
+
+Uamuzi nne pekee: **`VERIFIED`** (inahitaji `--evidence`) · **`LESSON`** · **`APPROVED`**
+(pre-registration, kabla ya matokeo) · **`REJECTED`** (ushahidi hautosha — kinarudi `IMPLEMENTED`).
+
+**Mistari haifutwi wala haihaririwi.** Ukibadilisha mawazo, unaweka mstari mpya; wa mwisho ndio
+unaotawala. Historia ya kubadili mawazo ni sehemu ya ushahidi.
+
+**Kabla ya sahihi ya kwanza:** fungua `docs/SIGNATURES.md`, badilisha mstari `**PD:**` uweke
+utambulisho wako halisi wa git. Sahihi za `VERIFIED`/`APPROVED`/`LESSON` kutoka kwa mtu mwingine
+yeyote **zinakataliwa na lango G14** — hivyo mimi (au mtekelezaji yeyote) siwezi kusaini kwa
+niaba yako hata nikitaka.
+
+Amri nyingine: `python -m src.governance.cli pending` (nini kinasubiri sahihi yangu?) ·
+`verify` (lango G14) · `show` (sahihi zote).
+
 ---
 
 ## 1. MUUNDO WA USIMAMIZI
@@ -575,6 +611,7 @@ G10 CONFIG ONLY      kigezo cha maamuzi nje ya risk.yaml/data.yaml → FAIL (DoD
 G11 NO DATA IN GIT   parquet / `research/data/` / faili > 5MB iliyo-track → FAIL (DF-17)
 G12 ENGINE ⊥ RESEARCH `src/` (engine) ikimport `research.src` → FAIL     (DF-17)
 G13 NO SECRETS       `*.local.bat` iliyo-track / template yenye thamani → FAIL (DF-19)
+G14 SAHIHI           sahihi isiyo ya PD · ushahidi uliobadilika · ID isiyopo (§0.1)
 ```
 
 ### 4.3 Ulinzi wa HOLDOUT (G2 — ufafanuzi)
