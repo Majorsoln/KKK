@@ -477,9 +477,38 @@ vigezo vya R0 (`RESEARCH_PLAN_R0.md` §R0) kimekaguliwa; mapungufu sita yaliyoku
 | `min_years` (miaka ≥ 10) | R0 | `quality_report.json` → `coverage_by_symbol.*.meets_min_years` |
 | vizingiti **vyote** kwenye ripoti | prompt: "R0 dhidi ya vizingiti vya `data.yaml`" | `new_report` sasa inachukua block nzima ya `quality:`, si vitano vilivyochaguliwa |
 
-**Kinachofuata:** `check-l1` tena kwa symbols mbili (kupima marekebisho ya Ijumaa + kipimo kipya
-cha `stale_feed`) → PD kuchagua vizingiti vilivyobaki → `audit.bat` kwa symbols zote 12
-(sasa hatua 6, ikiwemo `compare-provenance`).
+**Kipimo cha pili (2026-08-07, baada ya marekebisho).** Kalenda: symbols zote 12, partitions
+25,498, siku **3,297** (full 2,750 · partial 547). Siku 547 za `partial` = **Jumapili** za miaka
+10.6 (~551): soko linafunguka jioni ya Jumapili (~22:00 UTC) na data yote inayo. Si hitilafu —
+`compare_with_assumed` sasa inatenganisha `weekend_open` (Jumapili, inatarajiwa) na
+`unexpected_active` (Jumamosi/sikukuu, **inahitaji maelezo**); bila kutenganisha, ripoti
+ingeonyesha "hitilafu 547" wakati kuna sifuri, na Jumamosi moja ya kweli ingezama.
+Siku **0** zilizotarajiwa kukosa data.
+
+`check-l1` (EURUSD, partitions 400 za 2016–2017): **390/400 zimepita (97.5%)**, kutoka 37%.
+`session_mismatch` = **0** (ilikuwa 548). Mgawanyo unathibitisha marekebisho:
+
+| Ukaguzi | p50 | p99 | max | Kizingiti | Zinafeli |
+|---|---|---|---|---|---|
+| `coverage` | 1.0 | — (p1 = 0.9537) | — | 0.995 | 10 |
+| `session_match` | 0.04 dk | 0.64 dk | 60.04 dk (DST) | 15 dk | **0** |
+| `gaps` | 72 s | 233 s | 10,800 s | 3,600 s | 2 |
+| `stale_feed` (mpya) | 89 s | 280 s | 10,800 s | 1,800 s | 2 |
+| `monotonicity` · `quote_sanity` | 0 | 0 | 0 | 0 | **0** |
+
+Kasoro moja ilijitokeza hapa: `quality-stats` ilisema `session_match` inafeli 3 wakati ripoti
+yenyewe ina 0. Ilikuwa inahesabu upya kwa kizingiti (`> 15`) badala ya kusoma **jibu** la
+ukaguzi — na `check_session_match` inapitisha hatua ya saa 1 (DST) kwa makusudi. Sasa
+inahesabu kufeli kutoka kwenye jibu; ukaguzi usiofelisha chochote hauonyeshi chaguo za
+vizingiti (`clock_drift` kwenye data ya kihistoria ilikuwa ikitoa kelele).
+
+Pia `stale_feed` na `gaps` zilikuwa zikiripoti thamani ile ile (10,800.6) kwa tukio moja —
+muda peke yake hauwezi kutofautisha **feed iliyoganda** (ticks zinakuja, quote haibadiliki) na
+**pengo** (hakuna ticks kabisa), na suluhisho la kila moja ni tofauti. `stale_feed` sasa
+inahesabu ticks zilizo ndani ya dirisha na kusema ni ipi.
+
+**Kinachofuata:** `audit.bat` kwa symbols zote 12 (~saa 2 kwa `check-l1`) → PD kupitia
+`reports/quality/` → sahihi ya exit ya T1.
 
 **TRACK E:** `src/rce/` imejengwa kwa spec ILE ILE (haijaguswa). Kilichobaki kwa `VERIFIED`:
 namba halisi za Dukascopy kwenye `config/broker_costs.yaml` (commission round-turn), na

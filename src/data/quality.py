@@ -31,6 +31,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+import numpy as np
 import pandas as pd
 
 # Sababu za FAIL — majina yale yale ya spec §3.
@@ -279,18 +280,30 @@ def check_stale_feed(frame: pd.DataFrame, max_stale_seconds: float) -> CheckResu
     """
     if len(frame) < 2:
         return CheckResult(name="stale_feed", passed=True, detail="ticks chache mno kupima")
-    changed = (frame["bid"].diff() != 0) | (frame["ask"].diff() != 0)
-    # Nyakati za mabadiliko + tick ya mwisho: mkia wa siku nao ni ukimya.
-    marks = pd.concat([frame.loc[changed, "timestamp"], frame["timestamp"].iloc[-1:]])
-    longest = float(marks.diff().max().total_seconds()) if len(marks) > 1 else 0.0
+    changed = ((frame["bid"].diff() != 0) | (frame["ask"].diff() != 0)).to_numpy()
+    edges = np.append(np.flatnonzero(changed), len(frame) - 1)
+    if len(edges) < 2:
+        return CheckResult(name="stale_feed", passed=True, detail="quote moja tu")
+
+    stamps = frame["timestamp"].to_numpy()[edges]
+    durations = np.diff(stamps) / np.timedelta64(1, "s")
+    # Ticks zilizofika ndani ya kila dirisha la ukimya — hii ndiyo inayotofautisha
+    # feed ILIYOGANDA (ticks zinakuja, quote haibadiliki) na PENGO (hakuna ticks
+    # kabisa). Muda peke yake hauwezi kutofautisha, na suluhisho la kila moja ni
+    # tofauti: la kwanza ni tatizo la broker/chanzo, la pili ni data iliyokosekana.
+    counts = np.diff(edges)
+    worst = int(np.argmax(durations))
+    longest = float(durations[worst])
+    ticks_inside = int(counts[worst]) - 1
     passed = longest <= max_stale_seconds
+    aina = "feed imeganda" if ticks_inside > 0 else "hakuna ticks (pengo)"
     return CheckResult(
         name="stale_feed",
         passed=passed,
         reason="" if passed else FAIL_STALE_FEED,
         value=round(longest, 1),
         threshold=float(max_stale_seconds),
-        detail=f"quote ile ile kwa dakika {longest / 60:.1f}",
+        detail=f"quote ile ile kwa dakika {longest / 60:.1f} · ticks {ticks_inside} · {aina}",
     )
 
 
@@ -544,6 +557,7 @@ def threshold_study(report: dict[str, Any]) -> dict[str, Any]:
     values: dict[str, list[float]] = {}
     thresholds: dict[str, float] = {}
     offenders: dict[str, dict[str, int]] = {}
+    failures: dict[str, int] = {}
 
     for part in report.get("partitions", []):
         for check in part.get("checks", []):
@@ -554,6 +568,12 @@ def threshold_study(report: dict[str, Any]) -> dict[str, Any]:
             if check.get("threshold") is not None:
                 thresholds[name] = float(check["threshold"])
             if not check.get("passed", True):
+                # Kufeli kunahesabiwa kutoka kwenye JIBU la ukaguzi, si kwa
+                # kulinganisha thamani na kizingiti upya. Checks kadhaa zina
+                # sheria zaidi ya kizingiti — `session_match` inapitisha hatua
+                # ya saa 1 (DST) hata ikizidi uvumilivu. Kuhesabu upya hapa
+                # kulikuwa kunaripoti kufeli kusikokuwepo kwenye ripoti yenyewe.
+                failures[name] = failures.get(name, 0) + 1
                 key = f"{part.get('symbol')}/{_year_of(part.get('partition', ''))}"
                 offenders.setdefault(name, {})[key] = offenders.setdefault(name, {}).get(key, 0) + 1
 
@@ -567,20 +587,18 @@ def threshold_study(report: dict[str, Any]) -> dict[str, Any]:
             if direction == "min"
             else [round(float(data.quantile(q)), 4) for q in (0.90, 0.95, 0.99, 0.999)]
         )
+        failed_now = failures.get(name, 0)
         out["checks"][name] = {
             "direction": direction,
             "measured": len(data),
             "current_threshold": current,
-            "would_fail_now": (
-                int((data < current).sum())
-                if direction == "min" and current is not None
-                else int((data > current).sum())
-                if current is not None
-                else None
-            ),
+            "failing_now": failed_now,
             "quantiles": {f"p{q * 100:g}": round(float(data.quantile(q)), 4) for q in quantiles},
             "min": round(float(data.min()), 4),
             "max": round(float(data.max()), 4),
+            # Ukaguzi usiofelisha chochote hauna cha kupangwa upya — chaguo
+            # zake zingekuwa kelele (mf. `clock_drift` kwenye data ya kihistoria,
+            # ambayo thamani zake ni sekunde milioni nyuma ya sasa).
             "candidates": [
                 {
                     "threshold": value,
@@ -589,7 +607,9 @@ def threshold_study(report: dict[str, Any]) -> dict[str, Any]:
                     else int((data > value).sum()),
                 }
                 for value in sorted(set(candidates))
-            ],
+            ]
+            if failed_now
+            else [],
             "top_offenders": dict(
                 sorted(offenders.get(name, {}).items(), key=lambda kv: -kv[1])[:8]
             ),
@@ -603,17 +623,18 @@ def render_threshold_study(study: dict[str, Any]) -> str:
         arrow = "chini ni mbaya" if entry["direction"] == "min" else "juu ni mbaya"
         lines.append(
             f"{name}  ({arrow}) · kizingiti cha sasa = {entry['current_threshold']} "
-            f"→ zinafeli {entry['would_fail_now']}/{entry['measured']}"
+            f"→ zinafeli {entry['failing_now']}/{entry['measured']}"
         )
         q = entry["quantiles"]
         lines.append(
             f"   p1={q['p1']} p5={q['p5']} p10={q['p10']} p50={q['p50']} "
             f"p90={q['p90']} p95={q['p95']} p99={q['p99']}  [min={entry['min']} max={entry['max']}]"
         )
-        picks = " · ".join(
-            f"{c['threshold']}→{c['would_fail']}" for c in entry["candidates"]
-        )
-        lines.append(f"   chaguo (kizingiti→zitakazofeli): {picks}")
+        if entry["candidates"]:
+            picks = " · ".join(
+                f"{c['threshold']}→{c['would_fail']}" for c in entry["candidates"]
+            )
+            lines.append(f"   chaguo (kizingiti→zitakazofeli): {picks}")
         if entry["top_offenders"]:
             top = " · ".join(f"{k}={v}" for k, v in entry["top_offenders"].items())
             lines.append(f"   zinazoongoza kufeli: {top}")

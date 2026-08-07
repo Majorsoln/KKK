@@ -183,7 +183,7 @@ def test_threshold_study_inaonyesha_kizingiti_kingefelisha_ngapi(cfg, l0_tree):
     coverage = study["checks"]["coverage"]
     assert coverage["direction"] == "min"
     assert coverage["current_threshold"] == 0.995
-    assert coverage["would_fail_now"] == 1
+    assert coverage["failing_now"] == 1
     assert coverage["min"] == 0.5, "siku iliyokatika ina nusu ya dakika"
     assert "EURUSD/2026" in coverage["top_offenders"]
     # Kizingiti kikilegezwa, idadi ya zinazofeli haiwezi kupanda — ndiyo maana
@@ -191,6 +191,33 @@ def test_threshold_study_inaonyesha_kizingiti_kingefelisha_ngapi(cfg, l0_tree):
     candidates = sorted(coverage["candidates"], key=lambda c: c["threshold"])
     counts = [c["would_fail"] for c in candidates]
     assert counts == sorted(counts)
+
+    # Ukaguzi usiofelisha chochote hauna cha kupangwa upya.
+    assert study["checks"]["monotonicity"]["failing_now"] == 0
+    assert study["checks"]["monotonicity"]["candidates"] == []
+
+
+def test_threshold_study_inahesabu_kufeli_kutoka_kwenye_jibu_si_kwa_kizingiti(cfg, l0_tree):
+    """`session_match` inapitisha hatua ya saa 1 (DST) ingawa inazidi uvumilivu.
+
+    Kuhesabu upya kwa kizingiti kungeripoti kufeli kusikokuwepo kwenye ripoti.
+    """
+    from src.data.quality import CheckResult, PartitionQuality, QualityReport, threshold_study
+
+    dst = PartitionQuality(partition="x/2026/a.parquet", symbol="EURUSD", provenance="aggregator")
+    dst.checks = [
+        CheckResult(
+            name="session_match",
+            passed=True,  # hatua ya DST — imepita
+            value=60.04,
+            threshold=15.0,
+            detail="hatua ya saa 1 (DST), si hitilafu",
+        )
+    ]
+    study = threshold_study(QualityReport(partitions=[dst]).to_json())
+    entry = study["checks"]["session_match"]
+    assert entry["max"] == 60.04 and entry["current_threshold"] == 15.0
+    assert entry["failing_now"] == 0, "thamani inazidi kizingiti, lakini ukaguzi umepita"
 
 
 def test_ripoti_inapangwa_kwa_symbol_na_mwaka(cfg, l0_tree):

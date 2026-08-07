@@ -403,11 +403,19 @@ def compare_with_assumed(calendar: SessionCalendar, assumed) -> dict[str, Any]:
 
     Inatoa **siku zinazotofautiana**, ambazo ndizo taarifa halisi:
     * `silent_but_expected` — tulidhani ni siku kamili, data haina ticks;
-    * `active_but_excluded` — tulidhani imefungwa, data ina ticks;
-    * `partial_days` — siku za nusu ambazo kalenda ya kudhaniwa haizijui.
+    * `weekend_open` — Jumapili yenye ticks: soko linafunguka jioni (~22:00 UTC).
+      Si hitilafu; ni sehemu ya kalenda inayotarajiwa (`is_trading_day`);
+    * `unexpected_active` — Jumamosi au sikukuu yenye ticks. **Hii ndiyo
+      inayohitaji maelezo**: kalenda ya kudhaniwa inasema soko limefungwa kabisa;
+    * `partial_days` — siku za nusu zilizogunduliwa kwa data.
+
+    Kutenganisha mbili za katikati ni muhimu: kwenye miaka 10, Jumapili ni ~550.
+    Zikichanganywa na Jumamosi/sikukuu, ripoti inaonyesha "hitilafu 547" wakati
+    kuna sifuri, na hitilafu ya kweli — Jumamosi moja yenye ticks — inazama.
     """
     silent: list[str] = []
-    active: list[str] = []
+    weekend_open: list[str] = []
+    unexpected: list[str] = []
     observed = set(calendar.days)
 
     if calendar.days:
@@ -418,12 +426,15 @@ def compare_with_assumed(calendar: SessionCalendar, assumed) -> dict[str, Any]:
                 silent.append(day.isoformat())
 
     for key, entry in calendar.days.items():
-        if entry.ticks and not assumed.is_full_trading_day(date.fromisoformat(key)):
-            active.append(key)
+        day = date.fromisoformat(key)
+        if not entry.ticks or assumed.is_full_trading_day(day):
+            continue
+        (weekend_open if assumed.is_trading_day(day) else unexpected).append(key)
 
     return {
         "silent_but_expected": sorted(silent),
-        "active_but_excluded": sorted(active),
+        "weekend_open": sorted(weekend_open),
+        "unexpected_active": sorted(unexpected),
         "partial_days": calendar.partial_days(),
     }
 

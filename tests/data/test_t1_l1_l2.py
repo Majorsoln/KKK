@@ -163,6 +163,21 @@ def test_check8_stale_feed_inapima_muda_si_idadi_ya_ticks():
     ganda.loc[:, "ask"] = 1.1001
     result = check_stale_feed(ganda, max_stale_seconds=1800)
     assert not result.passed and result.reason == FAIL_STALE_FEED
+    assert "feed imeganda" in result.detail, "ticks zilikuja, quote haikubadilika"
+
+
+def test_check8_inatofautisha_feed_iliyoganda_na_pengo():
+    """Muda peke yake hauwezi kutofautisha; idadi ya ticks ndani ya dirisha inaweza."""
+    pengo = pd.concat(
+        [
+            _ticks(datetime(2026, 8, 3, 0, 0, tzinfo=timezone.utc), 60, step_s=1),
+            _ticks(datetime(2026, 8, 3, 2, 0, tzinfo=timezone.utc), 60, step_s=1),
+        ],
+        ignore_index=True,
+    )
+    result = check_stale_feed(pengo, max_stale_seconds=1800)
+    assert not result.passed
+    assert "hakuna ticks (pengo)" in result.detail
 
 
 def test_check8_ya_bars_iko_l2():
@@ -262,10 +277,13 @@ def test_kalenda_ya_data_dhidi_ya_ya_kudhaniwa():
         for d in (3, 4, 5, 6)
     ]
     obs.append(DayObservation(date(2026, 8, 9), ticks=1_000, first_ts=None, last_ts=None))
+    obs.append(DayObservation(date(2026, 8, 8), ticks=1_000, first_ts=None, last_ts=None))
     cal = build_calendar(obs)
     diff = compare_with_assumed(cal, TradingCalendar())
     assert "2026-08-07" in diff["silent_but_expected"], "Ijumaa haina data — inaripotiwa"
-    assert "2026-08-09" in diff["active_but_excluded"], "Jumapili ina data — inaripotiwa"
+    assert "2026-08-09" in diff["weekend_open"], "Jumapili ni ufunguzi wa wiki, si hitilafu"
+    assert "2026-08-08" in diff["unexpected_active"], "Jumamosi yenye ticks INAHITAJI maelezo"
+    assert "2026-08-09" not in diff["unexpected_active"]
 
 
 # ===========================================================================
