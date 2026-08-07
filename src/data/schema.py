@@ -202,6 +202,29 @@ def read_partition(
     )
 
 
+def read_quotes(path: str | Path, cfg: DataConfig) -> pd.DataFrame:
+    """`timestamp/bid/ask` PEKEE — columns tatu badala ya tano.
+
+    Hakuna ukaguzi wa §3 unaotumia volumes: coverage, monotonicity, gaps,
+    session, clock drift zinatumia timestamp; quote sanity na stale feed
+    zinatumia bid/ask. Kusoma volumes ni asilimia 40 ya kazi bila jibu hata moja
+    linaloongezeka, na L1 inasoma partitions 25,486.
+    """
+    import pyarrow.parquet as pq
+
+    path = Path(path)
+    spec = detect_variant(list(pq.ParquetFile(path).schema_arrow.names), cfg)
+    ts_column, bid_column, ask_column = spec.columns[0], spec.columns[1], spec.columns[2]
+    frame = pd.read_parquet(path, columns=[ts_column, bid_column, ask_column])
+    return pd.DataFrame(
+        {
+            "timestamp": _to_utc_microseconds(frame[ts_column], spec.time_unit),
+            "bid": pd.to_numeric(frame[bid_column], errors="coerce").astype("float64"),
+            "ask": pd.to_numeric(frame[ask_column], errors="coerce").astype("float64"),
+        }
+    )
+
+
 def partition_metadata(path: str | Path, cfg: DataConfig) -> dict[str, Any]:
     """Muhtasari wa partition kutoka **FOOTER** ya parquet — HAISOMI ticks.
 

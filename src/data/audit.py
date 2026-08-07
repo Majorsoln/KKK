@@ -69,9 +69,35 @@ def select_partitions(
 # --------------------------------------------------------------------------
 
 
-def _cache_key(path: Path) -> str:
+def _cache_key(path: Path, context: str = "") -> str:
     stat = path.stat()
-    return f"{path}|{stat.st_size}|{int(stat.st_mtime)}"
+    return f"{path}|{stat.st_size}|{int(stat.st_mtime)}|{context}"
+
+
+def _judgement_fingerprint(cfg, calendar: SessionCalendar | None, symbol: str | None) -> str:
+    """Alama ya **kile kinachohukumu** partition hii: vizingiti + kalenda yake.
+
+    Bila hii, cache ingekuwa hatari: ukikimbiza symbols mbili leo na kumi na mbili
+    kesho, kalenda inajengwa upya, lakini matokeo ya L1 ya jana yangetumika tena
+    kimya — yakiwa yamehukumiwa kwa kalenda ya zamani. Kubadilisha kizingiti
+    chochote cha `config/data.yaml` kunafanya vivyo hivyo.
+
+    Kinachoingia: `config_hash` (vizingiti vyote), matarajio ya **symbol hii**
+    (dakika + mipaka ya session kwa mwezi), na siku zisizo `full` (kwa sababu
+    `expected_minutes` inarudi 0 kwa hizo, yaani "haijahukumiwa").
+    """
+    import hashlib
+
+    key = str(symbol or "?").upper()
+    payload = {
+        "config_hash": getattr(cfg, "config_hash", ""),
+        "months": (calendar.symbol_months.get(key) if calendar else None),
+        "sessions": (calendar.symbol_sessions.get(key) if calendar else None),
+        "non_full_days": (calendar.partial_days() if calendar else []),
+    }
+    return hashlib.sha256(
+        json.dumps(payload, sort_keys=True, default=str).encode("utf-8")
+    ).hexdigest()[:16]
 
 
 def _load_cache(path: Path) -> dict[str, Any]:
@@ -199,8 +225,14 @@ def run_quality_audit(
     cache = _load_cache(cache_path) if cache_path else {}
 
     report = new_report(cfg)
+    fingerprints: dict[str, str] = {}
     for index, path in enumerate(partitions, start=1):
-        key = _cache_key(path)
+        symbol = symbol_from_path(path, cfg)
+        marker = fingerprints.get(str(symbol))
+        if marker is None:
+            marker = _judgement_fingerprint(cfg, calendar, symbol)
+            fingerprints[str(symbol)] = marker
+        key = _cache_key(path, marker)
         payload = cache.get(key)
         if payload is None:
             try:
@@ -208,7 +240,7 @@ def run_quality_audit(
             except Exception as exc:
                 payload = {
                     "partition": str(path),
-                    "symbol": symbol_from_path(path, cfg),
+                    "symbol": symbol,
                     "provenance": "?",
                     "rows": 0,
                     "passed": False,

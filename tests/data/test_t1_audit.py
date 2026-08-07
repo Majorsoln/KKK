@@ -143,6 +143,34 @@ def test_l1_bila_kalenda_hairuhusu_kupita_kwa_uwongo(cfg, l0_tree):
     assert all("haijahukumiwa" in c.detail for c in coverage)
 
 
+def test_cache_ya_l1_inatupwa_kalenda_ikibadilika(cfg, l0_tree, tmp_path):
+    """Matokeo ya jana hayahukumu data kwa kalenda ya leo.
+
+    Hii ndiyo hatari halisi ya kukimbiza symbols mbili leo na kumi na mbili
+    kesho: bila alama ya hukumu, ripoti ingesema PASS kwa kalenda isiyokuwepo.
+    """
+    cache = tmp_path / "l1.jsonl"
+    calendar = build_session_calendar(cfg, l0_tree, symbols=["EURUSD"]).calendar
+    first = run_quality_audit(cfg, l0_tree, calendar=calendar, symbols=["EURUSD"], cache_path=cache)
+
+    lines_after_first = cache.read_text(encoding="utf-8").count("\n")
+    run_quality_audit(cfg, l0_tree, calendar=calendar, symbols=["EURUSD"], cache_path=cache)
+    assert cache.read_text(encoding="utf-8").count("\n") == lines_after_first, (
+        "kalenda ile ile → hakuna kazi mpya"
+    )
+
+    pana = build_session_calendar(cfg, l0_tree).calendar  # symbols zote → kalenda mpya
+    pana.symbol_months["EURUSD"]["2026-08"] = 1.0  # matarajio yamebadilika
+    second = run_quality_audit(cfg, l0_tree, calendar=pana, symbols=["EURUSD"], cache_path=cache)
+    assert cache.read_text(encoding="utf-8").count("\n") > lines_after_first, (
+        "kalenda mpya → kila partition inahukumiwa upya"
+    )
+    assert "low_coverage" in first.reason_counts()
+    assert "low_coverage" not in second.reason_counts(), (
+        "matarajio mapya yamehukumu upya — si kurudia jibu la kalenda ya zamani"
+    )
+
+
 def test_ripoti_inapangwa_kwa_symbol_na_mwaka(cfg, l0_tree):
     calendar = build_session_calendar(cfg, l0_tree).calendar
     report = run_quality_audit(cfg, l0_tree, calendar=calendar)

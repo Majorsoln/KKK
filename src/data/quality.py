@@ -275,12 +275,12 @@ def check_partition(
     wa mwezi mzima.
     """
     from .manifest import provenance_from_path, symbol_from_path
-    from .schema import read_partition
+    from .schema import read_quotes
 
     path = Path(path)
     symbol = symbol_from_path(path, cfg)
     provenance = provenance_from_path(path, cfg)
-    frame = read_partition(path, cfg)
+    frame = read_quotes(path, cfg)
 
     result = PartitionQuality(
         partition=str(path),
