@@ -71,7 +71,10 @@ def select_partitions(
 
 def _cache_key(path: Path, context: str = "") -> str:
     stat = path.stat()
-    return f"{path}|{stat.st_size}|{int(stat.st_mtime)}|{context}"
+    key = f"{path}|{stat.st_size}|{int(stat.st_mtime)}"
+    # `context` tupu haiongezi kitu — hivyo scan isiyo na muktadha (kalenda)
+    # haiharibu cache yake kila mara muundo wa ufunguo unapopanuka.
+    return f"{key}|{context}" if context else key
 
 
 def _judgement_fingerprint(cfg, calendar: SessionCalendar | None, symbol: str | None) -> str:
