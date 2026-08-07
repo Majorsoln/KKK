@@ -418,8 +418,29 @@ chini hadi siku 1, ikiacha nusu ya purge bila kufanya kazi; sasa inapandishwa ha
 3. **check 6 (session)** — hatua ya **saa 1 kamili** inaandikwa kama DST na **haifelishi** siku.
    Vinginevyo tungetupa siku 24 nzuri kila mwaka (mabadiliko mawili ya saa × symbols).
 
-**Kinachofuata:** kukimbiza `build-calendar` → `check-l1` → `compare-variants` → `build-l2`
-kwenye L0 halisi (SETUP §3.1), kisha PD kupitia `reports/quality/`.
+**Kipimo cha kwanza kwenye data halisi (EURUSD + XAUUSD, partitions 2,767, 2026-08-07).**
+Kalenda: siku 2,763 (full 2,745 · partial 18); **siku 0** zilizotarajiwa kukosa data (L0 ni
+mfululizo kamili); siku 13 tulizodhani zimefungwa zina data (kalenda ya kudhaniwa ya
+`calendar.py` ina makosa 13). Sentinel PASS, G2 PASS.
+
+L1 ilifelisha 1,735/2,767 — na **sehemu kubwa ilikuwa kipimo kibaya, si data mbovu**:
+
+| Sababu | Idadi | Uamuzi |
+|---|---|---|
+| `stale_feed` | 1,374 | **kosa la kipimo.** Kizingiti cha spec ni cha **bars** (`high == low`), nilikitumia kwa **ticks**. Dakika tulivu ya Asia ina ticks 40 zenye quote ile ile — si feed iliyoganda. Sasa: L0 inapima **muda** (`max_stale_seconds`), L2 inapima bars (`max_flat_bars`) |
+| `low_coverage` | 647 | kizingiti `0.995` dhidi ya median — kinasubiri `quality-stats` |
+| `session_mismatch` | 548 | uvumilivu `dakika 15` dhidi ya median ya mwezi — kinasubiri `quality-stats` |
+| `bad_timestamps` | 16 | **matokeo halisi** — yanahitaji uchunguzi |
+| `intrasession_gap` | 14 | **matokeo halisi** — yanahitaji uchunguzi |
+| `quote_violation` | 2 | **matokeo halisi** — yanahitaji uchunguzi |
+
+Somo lililoandikwa kwenye spec §3: **vizingiti vinatoka kwenye mgawanyo wa data, si mezani.**
+Amri mpya `quality-stats` inasoma `quality_report.json` iliyoshaandikwa (bila kusoma parquet
+tena) na kuonyesha, kwa kila ukaguzi, thamani zilivyotawanyika + **kizingiti gani kingefelisha
+ngapi**. PD anachagua kutoka hapo.
+
+**Kinachofuata:** `quality-stats` kwenye ripoti ya symbols mbili → PD kuchagua vizingiti →
+`audit.bat` kwa symbols zote 12 → PD kupitia `reports/quality/`.
 
 **TRACK E:** `src/rce/` imejengwa kwa spec ILE ILE (haijaguswa). Kilichobaki kwa `VERIFIED`:
 namba halisi za Dukascopy kwenye `config/broker_costs.yaml` (commission round-turn), na

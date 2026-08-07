@@ -18,6 +18,9 @@ python -m src.data.cli build-calendar %SYMS%
 echo === 2/5  L1 — checks za ubora + quality_report.json (DF-05) ===
 python -m src.data.cli check-l1 %SYMS%
 
+echo === 2b/5 VIZINGITI — mgawanyo halisi wa L1 (chagua kabla ya kuondoa data) ===
+python -m src.data.cli quality-stats
+
 echo === 3/5  TOLEO A vs TOLEO B baada ya normalization (RS-03) ===
 python -m src.data.cli compare-variants
 

@@ -238,22 +238,32 @@ def check_clock_drift(frame: pd.DataFrame, max_future_seconds: float = 60.0) -> 
     )
 
 
-def check_stale_feed(frame: pd.DataFrame, max_flat: int) -> CheckResult:
-    """8 — mfululizo mrefu wa bei isiyobadilika = feed iliyoganda."""
-    if frame.empty:
-        return CheckResult(name="stale_feed", passed=True)
-    unchanged = (frame["bid"].diff() == 0) & (frame["ask"].diff() == 0)
-    # Urefu wa mfululizo mrefu zaidi wa `True`.
-    groups = (~unchanged).cumsum()
-    longest = int(unchanged.groupby(groups).sum().max()) if len(unchanged) else 0
-    passed = longest <= max_flat
+def check_stale_feed(frame: pd.DataFrame, max_stale_seconds: float) -> CheckResult:
+    """8 — feed iliyoganda, ikipimwa kwa **MUDA**, si kwa idadi ya ticks.
+
+    Spec §3 inasema "mfululizo wa **bars** zenye `high==low`" — kipimo cha bars,
+    kinachofanyika L2 (`bars.check_flat_bars`), sawa na ukaguzi wa 4. Kwenye
+    ticks, kuhesabu mfululizo wa ticks ni kipimo kisicho na maana: dakika moja
+    tulivu ya Asia inaweza kuwa na ticks 40 zenye quote ile ile, na hiyo si feed
+    iliyoganda — ni soko tulivu.
+
+    Kinachomaanisha kitu ni **muda**: quote ile ile kwa nusu saa wakati session
+    iko wazi ni feed iliyoganda, iwe imeleta ticks 5 au 5,000.
+    """
+    if len(frame) < 2:
+        return CheckResult(name="stale_feed", passed=True, detail="ticks chache mno kupima")
+    changed = (frame["bid"].diff() != 0) | (frame["ask"].diff() != 0)
+    # Nyakati za mabadiliko + tick ya mwisho: mkia wa siku nao ni ukimya.
+    marks = pd.concat([frame.loc[changed, "timestamp"], frame["timestamp"].iloc[-1:]])
+    longest = float(marks.diff().max().total_seconds()) if len(marks) > 1 else 0.0
+    passed = longest <= max_stale_seconds
     return CheckResult(
         name="stale_feed",
         passed=passed,
         reason="" if passed else FAIL_STALE_FEED,
-        value=float(longest),
-        threshold=float(max_flat),
-        detail=f"ticks {longest} mfululizo bila mabadiliko ya bei",
+        value=round(longest, 1),
+        threshold=float(max_stale_seconds),
+        detail=f"quote ile ile kwa dakika {longest / 60:.1f}",
     )
 
 
@@ -338,7 +348,12 @@ def check_partition(
         check_quote_sanity(frame, max_spread, pip),
         _worst_by_day(frame, _session),
         check_clock_drift(frame),
-        check_stale_feed(frame, int(cfg.get("quality.max_flat_bars", 10))),
+        _worst_by_day(
+            frame,
+            lambda day, group: check_stale_feed(
+                group, float(cfg.get("quality.max_stale_seconds", 1800))
+            ),
+        ),
     ]
     return result
 
@@ -468,6 +483,113 @@ def _year_of(partition: str) -> str:
     if len(stem) >= 4 and stem[:4].isdigit():
         return stem[:4]
     return "?"
+
+
+# --------------------------------------------------------------------------
+# Kupanga vizingiti KWA DATA (si kwa kubuni)
+# --------------------------------------------------------------------------
+
+# Upande unaofelisha kwa kila ukaguzi: `min` = thamani ndogo ni mbaya
+# (coverage); `max` = thamani kubwa ni mbaya (kila kingine).
+CHECK_DIRECTION: dict[str, str] = {
+    "coverage": "min",
+    "monotonicity": "max",
+    "gaps": "max",
+    "quote_sanity": "max",
+    "session_match": "max",
+    "clock_drift": "max",
+    "stale_feed": "max",
+}
+
+
+def threshold_study(report: dict[str, Any]) -> dict[str, Any]:
+    """Mgawanyo wa thamani zilizopimwa + partitions zingefeli kwa kizingiti gani.
+
+    Kizingiti kilichobuniwa mezani ni nadhani; kizingiti kilichotokana na
+    mgawanyo wa data ni uamuzi. Kazi hii inasoma `quality_report.json`
+    iliyoshaandikwa — **hakuna kusoma parquet tena** — na kuonyesha, kwa kila
+    ukaguzi, thamani halisi zilivyotawanyika na ni partitions ngapi zingefeli
+    kwa kila kizingiti kinachopendekezwa. PD ndiye anayechagua.
+    """
+    quantiles = [0.001, 0.01, 0.05, 0.10, 0.50, 0.90, 0.95, 0.99, 0.999]
+    values: dict[str, list[float]] = {}
+    thresholds: dict[str, float] = {}
+    offenders: dict[str, dict[str, int]] = {}
+
+    for part in report.get("partitions", []):
+        for check in part.get("checks", []):
+            name = check.get("name", "?")
+            if check.get("value") is None:
+                continue
+            values.setdefault(name, []).append(float(check["value"]))
+            if check.get("threshold") is not None:
+                thresholds[name] = float(check["threshold"])
+            if not check.get("passed", True):
+                key = f"{part.get('symbol')}/{_year_of(part.get('partition', ''))}"
+                offenders.setdefault(name, {})[key] = offenders.setdefault(name, {}).get(key, 0) + 1
+
+    out: dict[str, Any] = {"partitions": len(report.get("partitions", [])), "checks": {}}
+    for name, series in sorted(values.items()):
+        data = pd.Series(series, dtype="float64")
+        direction = CHECK_DIRECTION.get(name, "max")
+        current = thresholds.get(name)
+        candidates = (
+            [round(float(data.quantile(q)), 4) for q in (0.001, 0.01, 0.05, 0.10)]
+            if direction == "min"
+            else [round(float(data.quantile(q)), 4) for q in (0.90, 0.95, 0.99, 0.999)]
+        )
+        out["checks"][name] = {
+            "direction": direction,
+            "measured": len(data),
+            "current_threshold": current,
+            "would_fail_now": (
+                int((data < current).sum())
+                if direction == "min" and current is not None
+                else int((data > current).sum())
+                if current is not None
+                else None
+            ),
+            "quantiles": {f"p{q * 100:g}": round(float(data.quantile(q)), 4) for q in quantiles},
+            "min": round(float(data.min()), 4),
+            "max": round(float(data.max()), 4),
+            "candidates": [
+                {
+                    "threshold": value,
+                    "would_fail": int((data < value).sum())
+                    if direction == "min"
+                    else int((data > value).sum()),
+                }
+                for value in sorted(set(candidates))
+            ],
+            "top_offenders": dict(
+                sorted(offenders.get(name, {}).items(), key=lambda kv: -kv[1])[:8]
+            ),
+        }
+    return out
+
+
+def render_threshold_study(study: dict[str, Any]) -> str:
+    lines = [f"partitions zilizopimwa: {study['partitions']}", ""]
+    for name, entry in study["checks"].items():
+        arrow = "chini ni mbaya" if entry["direction"] == "min" else "juu ni mbaya"
+        lines.append(
+            f"{name}  ({arrow}) · kizingiti cha sasa = {entry['current_threshold']} "
+            f"→ zinafeli {entry['would_fail_now']}/{entry['measured']}"
+        )
+        q = entry["quantiles"]
+        lines.append(
+            f"   p1={q['p1']} p5={q['p5']} p10={q['p10']} p50={q['p50']} "
+            f"p90={q['p90']} p95={q['p95']} p99={q['p99']}  [min={entry['min']} max={entry['max']}]"
+        )
+        picks = " · ".join(
+            f"{c['threshold']}→{c['would_fail']}" for c in entry["candidates"]
+        )
+        lines.append(f"   chaguo (kizingiti→zitakazofeli): {picks}")
+        if entry["top_offenders"]:
+            top = " · ".join(f"{k}={v}" for k, v in entry["top_offenders"].items())
+            lines.append(f"   zinazoongoza kufeli: {top}")
+        lines.append("")
+    return "\n".join(lines)
 
 
 def new_report(cfg) -> QualityReport:

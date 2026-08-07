@@ -378,6 +378,7 @@ class BarsBuild:
     symbol: str
     rows: dict[str, int] = field(default_factory=dict)
     ohlc_violations: dict[str, int] = field(default_factory=dict)
+    longest_flat: dict[str, int] = field(default_factory=dict)
     ticks: int = 0
     chunks: int = 0
 
@@ -385,9 +386,16 @@ class BarsBuild:
     def ok(self) -> bool:
         return not any(self.ohlc_violations.values())
 
+    @property
+    def flat_offenders(self) -> dict[str, int]:
+        """TF zenye mfululizo wa bars `high == low` unaozidi kizingiti (§3 check 8)."""
+        return {tf: value for tf, value in self.longest_flat.items() if value}
+
     def render(self) -> str:
         bars = " · ".join(f"{tf}={rows}" for tf, rows in self.rows.items())
         status = "" if self.ok else f"  ! OHLC: {self.ohlc_violations}"
+        if self.flat_offenders:
+            status += f"  ! bars tulivu mfululizo: {self.flat_offenders}"
         return f"{self.symbol}: ticks={self.ticks:,} vipande={self.chunks} | {bars}{status}"
 
 
@@ -439,7 +447,7 @@ def build_l2_for_symbol(
     on_progress: ProgressFn | None = None,
 ) -> BarsBuild:
     """Bars za TF zote kwa symbol moja, kwa vipande, kisha kuandikwa L2."""
-    from .bars import build_all_timeframes, check_ohlc_sanity, write_bars
+    from .bars import build_all_timeframes, check_flat_bars, check_ohlc_sanity, write_bars
     from .schema import read_partition
 
     paths = select_partitions(cfg, l0_root, [symbol])
@@ -469,6 +477,8 @@ def build_l2_for_symbol(
         result.rows[tf] = int(len(bars))
         sanity = check_ohlc_sanity(bars)
         result.ohlc_violations[tf] = int(sanity.value or 0) if not sanity.passed else 0
+        flat = check_flat_bars(bars, int(cfg.get("quality.max_flat_bars", 10)))
+        result.longest_flat[tf] = int(flat.value or 0) if not flat.passed else 0
         write_bars(bars, l2_root, symbol, tf)
     return result
 

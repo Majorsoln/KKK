@@ -29,7 +29,7 @@ from typing import Iterable
 
 import pandas as pd
 
-from .quality import FAIL_OHLC, CheckResult
+from .quality import FAIL_OHLC, FAIL_STALE_FEED, CheckResult
 
 # Spec §4 / config `bars.timeframes`. Kila TF ina kazi yake (§0 ya RCE).
 TIMEFRAME_RULES: dict[str, str] = {
@@ -146,6 +146,29 @@ def check_ohlc_sanity(bars: pd.DataFrame) -> CheckResult:
         value=float(violations),
         threshold=0.0,
         detail=f"bars {violations} kati ya {len(bars)} zimekiuka",
+    )
+
+
+def check_flat_bars(bars: pd.DataFrame, max_flat: int) -> CheckResult:
+    """Ukaguzi wa 8 wa §3 ukifanyika mahali pake: mfululizo wa bars `high == low`.
+
+    Bar yenye `high == low` ilipokea quote **moja** kwa kipindi chote cha bar.
+    Moja inatokea; mfululizo mrefu ni feed iliyoganda. Kipimo hiki kinahitaji
+    bars — ndiyo maana kiko hapa, si L1 (§3).
+    """
+    if bars.empty:
+        return CheckResult(name="flat_bars", passed=True, detail="hakuna bars")
+    flat = bars["high"] == bars["low"]
+    groups = (~flat).cumsum()
+    longest = int(flat.groupby(groups).sum().max()) if len(flat) else 0
+    passed = longest <= max_flat
+    return CheckResult(
+        name="flat_bars",
+        passed=passed,
+        reason="" if passed else FAIL_STALE_FEED,
+        value=float(longest),
+        threshold=float(max_flat),
+        detail=f"bars {longest} mfululizo zenye high == low",
     )
 
 

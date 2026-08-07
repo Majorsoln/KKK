@@ -171,6 +171,27 @@ def test_cache_ya_l1_inatupwa_kalenda_ikibadilika(cfg, l0_tree, tmp_path):
     )
 
 
+def test_threshold_study_inaonyesha_kizingiti_kingefelisha_ngapi(cfg, l0_tree):
+    """Kizingiti kinatoka kwenye mgawanyo wa data, si mezani."""
+    from src.data.quality import threshold_study
+
+    calendar = build_session_calendar(cfg, l0_tree).calendar
+    report = run_quality_audit(cfg, l0_tree, calendar=calendar, symbols=["EURUSD"])
+    study = threshold_study(report.to_json())
+
+    coverage = study["checks"]["coverage"]
+    assert coverage["direction"] == "min"
+    assert coverage["current_threshold"] == 0.995
+    assert coverage["would_fail_now"] == 1
+    assert coverage["min"] == 0.5, "siku iliyokatika ina nusu ya dakika"
+    assert "EURUSD/2026" in coverage["top_offenders"]
+    # Kizingiti kikilegezwa, idadi ya zinazofeli haiwezi kupanda — ndiyo maana
+    # jedwali hili linaweza kutumika kuchagua kizingiti.
+    candidates = sorted(coverage["candidates"], key=lambda c: c["threshold"])
+    counts = [c["would_fail"] for c in candidates]
+    assert counts == sorted(counts)
+
+
 def test_ripoti_inapangwa_kwa_symbol_na_mwaka(cfg, l0_tree):
     calendar = build_session_calendar(cfg, l0_tree).calendar
     report = run_quality_audit(cfg, l0_tree, calendar=calendar)

@@ -103,6 +103,16 @@ Haigusi MT5 — ni salama hata `record.bat` ikiwa inaendelea. Hatua tano, kwa **
 | 4 | `build-l2` | `data\L2_bars\symbol=<SYM>\tf=<TF>\bars.parquet` (TF 7) |
 | 5 | `sentinel` + `splits` | malango G1 na G2; `reports\quality\splits.json` |
 
+Baada ya hatua ya 2, **kabla ya kuondoa partition yoyote**:
+```cmd
+python -m src.data.cli quality-stats
+```
+Inasoma `quality_report.json` iliyoshaandikwa (haisomi parquet tena, ni sekunde chache) na
+kuonyesha kwa kila ukaguzi: thamani zilivyotawanyika (p1…p99), kizingiti cha sasa kinafelisha
+ngapi, na **kizingiti gani kingefelisha ngapi**. Ukaguzi ukifelisha nusu ya data, kwa kawaida
+kipimo ndicho kibaya — si data. Chagua kizingiti hapo, kiandike `config\data.yaml` → `quality:`,
+kisha `check-l1` tena (cache inajitupa yenyewe kizingiti kikibadilika).
+
 **Ni kazi ya masaa** — inasoma L0 nzima. Ikikatika, iendeshe tena: hatua 1 na 2 zina cache
 (`_calendar_scan.jsonl`, `_l1_scan.jsonl`) inayozifanya zianzie zilipoishia. Kuanza upya kabisa:
 `--no-cache`.

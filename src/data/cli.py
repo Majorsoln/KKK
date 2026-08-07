@@ -17,6 +17,7 @@ T1 — ukaguzi wa R0 (mfuatano huu, si mwingine):
 
     python -m src.data.cli build-calendar     # RS-03 — kalenda ya sessions KUTOKA DATA
     python -m src.data.cli check-l1           # DF-05 — checks za ubora + quality_report.json
+    python -m src.data.cli quality-stats      # DF-05 — vizingiti kutoka DATA (haisomi parquet)
     python -m src.data.cli compare-variants   # RS-03 — Toleo A ↔ Toleo B baada ya normalization
     python -m src.data.cli build-l2           # DF-06 — bars za TF 7 kutoka ticks
     python -m src.data.cli sentinel           # DF-08 / G1 — sentinel ya uvujaji
@@ -470,6 +471,26 @@ def cmd_check_l1(args: argparse.Namespace) -> int:
     return 0 if not report.failed else 1
 
 
+def cmd_quality_stats(args: argparse.Namespace) -> int:
+    """DF-05 — mgawanyo wa thamani za L1 → vizingiti vinavyotokana na DATA."""
+    cfg = _load(args)
+    from .quality import render_threshold_study, threshold_study
+
+    out_dir = _quality_dir(args, cfg)
+    path = Path(args.report).expanduser() if args.report else out_dir / "quality_report.json"
+    if not path.is_file():
+        print(f"quality_report.json haipo: {path} — endesha `check-l1` kwanza.", file=sys.stderr)
+        return 2
+
+    study = threshold_study(json.loads(path.read_text(encoding="utf-8")))
+    print(render_threshold_study(study))
+    target = out_dir / "threshold_study.json"
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(json.dumps(study, indent=2) + "\n", encoding="utf-8")
+    print(f"ripoti: {target}")
+    return 0
+
+
 def cmd_compare_variants(args: argparse.Namespace) -> int:
     """RS-03 — Toleo A ↔ Toleo B baada ya normalization (spec §2.1)."""
     cfg = _load(args)
@@ -761,6 +782,15 @@ def build_parser() -> argparse.ArgumentParser:
     p_l1.add_argument("--no-cache", action="store_true")
     p_l1.add_argument("--progress-every", type=int, default=100)
     p_l1.set_defaults(func=cmd_check_l1)
+
+    p_stats = subparsers.add_parser(
+        "quality-stats",
+        help="DF-05 — mgawanyo wa L1 → vizingiti kutoka DATA (haisomi parquet)",
+        parents=[common],
+    )
+    p_stats.add_argument("--report", help="quality_report.json (default: out-dir)")
+    p_stats.add_argument("--out-dir")
+    p_stats.set_defaults(func=cmd_quality_stats)
 
     p_var = subparsers.add_parser(
         "compare-variants",

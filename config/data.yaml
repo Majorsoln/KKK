@@ -78,7 +78,10 @@ quality:
   max_gap_bars:        3                # pengo ndani ya session kwa bars za L2
   session_tolerance_minutes: 15         # mipaka ya session dhidi ya kalenda (DST inanaswa hapa)
   partial_day_frac:    0.25             # siku yenye ticks < hii x wastani wa mwezi = `partial`
-  max_flat_bars:       10               # mfululizo wa high==low -> stale feed
+  max_stale_seconds:   1800             # L0: quote ILE ILE kwa muda huu -> feed imeganda
+                                        # (kuhesabu ticks ni kipimo kisicho na maana:
+                                        #  dakika tulivu ya Asia ina ticks 40 zenye quote moja)
+  max_flat_bars:       10               # L2: mfululizo wa BARS zenye high==low (§3 check 8)
   max_plausible_spread_pips:            # kikomo cha akili timamu, si cha trading
     default:   50.0
     XAUUSD:   200.0

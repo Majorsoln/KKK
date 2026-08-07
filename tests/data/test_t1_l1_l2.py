@@ -121,13 +121,36 @@ def test_check7_inakataa_timestamp_isiyo_utc():
     assert not check_clock_drift(frame).passed
 
 
-def test_check8_stale_feed():
-    frame = _ticks(datetime(2026, 8, 3, tzinfo=timezone.utc), 20)
-    assert check_stale_feed(frame, max_flat=10).passed
+def test_check8_stale_feed_inapima_muda_si_idadi_ya_ticks():
+    """Ticks 40 zenye quote moja kwa dakika = soko tulivu. Nusu saa = feed imeganda."""
+    frame = _ticks(datetime(2026, 8, 3, tzinfo=timezone.utc), 1200, step_s=1.0)
+    assert check_stale_feed(frame, max_stale_seconds=1800).passed
 
-    frame.loc[:, "bid"] = 1.1
-    frame.loc[:, "ask"] = 1.1001
-    result = check_stale_feed(frame, max_flat=10)
+    # Ticks nyingi mno, quote ile ile, kwa dakika 20 — bado ni soko tulivu.
+    tulivu = _ticks(datetime(2026, 8, 3, tzinfo=timezone.utc), 1200, step_s=1.0)
+    tulivu.loc[:, "bid"] = 1.1
+    tulivu.loc[:, "ask"] = 1.1001
+    assert check_stale_feed(tulivu, max_stale_seconds=1800).passed, "dakika 20 < nusu saa"
+
+    # Saa moja bila mabadiliko — hii ndiyo feed iliyoganda.
+    ganda = _ticks(datetime(2026, 8, 3, tzinfo=timezone.utc), 3600, step_s=1.0)
+    ganda.loc[:, "bid"] = 1.1
+    ganda.loc[:, "ask"] = 1.1001
+    result = check_stale_feed(ganda, max_stale_seconds=1800)
+    assert not result.passed and result.reason == FAIL_STALE_FEED
+
+
+def test_check8_ya_bars_iko_l2():
+    """Kipimo cha spec (`high == low` mfululizo) kinahitaji bars — kiko L2."""
+    from src.data.bars import check_flat_bars
+
+    ticks = _ticks(datetime(2026, 8, 3, tzinfo=timezone.utc), 3600, step_s=1.0)
+    bars = build_bars(ticks, "M5", "EURUSD")
+    assert check_flat_bars(bars, max_flat=3).passed
+
+    ganda = bars.copy()
+    ganda.loc[:, "high"] = ganda["low"]
+    result = check_flat_bars(ganda, max_flat=3)
     assert not result.passed and result.reason == FAIL_STALE_FEED
 
 

@@ -165,10 +165,16 @@ Kila partition inapita ukaguzi huu. Ikifeli → **haitumiki kwa training**, na r
 | 5 | **quote sanity** | `bid < ask`, `spread > 0`, `spread ≤ max_plausible` | `quote_violation` |
 | 6 | **DST/session** | mabadiliko ya saa yanalingana na kalenda ya broker — mipaka ni median ya **symbol/mwezi**; hatua ya saa 1 kamili inaandikwa kama DST, si FAIL | `session_mismatch` |
 | 7 | **clock drift** | tofauti ya server↔UTC ni thabiti | `clock_drift` |
-| 8 | **flat bars** | mfululizo wa bars zenye `high==low` ≤ kikomo | `stale_feed` |
+| 8 | **flat bars** | mfululizo wa bars zenye `high==low` ≤ `max_flat_bars` — **inakaguliwa L2** · L0 (ticks): quote ile ile kwa `max_stale_seconds` | `stale_feed` |
 
 **Weekend, holiday na rollover si "gaps"** — ni kalenda. Kalenda inatengenezwa kwa data yenyewe
 (bars zinazoonekana) na kuthibitishwa, si kudhaniwa.
+
+**Vizingiti vinatoka kwenye mgawanyo wa data, si mezani.** Baada ya `check-l1`, `quality-stats`
+inaonyesha kwa kila ukaguzi thamani halisi zilivyotawanyika na ni partitions ngapi zingefeli kwa
+kila kizingiti kinachopendekezwa. PD anachagua kutoka hapo na kuandika `config/data.yaml`.
+Kizingiti kilichofelisha nusu ya data ni **dalili ya kipimo kibaya**, si ya data mbovu —
+kikaguliwe kabla ya kuondoa partition hata moja.
 
 **Kila ukaguzi unaotegemea kalenda unafanyika kwa SIKU, si kwa faili** (checks 1, 3, 6). Partition
 ya mwezi (Toleo B) ina siku ~22; kuikagua kama kipande kimoja kungeita usiku kati ya sessions
