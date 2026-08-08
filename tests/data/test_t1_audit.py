@@ -439,3 +439,32 @@ def test_kizingiti_kisichohusu_bars_hakifuti_l2(cfg, l0_tree, tmp_path):
     cfg.raw["bars"]["build_from"] = "kitu_kingine"   # HII inahusu bars
     rebuilt = build_l2(cfg, l0_tree, l2_root, symbols=["EURUSD"], timeframes=["H1"])[0]
     assert not rebuilt.reused, "mabadiliko ya `bars` yanajenga upya"
+
+
+def test_r0_summary_inasoma_ripoti_bila_kuhesabu_upya(cfg, l0_tree, tmp_path, capsys):
+    """Ushahidi wa sahihi ya T1: vigezo vyote kwenye jedwali moja."""
+    from src.data.cli import main
+
+    out_dir = tmp_path / "quality"
+    calendar_build = build_session_calendar(cfg, l0_tree)
+    calendar_build.calendar.save(out_dir / "session_calendar.json")
+    (out_dir / "calendar_vs_assumed.json").write_text(
+        __import__("json").dumps({**calendar_build.comparison, "by_variant": calendar_build.by_variant}),
+        encoding="utf-8",
+    )
+    run_quality_audit(cfg, l0_tree, calendar=calendar_build.calendar).save(
+        out_dir / "quality_report.json"
+    )
+
+    rc = main(["r0-summary", "--out-dir", str(out_dir)])
+    printed = capsys.readouterr().out
+    assert "R0 — DATA AUDIT" in printed
+    assert "siku zilizotarajiwa bila data" in printed
+    assert "miaka ≥ min_years" in printed
+    assert rc == 1, "siku 4 si miaka 10 — inahitaji uamuzi wa PD"
+
+
+def test_r0_summary_inakataa_bila_ripoti(cfg, tmp_path, capsys):
+    from src.data.cli import main
+
+    assert main(["r0-summary", "--out-dir", str(tmp_path / "hakuna")]) == 2

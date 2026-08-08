@@ -18,6 +18,7 @@ T1 — ukaguzi wa R0 (mfuatano huu, si mwingine):
     python -m src.data.cli build-calendar     # RS-03 — kalenda ya sessions KUTOKA DATA
     python -m src.data.cli check-l1           # DF-05 — checks za ubora + quality_report.json
     python -m src.data.cli quality-stats      # DF-05 — vizingiti kutoka DATA (haisomi parquet)
+    python -m src.data.cli r0-summary         # R0  — vigezo vyote kwenye jedwali moja
     python -m src.data.cli compare-variants   # RS-03 — Toleo A ↔ Toleo B baada ya normalization
     python -m src.data.cli compare-provenance # R0   — aggregator ↔ broker, siku zinazopishana
     python -m src.data.cli build-l2           # DF-06 — bars za TF 7 kutoka ticks
@@ -559,6 +560,117 @@ def cmd_audit_status(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_r0_summary(args: argparse.Namespace) -> int:
+    """R0 dhidi ya vigezo vyake (RESEARCH_PLAN_R0 §R0) — ushahidi wa sahihi ya T1.
+
+    Inasoma ripoti zilizoshaandikwa; **haihesabu chochote upya** na haisomi
+    parquet. Kila mstari ni kigezo kimoja cha jedwali la §R0, namba yake halisi,
+    na hukumu ya kiufundi. Hukumu ya mwisho ni ya PD — hii inampa jedwali moja
+    badala ya faili sita.
+    """
+    cfg = _load(args)
+    out_dir = _quality_dir(args, cfg)
+
+    def _read(name: str) -> dict | None:
+        path = out_dir / name
+        if not path.is_file():
+            return None
+        try:
+            return json.loads(path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            return None
+
+    quality = _read("quality_report.json")
+    calendar = _read("calendar_vs_assumed.json")
+    variants = _read("variant_comparison.json")
+    provenance = _read("provenance_comparison.json")
+    if quality is None:
+        print("quality_report.json haipo — endesha `scripts\\audit.bat`.", file=sys.stderr)
+        return 2
+
+    rows: list[tuple[str, str, str]] = []
+    attention = 0
+
+    def _add(kigezo: str, namba: str, ok: bool | None) -> None:
+        nonlocal attention
+        mark = "—" if ok is None else ("PASS" if ok else "ANGALIA")
+        if ok is False:
+            attention += 1
+        rows.append((kigezo, namba, mark))
+
+    totals = quality.get("totals", {})
+    passed, total = totals.get("passed", 0), totals.get("partitions", 0)
+    rate = passed / total if total else 0.0
+    _add("partitions zilizopita §3", f"{passed}/{total} ({rate:.1%})", None)
+
+    for reason, count in (quality.get("fail_reasons") or {}).items():
+        share = count / total if total else 0.0
+        _add(f"  kufeli: {reason}", f"{count} ({share:.2%})", share <= 0.01)
+
+    years = quality.get("coverage_by_symbol") or {}
+    short = [s for s, v in years.items() if v.get("meets_min_years") is False]
+    if years:
+        span = min(v.get("years", 0) for v in years.values())
+        _add(
+            f"miaka ≥ min_years ({cfg.get('source.min_years')})",
+            f"ndogo kuliko zote: {span:.1f} · zilizopungua: {len(short)}",
+            not short,
+        )
+
+    if calendar:
+        _add(
+            "siku zilizotarajiwa bila data",
+            str(len(calendar.get("silent_but_expected", []))),
+            not calendar.get("silent_but_expected"),
+        )
+        _add(
+            "Jumamosi/sikukuu zenye ticks (zinahitaji maelezo)",
+            str(len(calendar.get("unexpected_active", []))),
+            not calendar.get("unexpected_active"),
+        )
+        _add(
+            "Jumapili zenye ticks (ufunguzi wa wiki)",
+            str(len(calendar.get("weekend_open", []))),
+            None,
+        )
+        for name, entry in sorted((calendar.get("by_variant") or {}).items()):
+            _add(
+                f"  Toleo {name}: symbols {len(entry.get('symbols', []))}",
+                f"{entry.get('first_day')} → {entry.get('last_day')} · "
+                f"session {entry.get('session_open')}–{entry.get('session_close')}",
+                None,
+            )
+
+    if variants:
+        identical = variants.get("canonical_schema_identical")
+        _add("Toleo A ↔ B: schema moja baada ya normalization", str(identical), bool(identical))
+
+    if provenance:
+        ratio = (provenance.get("spread_p50_ratio") or {}).get("median")
+        days = len(provenance.get("overlap_days", []))
+        if ratio:
+            _add(
+                "spread broker ÷ aggregator (siku zinazopishana)",
+                f"{ratio} kwa siku {days}",
+                ratio <= float(cfg.get("research.ev.cost_stress_mult", 1.5)),
+            )
+        else:
+            _add("spread broker ÷ aggregator", "haikupimika", False)
+
+    width = max(len(r[0]) for r in rows)
+    print("R0 — DATA AUDIT dhidi ya vigezo vya RESEARCH_PLAN_R0 §R0\n")
+    for kigezo, namba, mark in rows:
+        print(f"  {kigezo:<{width}}  {namba:<34}  {mark}")
+    print(f"\nvinavyohitaji uamuzi wako: {attention}")
+    print(f"config_hash: {quality.get('config_hash', '')[:16]}")
+    print(
+        "\nSahihi ya T1 (baada ya kupitia):\n"
+        f"  scripts\\sign.bat DF-05 VERIFIED --evidence {out_dir / 'quality_report.json'} "
+        '--reason "..."'
+    )
+    return 0 if attention == 0 else 1
+
+
 def cmd_quality_stats(args: argparse.Namespace) -> int:
     """DF-05 — mgawanyo wa thamani za L1 → vizingiti vinavyotokana na DATA."""
     cfg = _load(args)
@@ -957,6 +1069,14 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p_status.add_argument("--out-dir")
     p_status.set_defaults(func=cmd_audit_status)
+
+    p_r0 = subparsers.add_parser(
+        "r0-summary",
+        help="R0 dhidi ya vigezo vyake — ushahidi wa sahihi ya T1",
+        parents=[common],
+    )
+    p_r0.add_argument("--out-dir")
+    p_r0.set_defaults(func=cmd_r0_summary)
 
     p_stats = subparsers.add_parser(
         "quality-stats",

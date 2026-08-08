@@ -47,6 +47,10 @@ python -m src.data.cli sentinel 2>&1 | powershell -NoProfile -Command "$input | 
 python -m src.data.cli splits --out research\reports\quality\splits.json 2>&1 | powershell -NoProfile -Command "$input | Tee-Object -Append '%LOG%'"
 
 echo(
+echo === R0 — VIGEZO VYOTE KWENYE JEDWALI MOJA ===
+python -m src.data.cli r0-summary 2>&1 | powershell -NoProfile -Command "$input | Tee-Object -Append '%LOG%'"
+
+echo(
 echo === HALI ===
 python -m src.data.cli audit-status
 powercfg /change standby-timeout-ac 30 >nul 2>&1

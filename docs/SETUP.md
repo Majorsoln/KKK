@@ -111,6 +111,7 @@ Haigusi MT5 — ni salama hata `record.bat` ikiwa inaendelea. Hatua tano, kwa **
 | 3b | `compare-provenance` | `provenance_comparison.json` — **spread ya broker dhidi ya ya aggregator** kwa siku zinazopishana |
 | 4 | `build-l2` | `data\L2_bars\symbol=<SYM>\tf=<TF>\bars.parquet` (TF 7 + `n_m1_bars`) |
 | 5 | `sentinel` + `splits` | malango G1 na G2; `splits.json` |
+| 6 | `r0-summary` | **vigezo vyote vya R0 kwenye jedwali moja** — ndio unachopitia kabla ya sahihi |
 
 Hatua **3b** ndiyo yenye uzito mkubwa zaidi kwa fedha: models zinafunzwa kwa data ya aggregator
 lakini zitafanya biashara kwa feed ya broker, na **spread ndiyo gharama** (§3.1 ya RCE). Uwiano
