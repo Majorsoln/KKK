@@ -178,7 +178,7 @@ def test_threshold_study_inaonyesha_kizingiti_kingefelisha_ngapi(cfg, l0_tree):
 
     calendar = build_session_calendar(cfg, l0_tree).calendar
     report = run_quality_audit(cfg, l0_tree, calendar=calendar, symbols=["EURUSD"])
-    study = threshold_study(report.to_json())
+    study = threshold_study(report.to_detail())
 
     coverage = study["checks"]["coverage"]
     assert coverage["direction"] == "min"
@@ -214,7 +214,7 @@ def test_threshold_study_inahesabu_kufeli_kutoka_kwenye_jibu_si_kwa_kizingiti(cf
             detail="hatua ya saa 1 (DST), si hitilafu",
         )
     ]
-    study = threshold_study(QualityReport(partitions=[dst]).to_json())
+    study = threshold_study(QualityReport(partitions=[dst]).to_detail())
     entry = study["checks"]["session_match"]
     assert entry["max"] == 60.04 and entry["current_threshold"] == 15.0
     assert entry["failing_now"] == 0, "thamani inazidi kizingiti, lakini ukaguzi umepita"
@@ -532,7 +532,7 @@ def test_what_if_inakataa_ripoti_ya_muundo_wa_zamani(cfg, l0_tree):
     from src.data.quality import what_if
 
     calendar = build_session_calendar(cfg, l0_tree).calendar
-    report = run_quality_audit(cfg, l0_tree, calendar=calendar).to_json()
+    report = run_quality_audit(cfg, l0_tree, calendar=calendar).to_detail()
     assert report["schema"] == 2
     assert what_if(report, {"coverage": 0.9})["days"] > 0
 
@@ -545,7 +545,7 @@ def test_threshold_study_inaonya_ripoti_ya_zamani(cfg, l0_tree):
     from src.data.quality import render_threshold_study, threshold_study
 
     calendar = build_session_calendar(cfg, l0_tree).calendar
-    report = run_quality_audit(cfg, l0_tree, calendar=calendar).to_json()
+    report = run_quality_audit(cfg, l0_tree, calendar=calendar).to_detail()
     assert threshold_study(report)["unit"] == "siku"
 
     zamani = threshold_study({**report, "schema": 1})

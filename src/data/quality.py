@@ -44,6 +44,9 @@ FAIL_SESSION_MISMATCH = "session_mismatch"
 FAIL_CLOCK_DRIFT = "clock_drift"
 FAIL_STALE_FEED = "stale_feed"
 
+# Kina cha kila siku — kikubwa, hakiingii git (ona `.gitignore`).
+DETAIL_NAME = "quality_detail.json"
+
 
 @dataclass
 class CheckResult:
@@ -567,6 +570,14 @@ class QualityReport:
         return dict(sorted(counts.items(), key=lambda kv: -kv[1]))
 
     def to_json(self) -> dict[str, Any]:
+        """**Muhtasari** — ndicho kinachopitiwa na PD na kuingia git.
+
+        Kina cha kila siku (checks 7 x siku ~39,000) ni ~34 MB. Kingeingia git
+        na kubadilika kila run — repo ingekua kwa GB bila sababu, kwa sababu git
+        inahifadhi kila toleo milele. Kwa hiyo kina kinakwenda `quality_detail.json`
+        (haipushwi; ona `.gitignore`), na muhtasari huu unabaki mdogo na wa kudumu.
+        Vyote viwili vinaandikwa na `save()` kwa wakati mmoja.
+        """
         return {
             # Muundo wa ripoti. 2 = hukumu kwa SIKU; 1 = kwa faili (kabla ya
             # 2026-08-08). Wasomaji wanaikagua badala ya kukisia kwa umbo.
@@ -587,13 +598,26 @@ class QualityReport:
             "coverage_by_symbol": self.coverage_by_symbol,
             "excluded_days": self.excluded_days(),
             "calendar_comparison": self.calendar_comparison,
+            "detail": DETAIL_NAME,
+        }
+
+    def to_detail(self) -> dict[str, Any]:
+        """Kina cha kila siku — malighafi ya `quality-stats` na `--what-if`."""
+        return {
+            "schema": 2,
+            "built_at": self.built_at,
+            "config_hash": self.config_hash,
             "partitions": [p.to_json() for p in self.partitions],
         }
 
     def save(self, path: Path) -> Path:
+        """Andika muhtasari (`path`) na kina (`quality_detail.json`) pamoja."""
         path = Path(path)
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps(self.to_json(), indent=2) + "\n", encoding="utf-8")
+        (path.parent / DETAIL_NAME).write_text(
+            json.dumps(self.to_detail()) + "\n", encoding="utf-8"
+        )
         return path
 
     def render(self) -> str:

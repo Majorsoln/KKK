@@ -676,10 +676,18 @@ def cmd_quality_stats(args: argparse.Namespace) -> int:
     cfg = _load(args)
     from .quality import render_threshold_study, threshold_study
 
+    from .quality import DETAIL_NAME
+
     out_dir = _quality_dir(args, cfg)
-    path = Path(args.report).expanduser() if args.report else out_dir / "quality_report.json"
+    # Kina (kila siku) kiko kwenye faili lake; muhtasari ni mdogo na hauna checks.
+    path = Path(args.report).expanduser() if args.report else out_dir / DETAIL_NAME
     if not path.is_file():
-        print(f"quality_report.json haipo: {path} — endesha `check-l1` kwanza.", file=sys.stderr)
+        print(
+            f"{path.name} haipo: {path}\n"
+            "  Kina cha kila siku kinaandikwa na `check-l1` pamoja na muhtasari. "
+            "Endesha `check-l1` kwanza.",
+            file=sys.stderr,
+        )
         return 2
 
     report = json.loads(path.read_text(encoding="utf-8"))

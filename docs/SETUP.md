@@ -105,7 +105,7 @@ Haigusi MT5 — ni salama hata `record.bat` ikiwa inaendelea. Hatua tano, kwa **
 | # | Amri iliyo ndani | Inatoa nini |
 |---|---|---|
 | 1 | `build-calendar` | `session_calendar.json` + `calendar_vs_assumed.json` (pamoja na kalenda kwa **kila toleo la schema kando**) |
-| 2 | `check-l1` | `quality_report.json` — checks kwa symbol/mwaka, vizingiti **vyote** vilivyotumika, wigo wa miaka dhidi ya `min_years` |
+| 2 | `check-l1` | `quality_report.json` (muhtasari, unapushwa) + `quality_detail.json` (kina cha kila siku, ~34 MB, **haipushwi**) |
 | 2b | `quality-stats` | `threshold_study.json` — mgawanyo halisi + kizingiti gani kingefelisha ngapi |
 | 3a | `compare-variants` | `variant_comparison.json` (Toleo A ↔ B baada ya normalization) |
 | 3b | `compare-provenance` | `provenance_comparison.json` — **spread ya broker dhidi ya ya aggregator** kwa siku zinazopishana |
@@ -152,7 +152,19 @@ inayoruka **symbol iliyokwisha** (alama yake = partitions + TF + `config_hash`; 
 symbol inajengwa upya, haibaki ya zamani kimya). Kuanza upya kabisa: `--no-cache` (hatua 1–2)
 au `--no-resume` (hatua 4).
 
-**Ni salama kuikatiza.** Ni bora kuliko kuacha mashine ikikimbia usiku mzima bila kuihitaji.
+**Ni salama kuikatiza — hata kwa kuzima PC.** Cache inaandikwa **kwa kila partition**
+(`flush` kila mstari), kwa hiyo kila partition iliyokamilika imehifadhiwa. Mstari uliokatika
+katikati unarukwa wakati wa kusoma. Mfano wa kawaida kabisa:
+
+```cmd
+scripts\audit.bat          :: iendeshe nusu saa
+Ctrl+C                     :: au zima PC moja kwa moja
+...
+scripts\audit.bat          :: inaendelea ilipoishia
+```
+
+Kinachohifadhiwa: **kila partition iliyomalizika**. Kinachopotea: **partition moja**
+iliyokuwa ikichakatwa. Hakuna zaidi.
 
 Maandishi yote yanaandikwa `research\reports\quality\audit.log` — dirisha likifungwa au PC
 ikizimika, ushahidi haupotei. Baada ya kukatika, swali la kwanza:

@@ -19,6 +19,18 @@ research/data/
 scripts/env.local.bat
 *.local.bat
 
+# Kina cha ubora: ~34 MB (checks 7 x siku ~39,000) na inabadilika kila run.
+# Muhtasari (`quality_report.json`) ndio unaopushwa na kusainiwa; kina ni
+# malighafi ya `quality-stats` na kinajengwa upya na `check-l1`.
+quality_detail.json
+
+# Cache za kuendelea baada ya kukatika — mstari mmoja kwa partition (~33 MB).
+# Si ushahidi; zinajengwa upya na `build-calendar`/`check-l1`.
+_calendar_scan.jsonl
+_l1_scan.jsonl
+_l2_state.json
+audit.log
+
 # Kinga ya pili (belt-and-braces): data ghafi popote ilipo
 *.parquet
 manifest_l0.json
