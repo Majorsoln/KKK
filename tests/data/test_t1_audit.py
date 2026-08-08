@@ -358,3 +358,40 @@ def test_kuchagua_kwa_symbol_na_provenance(cfg, l0_tree):
     assert len(select_partitions(cfg, l0_tree, ["EURUSD"])) == len(DAYS)
     assert len(select_partitions(cfg, l0_tree, provenance="aggregator")) == len(DAYS) + 1
     assert select_partitions(cfg, l0_tree, provenance="broker") == []
+
+
+def test_l2_inaendelea_ilipoishia_bila_kujenga_upya(cfg, l0_tree, tmp_path):
+    """Kazi ya masaa lazima iweze kukatizwa. Symbol iliyokwisha inarukwa."""
+    l2_root = tmp_path / "L2_bars"
+    first = build_l2(cfg, l0_tree, l2_root, symbols=["EURUSD"], timeframes=["H1"])[0]
+    assert first.ticks > 0 and (l2_root / "_l2_state.json").is_file()
+
+    second = build_l2(cfg, l0_tree, l2_root, symbols=["EURUSD"], timeframes=["H1"])[0]
+    assert second.chunks == first.chunks and second.rows == first.rows
+    assert second.ticks == first.ticks, "hali imesomwa, si kujengwa upya"
+
+
+def test_l2_inajenga_upya_data_ya_l0_ikibadilika(cfg, l0_tree, tmp_path):
+    """Bars za zamani hazibaki kimya baada ya L0 kuongezeka."""
+    l2_root = tmp_path / "L2_bars"
+    build_l2(cfg, l0_tree, l2_root, symbols=["EURUSD"], timeframes=["H1"])
+
+    mpya = date(2026, 8, 7)
+    path = l0_tree / "provenance=aggregator" / "symbol=EURUSD" / "2026" / f"{mpya}.parquet"
+    _day_ticks(mpya, FULL_MINUTES, 1.0900, 0.0001).to_parquet(path, index=False)
+
+    rebuilt = build_l2(cfg, l0_tree, l2_root, symbols=["EURUSD"], timeframes=["H1"])[0]
+    assert rebuilt.rows["H1"] > 0
+    from src.data.bars import read_bars
+
+    bars = read_bars(l2_root, "EURUSD", "H1")
+    assert mpya.isoformat() in {str(d.date()) for d in bars.index}, "siku mpya imeingia"
+
+
+def test_no_resume_inajenga_upya_hata_ikiwa_ipo(cfg, l0_tree, tmp_path):
+    l2_root = tmp_path / "L2_bars"
+    build_l2(cfg, l0_tree, l2_root, symbols=["EURUSD"], timeframes=["H1"])
+    forced = build_l2(
+        cfg, l0_tree, l2_root, symbols=["EURUSD"], timeframes=["H1"], resume=False
+    )[0]
+    assert forced.ticks > 0 and forced.chunks >= 1

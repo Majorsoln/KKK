@@ -664,7 +664,7 @@ def build_l2_for_symbol(
     l0_root: Path,
     l2_root: Path,
     timeframes: Sequence[str],
-    max_rows_per_chunk: int = 20_000_000,
+    max_rows_per_chunk: int = 5_000_000,
     on_progress: ProgressFn | None = None,
 ) -> BarsBuild:
     """Bars za TF zote kwa symbol moja, kwa vipande, kisha kuandikwa L2."""
@@ -718,19 +718,67 @@ def build_l2_for_symbol(
     return result
 
 
+def _l2_fingerprint(cfg, paths: Sequence[Path], timeframes: Sequence[str]) -> str:
+    """Alama ya kile kinachozalisha L2 ya symbol: partitions + TF + config."""
+    import hashlib
+
+    payload = "|".join(
+        sorted(f"{p}:{p.stat().st_size}:{int(p.stat().st_mtime)}" for p in paths)
+    )
+    payload += f"||{','.join(sorted(timeframes))}||{getattr(cfg, 'config_hash', '')}"
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()[:16]
+
+
 def build_l2(
     cfg,
     l0_root: Path,
     l2_root: Path,
     symbols: Sequence[str] | None = None,
     timeframes: Iterable[str] | None = None,
-    max_rows_per_chunk: int = 20_000_000,
+    max_rows_per_chunk: int = 5_000_000,
     on_progress: ProgressFn | None = None,
+    resume: bool = True,
 ) -> list[BarsBuild]:
+    """L2 kwa symbols zote, **ikiendelea ilipoishia**.
+
+    Hii ni kazi ya masaa (ticks bilioni 3.4). Bila resume, kukatika saa ya nane
+    kungemaanisha kuanza upya — na kazi isiyoweza kukatizwa ni kazi
+    inayolazimisha mtu kuiacha ikikimbia hata pale anapohitaji mashine yake.
+
+    Symbol inarukwa ikiwa L2 yake ipo NA alama ya `partitions + TF + config_hash`
+    haijabadilika. Data mpya ikiingia L0, alama inabadilika na symbol inajengwa
+    upya — hakuna njia ya kubaki na bars za zamani kimya.
+    """
     tfs = list(timeframes or cfg.get("bars.timeframes"))
     targets = [s.upper() for s in (symbols or cfg.symbols)]
-    return [
-        build_l2_for_symbol(
+    state_path = Path(l2_root) / "_l2_state.json"
+    state: dict[str, Any] = {}
+    if resume and state_path.is_file():
+        try:
+            state = json.loads(state_path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            state = {}
+
+    out: list[BarsBuild] = []
+    for symbol in targets:
+        paths = select_partitions(cfg, l0_root, [symbol])
+        marker = _l2_fingerprint(cfg, paths, tfs)
+        done = state.get(symbol, {})
+        if resume and done.get("fingerprint") == marker:
+            skipped = BarsBuild(
+                symbol=symbol,
+                rows=done.get("rows", {}),
+                ticks=int(done.get("ticks", 0)),
+                chunks=int(done.get("chunks", 0)),
+                span=tuple(done["span"]) if done.get("span") else None,
+                years=float(done.get("years", 0.0)),
+            )
+            if on_progress:
+                on_progress(1, 1, f"{symbol} — ipo tayari, imerukwa")
+            out.append(skipped)
+            continue
+
+        build = build_l2_for_symbol(
             cfg,
             symbol,
             l0_root,
@@ -739,5 +787,10 @@ def build_l2(
             max_rows_per_chunk=max_rows_per_chunk,
             on_progress=on_progress,
         )
-        for symbol in targets
-    ]
+        out.append(build)
+        # Hali inaandikwa BAADA ya kila symbol — kukatika baada ya symbol ya nane
+        # kunapoteza ya tisa pekee, si zote nane.
+        state[symbol] = {**build.to_json(), "fingerprint": marker}
+        state_path.parent.mkdir(parents=True, exist_ok=True)
+        state_path.write_text(json.dumps(state, indent=2) + "\n", encoding="utf-8")
+    return out

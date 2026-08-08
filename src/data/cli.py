@@ -599,6 +599,7 @@ def cmd_build_l2(args: argparse.Namespace) -> int:
         timeframes=[t.strip() for t in args.timeframes.split(",")] if args.timeframes else None,
         max_rows_per_chunk=args.max_rows_per_chunk,
         on_progress=on_progress,
+        resume=not args.no_resume,
     )
     for build in builds:
         print(build.render())
@@ -897,8 +898,13 @@ def build_parser() -> argparse.ArgumentParser:
     p_l2.add_argument(
         "--max-rows-per-chunk",
         type=int,
-        default=20_000_000,
+        default=5_000_000,
         help="ticks kwa kipande kimoja (kumbukumbu); mipaka ni ya SIKU za UTC",
+    )
+    p_l2.add_argument(
+        "--no-resume",
+        action="store_true",
+        help="jenga upya symbols zote hata zilizokwisha (default: ruka zisizobadilika)",
     )
     p_l2.add_argument("--progress-every", type=int, default=1)
     p_l2.set_defaults(func=cmd_build_l2)

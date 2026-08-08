@@ -122,9 +122,24 @@ ngapi, na **kizingiti gani kingefelisha ngapi**. Ukaguzi ukifelisha nusu ya data
 kipimo ndicho kibaya — si data. Chagua kizingiti hapo, kiandike `config\data.yaml` → `quality:`,
 kisha `check-l1` tena (cache inajitupa yenyewe kizingiti kikibadilika).
 
-**Ni kazi ya masaa** — inasoma L0 nzima. Ikikatika, iendeshe tena: hatua 1 na 2 zina cache
-(`_calendar_scan.jsonl`, `_l1_scan.jsonl`) inayozifanya zianzie zilipoishia. Kuanza upya kabisa:
-`--no-cache`.
+**Ni kazi ya masaa 9–13** kwa symbols zote 12 (partitions 25,498 · ticks bilioni 3.4). Kadirio
+kwa hatua, kutoka vipimo halisi:
+
+| Hatua | Muda | Kwa nini |
+|---|---|---|
+| 1 `build-calendar` | ~saa 1.9 (mara ya kwanza) · **dakika chache baadaye** | inasoma column ya timestamp pekee; ina cache |
+| 2 `check-l1` | ~saa 3–6 | inasoma `timestamp/bid/ask`; ina cache |
+| 3a/3b ulinganisho | dakika chache | sampuli + siku zinazopishana pekee |
+| 4 `build-l2` | **~saa 5–8** | inasoma TICKS ZOTE (columns 5) + resample TF 7 — hii ndiyo nzito kuliko zote |
+| 5 sentinel + splits | sekunde | |
+
+**Kila hatua inaendelea ilipoishia.** Ukikatiza (`Ctrl+C`) au mashine ikizimika, endesha
+`scripts\audit.bat` tena: hatua 1 na 2 zina cache ya JSONL, na hatua 4 ina `_l2_state.json`
+inayoruka **symbol iliyokwisha** (alama yake = partitions + TF + `config_hash`; L0 ikiongezeka,
+symbol inajengwa upya, haibaki ya zamani kimya). Kuanza upya kabisa: `--no-cache` (hatua 1–2)
+au `--no-resume` (hatua 4).
+
+**Ni salama kuikatiza.** Ni bora kuliko kuacha mashine ikikimbia usiku mzima bila kuihitaji.
 
 `check-l1` ikirudisha exit 1, hiyo **si hitilafu ya script** — ni partitions zilizofeli ubora.
 Zisome kwenye `quality_report.json` (`fail_reasons`), kisha ni uamuzi wa PD: kuziba kwa
