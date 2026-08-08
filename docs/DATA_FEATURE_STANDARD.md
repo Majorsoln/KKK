@@ -154,13 +154,19 @@ mpya + hashes — data ya 2026-05+ ni RESERVE (holdout ya mzunguko ujao, `DATA_S
 
 ## 3. L1 — USAFI NA MALANGO YA UBORA
 
-Kila partition inapita ukaguzi huu. Ikifeli → **haitumiki kwa training**, na ripoti inaandikwa.
+**Kitengo cha hukumu ni SIKU, si faili** (PD 2026-08-08). Siku ikifeli → **haitumiki kwa
+training**, na ripoti inaandikwa. Sababu ni kipimo, si nadharia: Toleo A linaandika partition kwa
+siku, Toleo B kwa **mwezi**. Kuhukumu kwa faili kunafanya mambo mawili yasiyokubalika — partition
+ya mwezi ina siku ~22, kwa hiyo ina nafasi mara 22 zaidi ya kukutana na siku moja mbaya (kipimo
+cha 2026-08-08: EURCHF/GBPJPY/XAUUSD zilifeli **12 kwa mwaka**, yaani partitions zao ZOTE), na
+`fail_action: exclude` ingetupa **mwezi mzima kwa siku moja** — symbols zote tatu za Toleo B
+zingetoweka kwenye training kwa kasoro ya kipimo, si ya data.
 
 | # | Ukaguzi | Sheria | FAIL reason |
 |---|---|---|---|
 | 1 | **coverage** | bars zilizopo ÷ bars zinazotarajiwa (session calendar) ≥ `min_coverage` — L0 (ticks): **dakika zenye quote** dhidi ya median ya siku kamili za symbol/mwezi | `low_coverage` |
 | 2 | **monotonicity** | timestamps zinapanda; **kurudi nyuma = 0 daima**; duplicate ≤ `max_duplicate_frac` (MT5 inatoa quotes mbili kwenye µs moja) | `bad_timestamps` |
-| 3 | **gaps** | L0 (ticks): pengo ≤ `max_gap_seconds` · L2 (bars): ≤ `max_gap_bars` | `intrasession_gap` |
+| 3 | **gaps** | L0 (ticks): pengo ≤ `max_gap_seconds` · L2 (bars): ≤ `max_gap_bars`. Kizingiti kinaruhusiwa kuwa cha **kila symbol** — XAUUSD ina mapumziko ya kila siku (~saa 1) ambayo si pengo la data | `intrasession_gap` |
 | 4 | **OHLC sanity** | `low ≤ min(open,close) ≤ max(open,close) ≤ high` — **inakaguliwa L2**, kwa sababu ticks hazina OHLC (§4) | `ohlc_violation` |
 | 5 | **quote sanity** | `bid < ask`, `spread > 0`, `spread ≤ max_plausible` — `crossed` na `zero_spread` zinahesabiwa **kando** | `quote_violation` |
 | 6 | **DST/session** | mabadiliko ya saa yanalingana na kalenda ya broker — mipaka ni median ya **symbol/mwezi**; hatua ya saa 1 kamili inaandikwa kama DST, si FAIL | `session_mismatch` |

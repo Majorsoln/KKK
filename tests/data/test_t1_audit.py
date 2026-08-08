@@ -468,3 +468,60 @@ def test_r0_summary_inakataa_bila_ripoti(cfg, tmp_path, capsys):
     from src.data.cli import main
 
     assert main(["r0-summary", "--out-dir", str(tmp_path / "hakuna")]) == 2
+
+
+# ===========================================================================
+# Kitengo cha hukumu ni SIKU, si faili (PD 2026-08-08)
+# ===========================================================================
+
+
+def test_siku_moja_mbaya_haitupi_mwezi_mzima(cfg, l0_root):
+    """Toleo B ni partition ya MWEZI. Siku 1 mbaya isipoteze siku 22 nzuri.
+
+    Hii ndiyo kasoro iliyofanya EURCHF/GBPJPY/XAUUSD kufeli 12 KWA MWAKA —
+    yaani partitions zao ZOTE — kwenye kipimo cha kwanza cha data halisi.
+    """
+    days = [date(2026, 8, d) for d in (3, 4, 5, 6, 7)]
+    frames = []
+    for day in days:
+        # 300/600: fupi ya kutosha kufeli coverage, ndefu ya kutosha kubaki
+        # `full` (chini ya 0.25 x median ingekuwa `partial`, yaani sikukuu).
+        minutes = 300 if day == days[2] else FULL_MINUTES
+        frames.append(_day_ticks(day, minutes, 2400.0, 0.01))
+    monthly = pd.concat(frames)
+    b_frame = pd.DataFrame(
+        {
+            "ts": (monthly["timestamp"].astype("int64") // 1000).values,
+            "bid": monthly["bid"].values,
+            "ask": monthly["ask"].values,
+            "bid_volume": monthly["bid_vol"].values,
+            "ask_volume": monthly["ask_vol"].values,
+        }
+    )
+    path = l0_root / "provenance=aggregator" / "symbol=XAUUSD" / "2026" / "2026-08.parquet"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    b_frame.to_parquet(path, index=False)
+
+    calendar = build_session_calendar(cfg, l0_root).calendar
+    report = run_quality_audit(cfg, l0_root, calendar=calendar, symbols=["XAUUSD"])
+
+    part = report.partitions[0]
+    assert len(part.days) == len(days), "partition ya mwezi inahukumiwa siku kwa siku"
+    assert len(part.failed_days) == 1, "siku MOJA pekee ndiyo mbaya"
+    assert part.usable_days == [d.isoformat() for d in days if d != days[2]]
+
+    assert report.total_days == len(days)
+    assert report.failed_days == 1
+    assert report.excluded_days() == {"XAUUSD": [days[2].isoformat()]}
+
+
+def test_kizingiti_kinaweza_kuwa_cha_kila_symbol(cfg):
+    """Dhahabu ina mapumziko ya kila siku; EURUSD haina."""
+    from src.data.quality import _per_symbol
+
+    cfg.raw["quality"]["max_gap_seconds"] = {"default": 3600, "XAUUSD": 5400}
+    assert _per_symbol(cfg, "quality.max_gap_seconds", "XAUUSD", 3600) == 5400
+    assert _per_symbol(cfg, "quality.max_gap_seconds", "EURUSD", 3600) == 3600
+
+    cfg.raw["quality"]["max_gap_seconds"] = 900       # namba moja bado inakubalika
+    assert _per_symbol(cfg, "quality.max_gap_seconds", "XAUUSD", 3600) == 900

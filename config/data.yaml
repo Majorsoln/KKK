@@ -74,16 +74,22 @@ recorder:
 # ---------- L1: MALANGO YA UBORA (spec §3) ----------
 quality:
   min_coverage:        0.995            # ticks zilizopo / zinazotarajiwa (kalenda ya session)
-  max_gap_seconds:     3600             # pengo ndani ya session (L0 ni TICKS, si bars)
+  max_gap_seconds:                      # pengo ndani ya session (L0 ni TICKS, si bars)
+    default:  3600
+    XAUUSD:   5400                      # dhahabu ina MAPUMZIKO YA KILA SIKU (~saa 1). Kipimo
+                                        # cha 2026-08-08: partitions ZOTE za XAUUSD zilifeli
+                                        # kwa 3600 (p99 = 3600.2 haswa) — hilo ni soko, si data
   max_gap_bars:        3                # pengo ndani ya session kwa bars za L2
   session_tolerance_minutes: 15         # mipaka ya session dhidi ya kalenda (DST inanaswa hapa)
   max_duplicate_frac:  0.001            # ticks zenye timestamp ILE ILE. MT5 inatoa µs/ms; quotes
                                         # mbili kutua kipimo kimoja ni la lazima kitakwimu, si
                                         # kasoro. KURUDI NYUMA hakuvumiliwi kamwe (kikomo ni 0).
   partial_day_frac:    0.25             # siku yenye ticks < hii x wastani wa mwezi = `partial`
-  max_stale_seconds:   1800             # L0: quote ILE ILE kwa muda huu -> feed imeganda
-                                        # (kuhesabu ticks ni kipimo kisicho na maana:
-                                        #  dakika tulivu ya Asia ina ticks 40 zenye quote moja)
+  max_stale_seconds:                    # L0: quote ILE ILE kwa muda huu -> feed imeganda
+    default:  1800                      # (kuhesabu ticks ni kipimo kisicho na maana:
+    XAUUSD:   5400                      #  dakika tulivu ya Asia ina ticks 40 zenye quote moja)
+                                        # XAUUSD: mapumziko yale yale ya kila siku yanaonekana
+                                        # kama ukimya — ni pengo la kalenda, si feed iliyoganda
   max_flat_bars:       10               # L2: mfululizo wa BARS zenye high==low (§3 check 8)
   max_plausible_spread_pips:            # kikomo cha akili timamu, si cha trading
     default:   50.0

@@ -61,13 +61,10 @@ class CheckResult:
 
 
 @dataclass
-class PartitionQuality:
-    """Matokeo ya partition moja — checks zote, si ile ya kwanza iliyofeli."""
+class DayQuality:
+    """Matokeo ya SIKU moja — hiki ndicho kipimo cha kutumika/kutotumika."""
 
-    partition: str
-    symbol: str | None
-    provenance: str
-    rows: int = 0
+    day: str
     checks: list[CheckResult] = field(default_factory=list)
 
     @property
@@ -80,13 +77,70 @@ class PartitionQuality:
 
     def to_json(self) -> dict[str, Any]:
         return {
+            "day": self.day,
+            "passed": self.passed,
+            "fail_reasons": self.fail_reasons,
+            "checks": [c.to_json() for c in self.checks],
+        }
+
+
+@dataclass
+class PartitionQuality:
+    """Matokeo ya partition moja, yakiwa yamegawanywa kwa SIKU.
+
+    **Kitengo cha hukumu ni siku, si faili** (PD 2026-08-08). Data yetu ina
+    miundo miwili: Toleo A linaandika partition kwa SIKU, Toleo B kwa MWEZI.
+    Kuhukumu kwa faili kunafanya vitu viwili vibaya kwa wakati mmoja:
+
+    * partition ya mwezi ina siku ~22, kwa hiyo ina nafasi mara 22 zaidi ya
+      kukumbana na siku moja mbaya — inafeli mara nyingi zaidi bila kuwa mbovu
+      zaidi (ndiyo maana EURCHF/GBPJPY/XAUUSD zilifeli 12 KWA MWAKA, yaani
+      partitions ZAO ZOTE);
+    * `fail_action: exclude` ingetupa **mwezi mzima kwa siku moja mbaya** —
+      symbols tatu za Toleo B zingetoweka kabisa kwenye training.
+
+    Kwa hiyo checks zote saba zinafanyika kwa kila siku, na kinachotolewa nje
+    ni **siku**, si faili.
+    """
+
+    partition: str
+    symbol: str | None
+    provenance: str
+    rows: int = 0
+    days: list[DayQuality] = field(default_factory=list)
+    checks: list[CheckResult] = field(default_factory=list)   # zisizo za siku (mf. faili tupu)
+
+    @property
+    def passed(self) -> bool:
+        return all(c.passed for c in self.checks) and all(d.passed for d in self.days)
+
+    @property
+    def failed_days(self) -> list[DayQuality]:
+        return [d for d in self.days if not d.passed]
+
+    @property
+    def usable_days(self) -> list[str]:
+        return [d.day for d in self.days if d.passed]
+
+    @property
+    def fail_reasons(self) -> list[str]:
+        reasons = [c.reason for c in self.checks if not c.passed and c.reason]
+        for day in self.failed_days:
+            reasons.extend(day.fail_reasons)
+        return reasons
+
+    def to_json(self) -> dict[str, Any]:
+        return {
             "partition": self.partition,
             "symbol": self.symbol,
             "provenance": self.provenance,
             "rows": self.rows,
             "passed": self.passed,
-            "fail_reasons": self.fail_reasons,
+            "days_total": len(self.days),
+            "days_failed": len(self.failed_days),
+            "fail_reasons": sorted(set(self.fail_reasons)),
             "checks": [c.to_json() for c in self.checks],
+            "days": [d.to_json() for d in self.days],
         }
 
 
@@ -352,50 +406,63 @@ def check_partition(
 
     max_spread = _max_plausible_spread(cfg, symbol)
     pip = _pip_size(symbol)
-    max_gap = float(cfg.get("quality.max_gap_seconds", 3600))
+    max_gap = _per_symbol(cfg, "quality.max_gap_seconds", symbol, 3600.0)
+    max_stale = _per_symbol(cfg, "quality.max_stale_seconds", symbol, 1800.0)
     tolerance = float(cfg.get("quality.session_tolerance_minutes", 15))
     min_coverage = float(cfg.get("quality.min_coverage", 0.995))
+    max_dup = float(cfg.get("quality.max_duplicate_frac", 0.0))
 
-    def _coverage(day, group: pd.DataFrame) -> CheckResult:
+    for day, group in frame.groupby(frame["timestamp"].dt.date):
         expected = int(
             expected_minutes
             if expected_minutes is not None
             else (calendar.expected_minutes(symbol, day) if calendar is not None else 0)
         )
         observed = int(group["timestamp"].dt.floor("min").nunique())
-        check = check_coverage(observed, expected, min_coverage)
+        coverage = check_coverage(observed, expected, min_coverage)
         if expected > 0:
-            check.detail = f"{day}: dakika {observed}/{expected}"
-        return check
+            coverage.detail = f"dakika {observed}/{expected}"
 
-    def _session(day, group: pd.DataFrame) -> CheckResult:
         bounds = calendar.expected_session(symbol, day) if calendar is not None else None
-        check = check_session_match(
+        session = check_session_match(
             group,
             bounds[0] if bounds else None,
             bounds[1] if bounds else None,
             tolerance,
             hour_step_ok=True,  # DST ni kalenda, si data mbovu (§3)
         )
-        if bounds:
-            check.detail = f"{day}: {check.detail}"
-        return check
 
-    result.checks = [
-        _worst_by_day(frame, _coverage),
-        check_monotonicity(frame, float(cfg.get("quality.max_duplicate_frac", 0.0))),
-        _worst_by_day(frame, lambda day, group: check_gaps(group, max_gap)),
-        check_quote_sanity(frame, max_spread, pip),
-        _worst_by_day(frame, _session),
-        check_clock_drift(frame),
-        _worst_by_day(
-            frame,
-            lambda day, group: check_stale_feed(
-                group, float(cfg.get("quality.max_stale_seconds", 1800))
-            ),
-        ),
-    ]
+        result.days.append(
+            DayQuality(
+                day=day.isoformat(),
+                checks=[
+                    coverage,
+                    check_monotonicity(group, max_dup),
+                    check_gaps(group, max_gap),
+                    check_quote_sanity(group, max_spread, pip),
+                    session,
+                    check_clock_drift(group),
+                    check_stale_feed(group, max_stale),
+                ],
+            )
+        )
     return result
+
+
+def _per_symbol(cfg, dotted: str, symbol: str | None, default: float) -> float:
+    """Kizingiti kinachoweza kuwa namba moja au ramani ya `symbol -> namba`.
+
+    XAUUSD ina **mapumziko ya kila siku** (dhahabu inafunga ~saa 1 kila siku);
+    EURUSD haina. Kizingiti kimoja cha `max_gap_seconds` kinamaanisha ama
+    kufelisha kila siku ya dhahabu, ama kutokuona pengo la kweli kwenye FX.
+    Kigezo kilekile kinaruhusiwa kuwa `{default: X, XAUUSD: Y}`.
+    """
+    value = cfg.get(dotted, default)
+    if isinstance(value, dict):
+        if symbol and symbol.upper() in value:
+            return float(value[symbol.upper()])
+        return float(value.get("default", default))
+    return float(value)
 
 
 def _worst_by_day(frame: pd.DataFrame, check) -> CheckResult:
@@ -456,22 +523,47 @@ class QualityReport:
     def failed(self) -> list[PartitionQuality]:
         return [p for p in self.partitions if not p.passed]
 
+    @property
+    def total_days(self) -> int:
+        return sum(len(p.days) for p in self.partitions)
+
+    @property
+    def failed_days(self) -> int:
+        return sum(len(p.failed_days) for p in self.partitions)
+
+    def excluded_days(self) -> dict[str, list[str]]:
+        """`symbol -> siku zisizoingia training` — hii ndiyo athari halisi ya §3."""
+        out: dict[str, list[str]] = {}
+        for part in self.partitions:
+            if not part.failed_days:
+                continue
+            out.setdefault(str(part.symbol), []).extend(d.day for d in part.failed_days)
+        return {sym: sorted(set(days)) for sym, days in sorted(out.items())}
+
     def by_symbol_year(self) -> dict[str, dict[str, int]]:
-        """Muhtasari kwa symbol/mwaka — ndivyo R0 inavyoulizwa (§R0)."""
+        """Muhtasari kwa symbol/mwaka, ukihesabu **SIKU** — ndivyo R0 inavyoulizwa."""
         summary: dict[str, dict[str, int]] = {}
         for part in self.partitions:
             year = _year_of(part.partition)
             key = f"{part.symbol}/{year}"
-            slot = summary.setdefault(key, {"passed": 0, "failed": 0, "rows": 0})
-            slot["passed" if part.passed else "failed"] += 1
+            slot = summary.setdefault(
+                key, {"days_passed": 0, "days_failed": 0, "partitions": 0, "rows": 0}
+            )
+            slot["days_passed"] += len(part.days) - len(part.failed_days)
+            slot["days_failed"] += len(part.failed_days)
+            slot["partitions"] += 1
             slot["rows"] += part.rows
         return dict(sorted(summary.items()))
 
     def reason_counts(self) -> dict[str, int]:
+        """Sababu zikihesabiwa kwa **SIKU** — kitengo cha kutolewa nje."""
         counts: dict[str, int] = {}
-        for part in self.failed:
-            for reason in part.fail_reasons:
+        for part in self.partitions:
+            for reason in (c.reason for c in part.checks if not c.passed and c.reason):
                 counts[reason] = counts.get(reason, 0) + 1
+            for day in part.failed_days:
+                for reason in day.fail_reasons:
+                    counts[reason] = counts.get(reason, 0) + 1
         return dict(sorted(counts.items(), key=lambda kv: -kv[1]))
 
     def to_json(self) -> dict[str, Any]:
@@ -483,10 +575,14 @@ class QualityReport:
                 "partitions": len(self.partitions),
                 "passed": len(self.passed),
                 "failed": len(self.failed),
+                "days": self.total_days,
+                "days_failed": self.failed_days,
+                "days_passed": self.total_days - self.failed_days,
             },
             "fail_reasons": self.reason_counts(),
             "by_symbol_year": self.by_symbol_year(),
             "coverage_by_symbol": self.coverage_by_symbol,
+            "excluded_days": self.excluded_days(),
             "calendar_comparison": self.calendar_comparison,
             "partitions": [p.to_json() for p in self.partitions],
         }
@@ -499,8 +595,9 @@ class QualityReport:
 
     def render(self) -> str:
         lines = [
-            f"L1 quality: partitions={len(self.partitions)} "
-            f"passed={len(self.passed)} failed={len(self.failed)}"
+            f"L1 quality: siku {self.total_days - self.failed_days}/{self.total_days} "
+            f"zimepita ({(self.total_days - self.failed_days) / max(self.total_days, 1):.1%}) "
+            f"· partitions {len(self.partitions)}"
         ]
         for reason, count in self.reason_counts().items():
             lines.append(f"  ! {reason}: {count}")
@@ -559,8 +656,17 @@ def threshold_study(report: dict[str, Any]) -> dict[str, Any]:
     offenders: dict[str, dict[str, int]] = {}
     failures: dict[str, int] = {}
 
+    def _units(part: dict[str, Any]):
+        """Kila siku ni kipimo kimoja; checks zisizo za siku ni kipimo cha faili."""
+        if part.get("days"):
+            for day in part["days"]:
+                yield day.get("day", "?"), day.get("checks", [])
+        else:
+            yield "?", part.get("checks", [])
+
     for part in report.get("partitions", []):
-        for check in part.get("checks", []):
+        for _day, checks in _units(part):
+          for check in checks:
             name = check.get("name", "?")
             if check.get("value") is None:
                 continue
@@ -615,6 +721,52 @@ def threshold_study(report: dict[str, Any]) -> dict[str, Any]:
             ),
         }
     return out
+
+
+def what_if(report: dict[str, Any], proposals: dict[str, float]) -> dict[str, Any]:
+    """Kizingiti kikiwa X, siku ngapi zingefeli — kwa namba, si kwa kukisia.
+
+    Inasoma ripoti iliyoshaandikwa. Inatoa athari ya **kila kizingiti peke yake**
+    na ya **vyote pamoja** (siku moja inaweza kufeli kwa sababu mbili; jumla ya
+    sababu si sawa na idadi ya siku).
+    """
+    per_check: dict[str, int] = {name: 0 for name in proposals}
+    days_total = 0
+    days_failed_now = 0
+    days_failed_after = 0
+
+    for part in report.get("partitions", []):
+        for day in part.get("days", []):
+            days_total += 1
+            if not day.get("passed", True):
+                days_failed_now += 1
+            fails_after = False
+            for check in day.get("checks", []):
+                name = check.get("name", "?")
+                value = check.get("value")
+                if name in proposals and value is not None:
+                    limit = proposals[name]
+                    bad = (
+                        value < limit
+                        if CHECK_DIRECTION.get(name, "max") == "min"
+                        else value > limit
+                    )
+                    if bad:
+                        per_check[name] += 1
+                        fails_after = True
+                elif not check.get("passed", True):
+                    fails_after = True   # ukaguzi usiobadilishwa bado unafelisha
+            if fails_after:
+                days_failed_after += 1
+
+    return {
+        "days": days_total,
+        "failing_now": days_failed_now,
+        "failing_after": days_failed_after,
+        "recovered": days_failed_now - days_failed_after,
+        "per_check": per_check,
+        "proposals": proposals,
+    }
 
 
 def render_threshold_study(study: dict[str, Any]) -> str:

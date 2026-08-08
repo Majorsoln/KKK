@@ -702,6 +702,25 @@ def cmd_quality_stats(args: argparse.Namespace) -> int:
         print(f"jumla: {shown} partitions zenye `{args.reason}`")
         return 0 if shown == 0 else 1
 
+    if args.what_if:
+        from .quality import what_if
+
+        proposals: dict[str, float] = {}
+        for item in args.what_if.split(","):
+            if "=" not in item:
+                print(f"muundo: --what-if coverage=0.98,gaps=7200 (si `{item}`)", file=sys.stderr)
+                return 2
+            name, _, value = item.partition("=")
+            proposals[name.strip()] = float(value)
+        result = what_if(report, proposals)
+        print(f"siku zote: {result['days']}")
+        print(f"  zinafeli SASA   : {result['failing_now']} ({result['failing_now']/max(result['days'],1):.2%})")
+        print(f"  zingefeli BAADA : {result['failing_after']} ({result['failing_after']/max(result['days'],1):.2%})")
+        print(f"  zingerudi       : {result['recovered']}")
+        for name, count in result["per_check"].items():
+            print(f"    {name} @ {proposals[name]}: siku {count} zingefeli kwa ukaguzi huu")
+        return 0
+
     study = threshold_study(report)
     print(render_threshold_study(study))
     target = out_dir / "threshold_study.json"
@@ -1091,6 +1110,10 @@ def build_parser() -> argparse.ArgumentParser:
         "(mf. bad_timestamps, quote_violation, intrasession_gap)",
     )
     p_stats.add_argument("--limit", type=int, default=40, help="mistari ya kuonyesha na --reason")
+    p_stats.add_argument(
+        "--what-if",
+        help="jaribu vizingiti: `coverage=0.98,gaps=7200` — inaonyesha siku ngapi zingefeli",
+    )
     p_stats.set_defaults(func=cmd_quality_stats)
 
     p_var = subparsers.add_parser(

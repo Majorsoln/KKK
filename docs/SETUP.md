@@ -129,6 +129,12 @@ ngapi, na **kizingiti gani kingefelisha ngapi**. Ukaguzi ukifelisha nusu ya data
 kipimo ndicho kibaya — si data. Chagua kizingiti hapo, kiandike `config\data.yaml` → `quality:`,
 kisha `check-l1` tena (cache inajitupa yenyewe kizingiti kikibadilika).
 
+Kabla ya kuandika kizingiti, kijaribu kwa namba halisi:
+```cmd
+python -m src.data.cli quality-stats --what-if coverage=0.98,gaps=7200
+```
+Inaonyesha siku ngapi zinafeli sasa, ngapi zingefeli kwa vizingiti hivyo, na ngapi zingerudi.
+
 **Ni kazi ya masaa 9–13** kwa symbols zote 12 (partitions 25,498 · ticks bilioni 3.4). Kadirio
 kwa hatua, kutoka vipimo halisi:
 

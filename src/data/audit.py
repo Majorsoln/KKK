@@ -36,6 +36,9 @@ from .session_calendar import (
 
 ProgressFn = Callable[[int, int, str], None]
 
+# 2 = matokeo yamegawanywa kwa SIKU (PD 2026-08-08); 1 = kwa partition.
+CHECK_SCHEMA_VERSION = 2
+
 
 # --------------------------------------------------------------------------
 # Kuchagua partitions
@@ -93,6 +96,10 @@ def _judgement_fingerprint(cfg, calendar: SessionCalendar | None, symbol: str | 
 
     key = str(symbol or "?").upper()
     payload = {
+        # Muundo wa matokeo ukibadilika, cache ya zamani HAIWEZI kutumika tena:
+        # ingesomwa kimya na kutoa ripoti yenye nusu ya taarifa. Nambari hii
+        # inaongezwa kila muundo unapobadilika.
+        "schema": CHECK_SCHEMA_VERSION,
         "config_hash": getattr(cfg, "config_hash", ""),
         "expect": (calendar.symbol_expect.get(key) if calendar else None),
         "non_full_days": (calendar.partial_days() if calendar else []),
@@ -350,24 +357,34 @@ def _coverage_by_symbol(cfg, report: QualityReport, calendar: SessionCalendar | 
     return out
 
 
+def _checks_from_json(items) -> list:
+    from .quality import CheckResult
+
+    return [
+        CheckResult(
+            name=item.get("name", "?"),
+            passed=bool(item.get("passed")),
+            reason=item.get("reason", ""),
+            value=item.get("value"),
+            threshold=item.get("threshold"),
+            detail=item.get("detail", ""),
+        )
+        for item in items or []
+    ]
+
+
 def _quality_from_json(payload: dict[str, Any]):
-    from .quality import CheckResult, PartitionQuality
+    from .quality import DayQuality, PartitionQuality
 
     return PartitionQuality(
         partition=payload["partition"],
         symbol=payload.get("symbol"),
         provenance=payload.get("provenance", ""),
         rows=int(payload.get("rows", 0)),
-        checks=[
-            CheckResult(
-                name=item.get("name", "?"),
-                passed=bool(item.get("passed")),
-                reason=item.get("reason", ""),
-                value=item.get("value"),
-                threshold=item.get("threshold"),
-                detail=item.get("detail", ""),
-            )
-            for item in payload.get("checks", [])
+        checks=_checks_from_json(payload.get("checks")),
+        days=[
+            DayQuality(day=d.get("day", "?"), checks=_checks_from_json(d.get("checks")))
+            for d in payload.get("days", [])
         ],
     )
 
