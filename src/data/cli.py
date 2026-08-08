@@ -1205,7 +1205,30 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _force_utf8() -> None:
+    """Lazimisha UTF-8 kwenye stdout/stderr.
+
+    Windows: Python inachagua encoding kwa **aina ya lengo**. Console inaweza
+    kuwa UTF-8, lakini output ikielekezwa kwenye PIPE au FAILI (mfano
+    `audit.bat` inayoandika log kwa `Tee-Object`), inarudi kwenye cp1252 ya
+    locale — na `→`, `≥`, `↔` hazipo humo. Matokeo: `UnicodeEncodeError`
+    inayoua amri **baada ya kazi yote kumalizika**, ikipoteza ripoti ya mwisho.
+
+    `errors="replace"` ni kinga ya mwisho: console ya zamani isiyoweza kuonyesha
+    herufi fulani ionyeshe `?` badala ya kuanguka. Ripoti ya JSON haiathiriki —
+    inaandikwa UTF-8 moja kwa moja, si kupitia stdout.
+    """
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is not None:
+            try:
+                reconfigure(encoding="utf-8", errors="replace")
+            except (OSError, ValueError):  # stream isiyokubali — si sababu ya kusimama
+                pass
+
+
 def main(argv: list[str] | None = None) -> int:
+    _force_utf8()
     parser = build_parser()
     args = parser.parse_args(argv)
     _configure_logging(getattr(args, "verbose", False))

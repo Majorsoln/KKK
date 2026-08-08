@@ -249,6 +249,7 @@ isiyoweza kuzalishwa upya (§9).
 | `check-l1` exit 1 | si hitilafu — partitions zimefeli ubora; soma `quality_report.json` (§3.1) |
 | `coverage … haijahukumiwa` | kalenda haipo au haina symbol/mwezi huo → endesha `build-calendar` kwanza |
 | `sentinel: bars za L2 hazipo` | endesha `build-l2` kwanza (au `sentinel --synthetic` kupima code pekee) |
+| `UnicodeEncodeError ... charmap` | code ya zamani; `git pull`. `scripts\shell.bat` inaweka UTF-8, na CLI inajilazimisha yenyewe |
 | `env.local.bat haipo` | `copy scripts\env.example.bat scripts\env.local.bat` |
 | `ModuleNotFoundError: MetaTrader5` | endesha `scripts\setup.bat` (venv + extra `[mt5]`) |
 | `set VAR=x` inakataa (PowerShell) | tumia cmd, au `$env:VAR = "x"` |
