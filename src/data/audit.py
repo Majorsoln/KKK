@@ -580,6 +580,7 @@ class BarsBuild:
     years: float = 0.0
     ticks: int = 0
     chunks: int = 0
+    reused: bool = False        # imesomwa kutoka `_l2_state.json`, haijajengwa upya
 
     @property
     def ok(self) -> bool:
@@ -608,6 +609,9 @@ class BarsBuild:
         }
 
     def render(self) -> str:
+        if self.reused:
+            bars = " · ".join(f"{tf}={rows}" for tf, rows in self.rows.items())
+            return f"{self.symbol}: ipo tayari, imerukwa | {bars}"
         bars = " · ".join(f"{tf}={rows}" for tf, rows in self.rows.items())
         status = "" if self.ok else f"  ! OHLC: {self.ohlc_violations}"
         if self.flat_offenders:
@@ -719,14 +723,85 @@ def build_l2_for_symbol(
 
 
 def _l2_fingerprint(cfg, paths: Sequence[Path], timeframes: Sequence[str]) -> str:
-    """Alama ya kile kinachozalisha L2 ya symbol: partitions + TF + config."""
+    """Alama ya kile kinachozalisha L2 ya symbol: partitions + TF + config YA L2.
+
+    **Si `config_hash` nzima.** L2 inategemea `bars.*` na `source.schema_variants`
+    pekee. Kutumia hash ya config yote kungefanya kila mabadiliko yasiyohusika —
+    kizingiti cha `quality`, sheria ya `setups`, kigezo cha `research` — kubatilisha
+    L2 ya symbols 12 na kudai ujenzi wa saa 5–8 bila sababu. Kigezo kisichoingia
+    kwenye bars hakipaswi kuzifuta.
+    """
     import hashlib
 
     payload = "|".join(
         sorted(f"{p}:{p.stat().st_size}:{int(p.stat().st_mtime)}" for p in paths)
     )
-    payload += f"||{','.join(sorted(timeframes))}||{getattr(cfg, 'config_hash', '')}"
-    return hashlib.sha256(payload.encode("utf-8")).hexdigest()[:16]
+    relevant = json.dumps(
+        {
+            "timeframes": sorted(timeframes),
+            "bars": cfg.get("bars", {}) or {},
+            "schema_variants": cfg.get("source.schema_variants", {}) or {},
+        },
+        sort_keys=True,
+        default=str,
+    )
+    return hashlib.sha256(f"{payload}||{relevant}".encode("utf-8")).hexdigest()[:16]
+
+
+def adopt_existing_l2(
+    cfg,
+    l0_root: Path,
+    l2_root: Path,
+    symbols: Sequence[str] | None = None,
+    timeframes: Iterable[str] | None = None,
+) -> list[str]:
+    """Andikisha bars zilizopo kwenye hali, bila kuzijenga upya.
+
+    Inahitajika mara moja: bars zilizojengwa na toleo lisilo na `_l2_state.json`
+    zingejengwa upya bure. Symbol inaandikishwa **tu** ikiwa TF zote zipo — bar
+    inaandikwa kwa TF moja baada ya nyingine na kila faili ni atomic, kwa hiyo
+    TF saba zilizopo maana yake mzunguko ulikamilika. Symbol iliyokatizwa katikati
+    ina TF pungufu, na inajengwa upya kama kawaida.
+    """
+    from .bars import read_bars
+
+    tfs = list(timeframes or cfg.get("bars.timeframes"))
+    targets = [s.upper() for s in (symbols or cfg.symbols)]
+    state_path = Path(l2_root) / "_l2_state.json"
+    state: dict[str, Any] = {}
+    if state_path.is_file():
+        try:
+            state = json.loads(state_path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            state = {}
+
+    adopted: list[str] = []
+    for symbol in targets:
+        files = [Path(l2_root) / f"symbol={symbol}" / f"tf={tf}" / "bars.parquet" for tf in tfs]
+        if not all(f.is_file() for f in files):
+            continue
+        paths = select_partitions(cfg, l0_root, [symbol])
+        if not paths:
+            continue
+        build = BarsBuild(symbol=symbol, chunks=0)
+        for tf in tfs:
+            bars = read_bars(l2_root, symbol, tf)
+            build.rows[tf] = int(len(bars))
+            if tf == str(cfg.get("bars.decision_tf", "H1")) and not bars.empty:
+                build.span = (bars.index[0].isoformat(), bars.index[-1].isoformat())
+                build.years = (bars.index[-1] - bars.index[0]).days / 365.25
+                build.ticks = int(bars["n_ticks"].sum())
+        state[symbol] = {
+            **build.to_json(),
+            "fingerprint": _l2_fingerprint(cfg, paths, tfs),
+            "adopted": True,
+        }
+        adopted.append(symbol)
+
+    if adopted:
+        state_path.parent.mkdir(parents=True, exist_ok=True)
+        state_path.write_text(json.dumps(state, indent=2) + "\n", encoding="utf-8")
+    return adopted
 
 
 def build_l2(
@@ -772,6 +847,7 @@ def build_l2(
                 chunks=int(done.get("chunks", 0)),
                 span=tuple(done["span"]) if done.get("span") else None,
                 years=float(done.get("years", 0.0)),
+                reused=True,
             )
             if on_progress:
                 on_progress(1, 1, f"{symbol} — ipo tayari, imerukwa")

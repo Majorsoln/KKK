@@ -141,6 +141,19 @@ au `--no-resume` (hatua 4).
 
 **Ni salama kuikatiza.** Ni bora kuliko kuacha mashine ikikimbia usiku mzima bila kuihitaji.
 
+Maandishi yote yanaandikwa `research\reports\quality\audit.log` — dirisha likifungwa au PC
+ikizimika, ushahidi haupotei. Baada ya kukatika, swali la kwanza:
+
+```cmd
+python -m src.data.cli audit-status
+```
+Inaonyesha hatua zilizokamilika, ngapi ziko kwenye cache, na symbols zipi za L2 zipo tayari.
+
+**PC isilale.** `audit.bat` inaweka `standby-timeout-ac 0` yenyewe (AC pekee — betri haiguswi),
+lakini **kufunga kifuniko** ni mpangilio tofauti ambao script haiwezi kuubadilisha kwa usalama:
+Control Panel → Power Options → *Choose what closing the lid does* → **When plugged in: Do
+nothing**. Bila hilo, kufunga laptop kunaua kazi ya saa 9.
+
 `check-l1` ikirudisha exit 1, hiyo **si hitilafu ya script** — ni partitions zilizofeli ubora.
 Zisome kwenye `quality_report.json` (`fail_reasons`), kisha ni uamuzi wa PD: kuziba kwa
 `catchup.bat`, au kuziacha nje ya training (`quality.fail_action: exclude`).

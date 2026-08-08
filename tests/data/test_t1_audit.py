@@ -367,8 +367,8 @@ def test_l2_inaendelea_ilipoishia_bila_kujenga_upya(cfg, l0_tree, tmp_path):
     assert first.ticks > 0 and (l2_root / "_l2_state.json").is_file()
 
     second = build_l2(cfg, l0_tree, l2_root, symbols=["EURUSD"], timeframes=["H1"])[0]
-    assert second.chunks == first.chunks and second.rows == first.rows
-    assert second.ticks == first.ticks, "hali imesomwa, si kujengwa upya"
+    assert second.reused, "hali imesomwa, si kujengwa upya"
+    assert second.rows == first.rows and second.ticks == first.ticks
 
 
 def test_l2_inajenga_upya_data_ya_l0_ikibadilika(cfg, l0_tree, tmp_path):
@@ -394,4 +394,48 @@ def test_no_resume_inajenga_upya_hata_ikiwa_ipo(cfg, l0_tree, tmp_path):
     forced = build_l2(
         cfg, l0_tree, l2_root, symbols=["EURUSD"], timeframes=["H1"], resume=False
     )[0]
-    assert forced.ticks > 0 and forced.chunks >= 1
+    assert not forced.reused and forced.ticks > 0
+
+
+def test_adopt_inaokoa_bars_zilizopo_bila_kujenga_upya(cfg, l0_tree, tmp_path):
+    """Bars za toleo lisilo na hali zisijengwe upya bure (saa 5-8)."""
+    from src.data.audit import adopt_existing_l2
+
+    l2_root = tmp_path / "L2_bars"
+    tfs = ["D1", "H1"]
+    build_l2(cfg, l0_tree, l2_root, symbols=["EURUSD"], timeframes=tfs)
+    (l2_root / "_l2_state.json").unlink()          # kama toleo la zamani
+
+    adopted = adopt_existing_l2(cfg, l0_tree, l2_root, symbols=["EURUSD"], timeframes=tfs)
+    assert adopted == ["EURUSD"]
+    again = build_l2(cfg, l0_tree, l2_root, symbols=["EURUSD"], timeframes=tfs)[0]
+    assert again.reused, "haijajengwa upya — imesomwa kutoka kwenye hali"
+    assert again.rows["H1"] > 0
+
+
+def test_adopt_hairuki_symbol_yenye_tf_pungufu(cfg, l0_tree, tmp_path):
+    """Symbol iliyokatizwa katikati ina TF pungufu — lazima ijengwe upya."""
+    from src.data.audit import adopt_existing_l2
+
+    l2_root = tmp_path / "L2_bars"
+    tfs = ["D1", "H1"]
+    build_l2(cfg, l0_tree, l2_root, symbols=["EURUSD"], timeframes=tfs)
+    (l2_root / "_l2_state.json").unlink()
+    (l2_root / "symbol=EURUSD" / "tf=H1" / "bars.parquet").unlink()
+
+    assert adopt_existing_l2(cfg, l0_tree, l2_root, symbols=["EURUSD"], timeframes=tfs) == []
+
+
+def test_kizingiti_kisichohusu_bars_hakifuti_l2(cfg, l0_tree, tmp_path):
+    """Kubadilisha `quality` au `setups` HAKUPASWI kudai ujenzi wa saa 5-8."""
+    l2_root = tmp_path / "L2_bars"
+    build_l2(cfg, l0_tree, l2_root, symbols=["EURUSD"], timeframes=["H1"])
+
+    cfg.raw["quality"]["min_coverage"] = 0.9
+    cfg.raw.setdefault("setups", {})["target_rate"] = 0.07
+    again = build_l2(cfg, l0_tree, l2_root, symbols=["EURUSD"], timeframes=["H1"])[0]
+    assert again.reused, "L2 haitegemei vizingiti hivyo"
+
+    cfg.raw["bars"]["build_from"] = "kitu_kingine"   # HII inahusu bars
+    rebuilt = build_l2(cfg, l0_tree, l2_root, symbols=["EURUSD"], timeframes=["H1"])[0]
+    assert not rebuilt.reused, "mabadiliko ya `bars` yanajenga upya"

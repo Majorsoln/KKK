@@ -475,6 +475,90 @@ def cmd_check_l1(args: argparse.Namespace) -> int:
     return 0 if not report.failed else 1
 
 
+def cmd_audit_status(args: argparse.Namespace) -> int:
+    """Hatua za R0 zilizokamilika — baada ya kukatika, hili ndilo swali la kwanza."""
+    cfg = _load(args)
+    from .audit import select_partitions
+
+    out_dir = _quality_dir(args, cfg)
+    l0_root = cfg.l0_root
+    l2_root = cfg.l2_root
+    total = len(select_partitions(cfg, l0_root))
+    print(f"L0: partitions {total}\n")
+
+    def _cached(name: str) -> int:
+        path = out_dir / name
+        if not path.is_file():
+            return 0
+        with path.open("r", encoding="utf-8") as handle:
+            return sum(1 for line in handle if line.strip())
+
+    rows: list[tuple[str, str, str]] = []
+    cal_cache = _cached("_calendar_scan.jsonl")
+    cal_done = (out_dir / "session_calendar.json").is_file()
+    rows.append(
+        (
+            "1 kalenda",
+            "IMEKAMILIKA" if cal_done else f"{cal_cache}/{total} kwenye cache",
+            "session_calendar.json" if cal_done else "endesha build-calendar",
+        )
+    )
+    l1_cache = _cached("_l1_scan.jsonl")
+    l1_done = (out_dir / "quality_report.json").is_file()
+    rows.append(
+        (
+            "2 L1 checks",
+            "IMEKAMILIKA" if l1_done else f"{l1_cache}/{total} kwenye cache",
+            "quality_report.json" if l1_done else "endesha check-l1",
+        )
+    )
+    for label, name in (
+        ("3a Toleo A↔B", "variant_comparison.json"),
+        ("3b aggregator↔broker", "provenance_comparison.json"),
+        ("5 splits", "splits.json"),
+    ):
+        exists = (out_dir / name).is_file()
+        rows.append((label, "IMEKAMILIKA" if exists else "—", name if exists else ""))
+
+    timeframes = list(cfg.get("bars.timeframes"))
+    symbols = cfg.symbols
+    ready = [
+        s
+        for s in symbols
+        if all((l2_root / f"symbol={s}" / f"tf={tf}" / "bars.parquet").is_file() for tf in timeframes)
+    ]
+    state = l2_root / "_l2_state.json"
+    tracked = 0
+    if state.is_file():
+        try:
+            tracked = len(json.loads(state.read_text(encoding="utf-8")))
+        except json.JSONDecodeError:
+            tracked = 0
+    rows.append(
+        (
+            "4 L2 bars",
+            f"{len(ready)}/{len(symbols)} symbols zina TF {len(timeframes)}",
+            f"_l2_state.json: {tracked} zimefuatiliwa" if state.is_file() else "hakuna hali",
+        )
+    )
+
+    width = max(len(r[0]) for r in rows)
+    for label, status, note in rows:
+        print(f"  {label:<{width}}  {status:<28}  {note}")
+
+    if ready and not state.is_file():
+        print(
+            f"\nONYO: symbols {len(ready)} zina bars lakini hakuna `_l2_state.json` — "
+            "zilijengwa na toleo la zamani lisilo na resume. `build-l2` itazijenga upya.\n"
+            "Kuziepuka: endesha `build-l2 --symbols <zilizobaki>` kwa zile pekee zisizokuwepo."
+        )
+        print(f"  zilizopo : {','.join(ready)}")
+        missing = [s for s in symbols if s not in ready]
+        if missing:
+            print(f"  zinazokosekana: {','.join(missing)}")
+    return 0
+
+
 def cmd_quality_stats(args: argparse.Namespace) -> int:
     """DF-05 — mgawanyo wa thamani za L1 → vizingiti vinavyotokana na DATA."""
     cfg = _load(args)
@@ -585,10 +669,23 @@ def cmd_compare_provenance(args: argparse.Namespace) -> int:
 def cmd_build_l2(args: argparse.Namespace) -> int:
     """DF-06 — bars za TF 7 kutoka ticks (spec §4)."""
     cfg = _load(args)
-    from .audit import build_l2
+    from .audit import adopt_existing_l2, build_l2
 
     l0_root = Path(args.l0_root).expanduser() if args.l0_root else cfg.l0_root
     l2_root = Path(args.l2_root).expanduser() if args.l2_root else cfg.l2_root
+    timeframes = [t.strip() for t in args.timeframes.split(",")] if args.timeframes else None
+
+    if args.adopt_existing:
+        adopted = adopt_existing_l2(
+            cfg, l0_root, l2_root, symbols=_symbol_list(args), timeframes=timeframes
+        )
+        print(
+            f"zimeandikishwa bila kujengwa upya: {len(adopted)} "
+            f"({', '.join(adopted) if adopted else 'hakuna'})"
+        )
+        if not args.build_after_adopt:
+            return 0
+
     on_progress, started = _progress_printer(args.progress_every)
 
     builds = build_l2(
@@ -596,7 +693,7 @@ def cmd_build_l2(args: argparse.Namespace) -> int:
         l0_root=l0_root,
         l2_root=l2_root,
         symbols=_symbol_list(args),
-        timeframes=[t.strip() for t in args.timeframes.split(",")] if args.timeframes else None,
+        timeframes=timeframes,
         max_rows_per_chunk=args.max_rows_per_chunk,
         on_progress=on_progress,
         resume=not args.no_resume,
@@ -853,6 +950,14 @@ def build_parser() -> argparse.ArgumentParser:
     p_l1.add_argument("--progress-every", type=int, default=100)
     p_l1.set_defaults(func=cmd_check_l1)
 
+    p_status = subparsers.add_parser(
+        "audit-status",
+        help="hatua za R0 zilizokamilika (baada ya kukatika)",
+        parents=[common],
+    )
+    p_status.add_argument("--out-dir")
+    p_status.set_defaults(func=cmd_audit_status)
+
     p_stats = subparsers.add_parser(
         "quality-stats",
         help="DF-05 — mgawanyo wa L1 → vizingiti kutoka DATA (haisomi parquet)",
@@ -900,6 +1005,16 @@ def build_parser() -> argparse.ArgumentParser:
         type=int,
         default=5_000_000,
         help="ticks kwa kipande kimoja (kumbukumbu); mipaka ni ya SIKU za UTC",
+    )
+    p_l2.add_argument(
+        "--adopt-existing",
+        action="store_true",
+        help="andikisha bars zilizopo (TF zote) kwenye hali bila kuzijenga upya",
+    )
+    p_l2.add_argument(
+        "--build-after-adopt",
+        action="store_true",
+        help="baada ya kuandikisha, endelea kujenga zilizobaki",
     )
     p_l2.add_argument(
         "--no-resume",
