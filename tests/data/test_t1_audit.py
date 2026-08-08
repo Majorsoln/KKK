@@ -525,3 +525,29 @@ def test_kizingiti_kinaweza_kuwa_cha_kila_symbol(cfg):
 
     cfg.raw["quality"]["max_gap_seconds"] = 900       # namba moja bado inakubalika
     assert _per_symbol(cfg, "quality.max_gap_seconds", "XAUUSD", 3600) == 900
+
+
+def test_what_if_inakataa_ripoti_ya_muundo_wa_zamani(cfg, l0_tree):
+    """Ripoti ya zamani haina `days` — `what_if` ingehesabu siku 0 KIMYA."""
+    from src.data.quality import what_if
+
+    calendar = build_session_calendar(cfg, l0_tree).calendar
+    report = run_quality_audit(cfg, l0_tree, calendar=calendar).to_json()
+    assert report["schema"] == 2
+    assert what_if(report, {"coverage": 0.9})["days"] > 0
+
+    zamani = {**report, "schema": 1}
+    with pytest.raises(ValueError, match="muundo wa zamani"):
+        what_if(zamani, {"coverage": 0.9})
+
+
+def test_threshold_study_inaonya_ripoti_ya_zamani(cfg, l0_tree):
+    from src.data.quality import render_threshold_study, threshold_study
+
+    calendar = build_session_calendar(cfg, l0_tree).calendar
+    report = run_quality_audit(cfg, l0_tree, calendar=calendar).to_json()
+    assert threshold_study(report)["unit"] == "siku"
+
+    zamani = threshold_study({**report, "schema": 1})
+    assert zamani["legacy"] is True
+    assert "muundo wa zamani" in render_threshold_study(zamani)

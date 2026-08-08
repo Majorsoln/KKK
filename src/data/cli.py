@@ -712,7 +712,11 @@ def cmd_quality_stats(args: argparse.Namespace) -> int:
                 return 2
             name, _, value = item.partition("=")
             proposals[name.strip()] = float(value)
-        result = what_if(report, proposals)
+        try:
+            result = what_if(report, proposals)
+        except ValueError as exc:
+            print(f"HITILAFU: {exc}", file=sys.stderr)
+            return 2
         print(f"siku zote: {result['days']}")
         print(f"  zinafeli SASA   : {result['failing_now']} ({result['failing_now']/max(result['days'],1):.2%})")
         print(f"  zingefeli BAADA : {result['failing_after']} ({result['failing_after']/max(result['days'],1):.2%})")

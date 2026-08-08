@@ -568,6 +568,9 @@ class QualityReport:
 
     def to_json(self) -> dict[str, Any]:
         return {
+            # Muundo wa ripoti. 2 = hukumu kwa SIKU; 1 = kwa faili (kabla ya
+            # 2026-08-08). Wasomaji wanaikagua badala ya kukisia kwa umbo.
+            "schema": 2,
             "built_at": self.built_at,
             "config_hash": self.config_hash,
             "thresholds": self.thresholds,
@@ -650,6 +653,7 @@ def threshold_study(report: dict[str, Any]) -> dict[str, Any]:
     ukaguzi, thamani halisi zilivyotawanyika na ni partitions ngapi zingefeli
     kwa kila kizingiti kinachopendekezwa. PD ndiye anayechagua.
     """
+    legacy = int(report.get("schema", 1)) < 2
     quantiles = [0.001, 0.01, 0.05, 0.10, 0.50, 0.90, 0.95, 0.99, 0.999]
     values: dict[str, list[float]] = {}
     thresholds: dict[str, float] = {}
@@ -683,7 +687,12 @@ def threshold_study(report: dict[str, Any]) -> dict[str, Any]:
                 key = f"{part.get('symbol')}/{_year_of(part.get('partition', ''))}"
                 offenders.setdefault(name, {})[key] = offenders.setdefault(name, {}).get(key, 0) + 1
 
-    out: dict[str, Any] = {"partitions": len(report.get("partitions", [])), "checks": {}}
+    out: dict[str, Any] = {
+        "partitions": len(report.get("partitions", [])),
+        "unit": "faili (muundo wa zamani)" if legacy else "siku",
+        "legacy": legacy,
+        "checks": {},
+    }
     for name, series in sorted(values.items()):
         data = pd.Series(series, dtype="float64")
         direction = CHECK_DIRECTION.get(name, "max")
@@ -730,6 +739,12 @@ def what_if(report: dict[str, Any], proposals: dict[str, float]) -> dict[str, An
     na ya **vyote pamoja** (siku moja inaweza kufeli kwa sababu mbili; jumla ya
     sababu si sawa na idadi ya siku).
     """
+    if int(report.get("schema", 1)) < 2:
+        raise ValueError(
+            "ripoti hii ni ya muundo wa zamani (hukumu kwa FAILI, si kwa siku). "
+            "`--what-if` ingehesabu siku 0 kimya. Endesha `check-l1` tena — cache "
+            "imeshajitupa yenyewe kwa sababu muundo umebadilika."
+        )
     per_check: dict[str, int] = {name: 0 for name in proposals}
     days_total = 0
     days_failed_now = 0
@@ -770,7 +785,14 @@ def what_if(report: dict[str, Any], proposals: dict[str, float]) -> dict[str, An
 
 
 def render_threshold_study(study: dict[str, Any]) -> str:
-    lines = [f"partitions zilizopimwa: {study['partitions']}", ""]
+    lines = [f"partitions zilizopimwa: {study['partitions']} · kitengo: {study.get('unit', 'siku')}"]
+    if study.get("legacy"):
+        lines.append(
+            "  ONYO: ripoti ni ya muundo wa zamani (hukumu kwa FAILI). Partition ya mwezi "
+            "inahesabiwa mara moja ingawa ina siku ~22 — namba hapa chini zina upendeleo "
+            "dhidi ya Toleo B. Endesha `check-l1` tena."
+        )
+    lines.append("")
     for name, entry in study["checks"].items():
         arrow = "chini ni mbaya" if entry["direction"] == "min" else "juu ni mbaya"
         lines.append(
