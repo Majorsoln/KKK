@@ -10,7 +10,13 @@ KILA SIKU        scripts\catchup.bat   ->   scripts\record.bat
 WAKATI WOWOTE    scripts\status.bat
 UKAGUZI (T1)     scripts\audit.bat
 SAHIHI YA PD     scripts\sign.bat      (§10)
+DIRISHA JIPYA    scripts\shell.bat     (kabla ya `python -m ...` kwa mkono)
 ```
+
+> **Dirisha jipya la cmd halina env wala venv.** Scripts za `scripts\*.bat` hujiandaa zenyewe,
+> lakini `python -m src.data.cli ...` moja kwa moja haitajiandaa. Endesha `scripts\shell.bat`
+> mara moja kwenye kila dirisha jipya — hii ndiyo sababu ya
+> `HITILAFU: storage.reports_root inategemea environment isiyowekwa`.
 
 ---
 
@@ -145,6 +151,7 @@ Maandishi yote yanaandikwa `research\reports\quality\audit.log` — dirisha liki
 ikizimika, ushahidi haupotei. Baada ya kukatika, swali la kwanza:
 
 ```cmd
+scripts\shell.bat
 python -m src.data.cli audit-status
 ```
 Inaonyesha hatua zilizokamilika, ngapi ziko kwenye cache, na symbols zipi za L2 zipo tayari.

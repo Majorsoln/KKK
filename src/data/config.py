@@ -82,9 +82,12 @@ class DataConfig:
         if _has_unresolved_env(text):
             missing = ", ".join(sorted(set(_ENV_PATTERN.findall(text))))
             raise ConfigError(
-                f"`{dotted}` inategemea environment isiyowekwa ({missing}). "
-                "PD anaamua storage ya research (§9 ya DATA_FEATURE_STANDARD) — weka env hiyo "
-                "au andika njia kamili kwenye config/data.yaml."
+                f"`{dotted}` inategemea environment isiyowekwa ({missing}).\n"
+                "  Dirisha jipya la cmd halina env wala venv. Liandae:\n"
+                "      scripts\\shell.bat\n"
+                "  (au endesha amri kupitia scripts\\*.bat, ambazo hujiandaa zenyewe).\n"
+                "  Njia hizo zinatoka `scripts\\env.local.bat`; PD anaamua storage ya research "
+                "(§9 ya DATA_FEATURE_STANDARD)."
             )
         return Path(text).expanduser()
 
