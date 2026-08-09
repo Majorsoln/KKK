@@ -19,6 +19,7 @@ T1 — ukaguzi wa R0 (mfuatano huu, si mwingine):
     python -m src.data.cli check-l1           # DF-05 — checks za ubora + quality_report.json
     python -m src.data.cli quality-stats      # DF-05 — vizingiti kutoka DATA (haisomi parquet)
     python -m src.data.cli r0-summary         # R0  — vigezo vyote kwenye jedwali moja
+    python -m src.data.cli symbol-profile     # R0  — wasifu kwa mwaka: chanzo kilibadilika?
     python -m src.data.cli compare-variants   # RS-03 — Toleo A ↔ Toleo B baada ya normalization
     python -m src.data.cli compare-provenance # R0   — aggregator ↔ broker, siku zinazopishana
     python -m src.data.cli build-l2           # DF-06 — bars za TF 7 kutoka ticks
@@ -557,6 +558,61 @@ def cmd_audit_status(args: argparse.Namespace) -> int:
         missing = [s for s in symbols if s not in ready]
         if missing:
             print(f"  zinazokosekana: {','.join(missing)}")
+    return 0
+
+
+def cmd_symbol_profile(args: argparse.Namespace) -> int:
+    """Wasifu wa kila symbol kwa MWAKA — kugundua chanzo kilipobadilika.
+
+    Kipimo cha 2026-08-08 kilionyesha mfumo usioelezeka: EURCHF na GBPJPY
+    zilifeli `gaps`/`stale_feed` siku ~117 mwaka **2023** pekee, wakati miaka
+    mingine zilikuwa na chache. Kufeli kunakojikita mwaka mmoja si bahati mbaya
+    ya siku moja moja — ni dalili ya **chanzo kilichobadilika**.
+
+    Amri hii inasoma `session_calendar.json` (haisomi parquet) na kuonyesha,
+    kwa kila symbol/mwaka, median ya dakika zenye quote na mipaka ya session.
+    Chanzo kikibadilika, namba hizi zinabadilika hatua moja — na inaonekana.
+    """
+    cfg = _load(args)
+    from .session_calendar import SessionCalendar
+
+    out_dir = _quality_dir(args, cfg)
+    path = Path(args.calendar).expanduser() if args.calendar else out_dir / "session_calendar.json"
+    if not path.is_file():
+        print(f"kalenda haipo: {path} — endesha `build-calendar`.", file=sys.stderr)
+        return 2
+
+    calendar = SessionCalendar.load(path)
+    wanted = _symbol_list(args)
+    import statistics
+
+    for symbol in sorted(calendar.symbol_expect):
+        if wanted and symbol not in wanted:
+            continue
+        by_year: dict[str, list[list[float]]] = {}
+        for day, values in calendar.symbol_expect[symbol].items():
+            by_year.setdefault(day[:4], []).append(values)
+        print(f"\n{symbol}")
+        previous: float | None = None
+        for year, rows in sorted(by_year.items()):
+            minutes = statistics.median(v[0] for v in rows)
+            opens = statistics.median(v[1] for v in rows)
+            closes = statistics.median(v[2] for v in rows)
+            shift = ""
+            if previous and previous > 0:
+                change = minutes / previous - 1
+                if abs(change) >= args.jump:
+                    shift = f"   <== HATUA {change:+.0%}"
+            print(
+                f"  {year}  siku {len(rows):>4}  dakika {minutes:>7.0f}  "
+                f"session {int(opens) // 60:02d}:{int(opens) % 60:02d}"
+                f"–{int(closes) // 60:02d}:{int(closes) % 60:02d}{shift}"
+            )
+            previous = minutes
+    print(
+        f"\n`HATUA` = mabadiliko ya median ya dakika kwa zaidi ya {args.jump:.0%} kutoka mwaka "
+        "uliotangulia. Chanzo kikibadilika, kinaonekana hapa."
+    )
     return 0
 
 
@@ -1113,6 +1169,17 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p_status.add_argument("--out-dir")
     p_status.set_defaults(func=cmd_audit_status)
+
+    p_prof = subparsers.add_parser(
+        "symbol-profile",
+        help="wasifu wa symbol kwa mwaka — kugundua chanzo kilipobadilika",
+        parents=[common],
+    )
+    p_prof.add_argument("--calendar")
+    p_prof.add_argument("--out-dir")
+    p_prof.add_argument("--symbols")
+    p_prof.add_argument("--jump", type=float, default=0.05, help="hatua inayotangazwa (0.05 = 5%%)")
+    p_prof.set_defaults(func=cmd_symbol_profile)
 
     p_r0 = subparsers.add_parser(
         "r0-summary",
