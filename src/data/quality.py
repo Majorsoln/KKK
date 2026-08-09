@@ -680,7 +680,7 @@ def threshold_study(report: dict[str, Any]) -> dict[str, Any]:
     legacy = int(report.get("schema", 1)) < 2
     quantiles = [0.001, 0.01, 0.05, 0.10, 0.50, 0.90, 0.95, 0.99, 0.999]
     values: dict[str, list[float]] = {}
-    thresholds: dict[str, float] = {}
+    thresholds: dict[str, set[float]] = {}
     offenders: dict[str, dict[str, int]] = {}
     failures: dict[str, int] = {}
 
@@ -700,7 +700,10 @@ def threshold_study(report: dict[str, Any]) -> dict[str, Any]:
                 continue
             values.setdefault(name, []).append(float(check["value"]))
             if check.get("threshold") is not None:
-                thresholds[name] = float(check["threshold"])
+                # Vizingiti vinaweza kuwa vya KILA SYMBOL (mf. XAUUSD ina
+                # mapumziko ya kila siku). Kuhifadhi kimoja kungeonyesha cha
+                # symbol ya mwisho iliyosomwa na kupotosha jedwali zima.
+                thresholds.setdefault(name, set()).add(float(check["threshold"]))
             if not check.get("passed", True):
                 # Kufeli kunahesabiwa kutoka kwenye JIBU la ukaguzi, si kwa
                 # kulinganisha thamani na kizingiti upya. Checks kadhaa zina
@@ -720,17 +723,24 @@ def threshold_study(report: dict[str, Any]) -> dict[str, Any]:
     for name, series in sorted(values.items()):
         data = pd.Series(series, dtype="float64")
         direction = CHECK_DIRECTION.get(name, "max")
-        current = thresholds.get(name)
+        limits = sorted(thresholds.get(name, ()))
+        current = limits[0] if len(limits) == 1 else None
         candidates = (
             [round(float(data.quantile(q)), 4) for q in (0.001, 0.01, 0.05, 0.10)]
             if direction == "min"
             else [round(float(data.quantile(q)), 4) for q in (0.90, 0.95, 0.99, 0.999)]
+        )
+        shown_limit = (
+            str(current)
+            if current is not None
+            else f"vya symbol: {', '.join(str(v) for v in limits)}"
         )
         failed_now = failures.get(name, 0)
         out["checks"][name] = {
             "direction": direction,
             "measured": len(data),
             "current_threshold": current,
+            "thresholds": limits,
             "failing_now": failed_now,
             "quantiles": {f"p{q * 100:g}": round(float(data.quantile(q)), 4) for q in quantiles},
             "min": round(float(data.min()), 4),
@@ -820,7 +830,8 @@ def render_threshold_study(study: dict[str, Any]) -> str:
     for name, entry in study["checks"].items():
         arrow = "chini ni mbaya" if entry["direction"] == "min" else "juu ni mbaya"
         lines.append(
-            f"{name}  ({arrow}) · kizingiti cha sasa = {entry['current_threshold']} "
+            f"{name}  ({arrow}) · kizingiti = "
+            f"{entry['current_threshold'] if entry['current_threshold'] is not None else 'vya symbol ' + str(entry.get('thresholds'))} "
             f"→ zinafeli {entry['failing_now']}/{entry['measured']}"
         )
         q = entry["quantiles"]

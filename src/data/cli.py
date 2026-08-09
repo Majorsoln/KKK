@@ -599,13 +599,21 @@ def cmd_r0_summary(args: argparse.Namespace) -> int:
         rows.append((kigezo, namba, mark))
 
     totals = quality.get("totals", {})
-    passed, total = totals.get("passed", 0), totals.get("partitions", 0)
-    rate = passed / total if total else 0.0
-    _add("partitions zilizopita §3", f"{passed}/{total} ({rate:.1%})", None)
+    # Kitengo ni SIKU (§3). Kugawanya siku kwa idadi ya PARTITIONS kungetoa
+    # asilimia zilizovimba — partition ya mwezi ina siku ~22.
+    days = int(totals.get("days", 0))
+    days_passed = int(totals.get("days_passed", 0))
+    if days:
+        _add("siku zilizopita §3", f"{days_passed}/{days} ({days_passed / days:.1%})", None)
+    _add(
+        "  (partitions)",
+        f"{totals.get('passed', 0)}/{totals.get('partitions', 0)}",
+        None,
+    )
 
     for reason, count in (quality.get("fail_reasons") or {}).items():
-        share = count / total if total else 0.0
-        _add(f"  kufeli: {reason}", f"{count} ({share:.2%})", share <= 0.01)
+        share = count / days if days else 0.0
+        _add(f"  kufeli: {reason}", f"siku {count} ({share:.2%})", share <= 0.01)
 
     years = quality.get("coverage_by_symbol") or {}
     short = [s for s, v in years.items() if v.get("meets_min_years") is False]
@@ -698,16 +706,21 @@ def cmd_quality_stats(args: argparse.Namespace) -> int:
         # duplicates=4"). Bila hii, `bad_timestamps: 16` ni namba isiyo na jibu.
         shown = 0
         for part in report.get("partitions", []):
-            for check in part.get("checks", []):
-                if check.get("reason") != args.reason:
-                    continue
-                shown += 1
-                if shown <= args.limit:
-                    print(
-                        f"{part.get('symbol')} · {Path(part['partition']).name} · "
-                        f"{check['name']}={check.get('value')} · {check.get('detail', '')}"
-                    )
-        print(f"jumla: {shown} partitions zenye `{args.reason}`")
+            # Checks ziko ndani ya kila SIKU; zile za partition nzima (mf. faili
+            # tupu) ziko `part["checks"]`. Zote mbili zinaangaliwa.
+            units = [(d.get("day", "?"), d.get("checks", [])) for d in part.get("days", [])]
+            units.append(("(faili)", part.get("checks", [])))
+            for day, checks in units:
+                for check in checks:
+                    if check.get("reason") != args.reason:
+                        continue
+                    shown += 1
+                    if shown <= args.limit:
+                        print(
+                            f"{part.get('symbol')} · {day} · "
+                            f"{check['name']}={check.get('value')} · {check.get('detail', '')}"
+                        )
+        print(f"jumla: siku {shown} zenye `{args.reason}`")
         return 0 if shown == 0 else 1
 
     if args.what_if:
