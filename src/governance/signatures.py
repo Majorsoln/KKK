@@ -186,6 +186,24 @@ def declared_pd(path: Path | None = None) -> str:
     return match.group(1).strip() if match else ""
 
 
+def _email_of(identity: str) -> str:
+    """Sehemu ya `<...>`, herufi ndogo — hii ndiyo inayotambulisha mtu.
+
+    Barua pepe ndiyo sehemu THABITI ya utambulisho wa git: inatolewa na mfumo,
+    ni ya kipekee, na haibadiliki kwa mapendeleo. Jina ni mapambo.
+    """
+    start = identity.find("<")
+    end = identity.find(">", start + 1)
+    if start == -1 or end == -1:
+        return identity.strip().casefold()
+    return identity[start + 1 : end].strip().casefold()
+
+
+def _name_of(identity: str) -> str:
+    start = identity.find("<")
+    return (identity if start == -1 else identity[:start]).strip().casefold()
+
+
 def load(path: Path | None = None) -> list[Signature]:
     target = Path(path or LEDGER)
     if not target.is_file():
@@ -327,6 +345,7 @@ class VerifyReport:
     checked: int = 0
     problems: list[str] = field(default_factory=list)
     verified_items: set[str] = field(default_factory=set)
+    notes: list[str] = field(default_factory=list)
 
     @property
     def ok(self) -> bool:
@@ -339,6 +358,7 @@ class VerifyReport:
             f"vipengele VERIFIED {len(self.verified_items)}"
         ]
         lines += [f"  ! {p}" for p in self.problems]
+        lines += [f"  · {n}" for n in self.notes]
         return "\n".join(lines)
 
 
@@ -378,19 +398,27 @@ def verify(
             report.problems.append(
                 f"#{signature.number}: mwenye sahihi hana barua pepe — si utambulisho wa git"
             )
-        elif (
-            pd_identity
-            and signature.decision in ("VERIFIED", "APPROVED", "LESSON")
-            and signature.signer != pd_identity
-        ):
+        elif pd_identity and signature.decision in ("VERIFIED", "APPROVED", "LESSON"):
             # Hii ndiyo kinga kuu: `VERIFIED` ni mamlaka ya PD PEKEE (§1.1).
             # Mtekelezaji — au model — akiendesha `sign`, utambulisho wake ndio
             # unaoandikwa, na lango linaikataa. Huwezi kujisainia mwenyewe.
-            report.problems.append(
-                f"#{signature.number}: `{signature.decision}` imesainiwa na "
-                f"`{signature.signer}`, si PD (`{pd_identity}`). Mamlaka ya "
-                "VERIFIED/APPROVED/LESSON ni ya PD pekee (§1.1)."
-            )
+            if _email_of(signature.signer) != _email_of(pd_identity):
+                report.problems.append(
+                    f"#{signature.number}: `{signature.decision}` imesainiwa na "
+                    f"`{signature.signer}`, si PD (`{pd_identity}`). Mamlaka ya "
+                    "VERIFIED/APPROVED/LESSON ni ya PD pekee (§1.1)."
+                )
+            elif _name_of(signature.signer) != _name_of(pd_identity):
+                # Barua pepe inalingana; jina la kuonyesha halilingani. Hilo si
+                # suala la mamlaka — `git config user.name` ni maandishi ya
+                # mtumiaji, yanayoweza kuwa "Japhet joseph lemma" leo na
+                # "Japhet Joseph Lemma" kesho. Kufelisha lango kwa herufi kubwa
+                # kungezuia PD halali bila kuzuia mtu asiye halali hata mmoja.
+                # Tofauti inaandikwa ili ionekane, si kuzuia.
+                report.notes.append(
+                    f"#{signature.number}: jina `{signature.signer}` linatofautiana na "
+                    f"tangazo `{pd_identity}` (barua pepe ni ile ile — si suala la mamlaka)"
+                )
         if not signature.reason:
             report.problems.append(f"#{signature.number}: hakuna sababu")
 

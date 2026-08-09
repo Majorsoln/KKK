@@ -205,3 +205,42 @@ def test_mtekelezaji_hawezi_kujisainia_verified(ledger, evidence):
     assert not report.ok
     assert any("si PD" in p for p in report.problems)
     assert "DF-06" not in report.verified_items, "hadhi haipandi kwa sahihi isiyo halali"
+
+
+# ===========================================================================
+# Utambulisho: barua pepe ndiyo mamlaka, jina ni mapambo (PD 2026-08-09)
+# ===========================================================================
+
+
+def test_herufi_kubwa_za_jina_hazimzuii_pd(ledger, evidence):
+    """`git config user.name` ni maandishi ya mtumiaji, si mamlaka.
+
+    Kipimo halisi: tangazo lilisema `Japhet Joseph Lemma`, git ikaandika
+    `Japhet joseph lemma` — mtu yule yule, barua pepe ile ile. Lango
+    lilikataa sahihi ZOTE NNE. Kufelisha kwa herufi kubwa hakuzuii mtu asiye
+    halali hata mmoja; kunazuia PD halali pekee.
+    """
+    plan = REPO / "docs" / "IMPLEMENTATION_PLAN.md"
+    _sign(ledger, evidence, signer="pd <PD@ELITEFX.TEST>")
+    report = sig.verify(ledger=ledger, plan=plan, root=ledger.parent)
+    assert report.ok, report.problems
+    assert "DF-05" in report.verified_items
+
+
+def test_jina_tofauti_linaandikwa_lakini_halizuii(ledger, evidence):
+    """Barua pepe ile ile, jina tofauti kabisa → inapita, lakini inaonekana."""
+    plan = REPO / "docs" / "IMPLEMENTATION_PLAN.md"
+    _sign(ledger, evidence, signer="J. Lemma <pd@elitefx.test>")
+    report = sig.verify(ledger=ledger, plan=plan, root=ledger.parent)
+    assert report.ok, report.problems
+    assert any("jina" in n for n in report.notes)
+    assert "jina" in report.render()
+
+
+def test_barua_pepe_tofauti_bado_inakataliwa(ledger, evidence):
+    """Kulegeza jina KUSILEGEZE mamlaka — hii ndiyo kinga yenyewe."""
+    plan = REPO / "docs" / "IMPLEMENTATION_PLAN.md"
+    _sign(ledger, evidence, signer="PD <mwingine@elitefx.test>")
+    report = sig.verify(ledger=ledger, plan=plan, root=ledger.parent)
+    assert not report.ok and any("si PD" in p for p in report.problems)
+    assert report.notes == []

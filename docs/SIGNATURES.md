@@ -22,6 +22,14 @@ Author wa commit + muda wake + `config_hash` + SHA256 ya ushahidi ndivyo vinavyo
 mstari huu kuwa sahihi badala ya maandishi. `python -m src.governance.cli verify`
 inakagua kila kitu (lango G14).
 
+> **Kuhusu #1–#2 na #3–#4 (2026-08-09).** Ni maamuzi mawili yale yale, yakiwa yamewekwa
+> mara mbili. #1–#2 zilisainiwa kabla ya `git pull`, kwa hiyo `code_rev` yake (`7e0795a`)
+> ni commit ambapo `quality.excluded_ranges` **haipo kabisa** na `min_coverage` bado ni
+> 0.995 — zinaidhinisha kitu kisichoonekana pale zinapoelekeza. #3–#4 zina `8110cb5` /
+> `7ad62af`: config inayobeba maamuzi yenyewe. **#3–#4 ndizo za kutumia.** #1–#2 zinabaki
+> kwa sababu faili hili ni la kuongezwa tu, na kwa sababu mfuatano wenyewe ni ushahidi:
+> unaonyesha kilichotokea, si kilichotakiwa kutokea.
+
 | # | Tarehe (UTC) | PD | Kipengele | Uamuzi | config_hash | code_rev | Ushahidi | SHA256 | Sababu |
 |---|---|---|---|---|---|---|---|---|---|
 | 1 | 2026-08-09T18:42:10+00:00 | Japhet joseph lemma <majorsoln@gmail.com> | DF-05 | APPROVED | `sha256:9981eb218` | `7e0795afabef9068` | — | `—` | 2023 ya Toleo B inaondoka: chanzo, si soko; labels za touch zingedanganya |
