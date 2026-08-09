@@ -26,3 +26,5 @@ inakagua kila kitu (lango G14).
 |---|---|---|---|---|---|---|---|---|---|
 | 1 | 2026-08-09T18:42:10+00:00 | Japhet joseph lemma <majorsoln@gmail.com> | DF-05 | APPROVED | `sha256:9981eb218` | `7e0795afabef9068` | — | `—` | 2023 ya Toleo B inaondoka: chanzo, si soko; labels za touch zingedanganya |
 | 2 | 2026-08-09T18:42:10+00:00 | Japhet joseph lemma <majorsoln@gmail.com> | DF-05 | APPROVED | `sha256:9981eb218` | `7e0795afabef9068` | — | `—` | min_coverage 0.95 — kizingiti cha 0.995 kilikuwa kinapima ukamilifu wa feed, si biashara |
+| 3 | 2026-08-09T18:51:40+00:00 | Japhet joseph lemma <majorsoln@gmail.com> | DF-05 | APPROVED | `sha256:8110cb5bd` | `7ad62afbee183c02` | — | `—` | 2023 ya Toleo B inaondoka: chanzo, si soko; labels za touch zingedanganya |
+| 4 | 2026-08-09T18:51:40+00:00 | Japhet joseph lemma <majorsoln@gmail.com> | DF-05 | APPROVED | `sha256:8110cb5bd` | `7ad62afbee183c02` | — | `—` | min_coverage 0.95 - kizingiti cha 0.995 kilikuwa kinapima ukamilifu wa feed, si biashara |
