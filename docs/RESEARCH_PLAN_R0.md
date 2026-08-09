@@ -62,7 +62,7 @@ kujenga chochote?
 
 | Kipimo | Kizingiti | Kinapimwa na (T1) |
 |---|---|---|
-| coverage kwa symbol/mwaka | ≥ `min_coverage` (0.995) | `check-l1` → `quality_report.json` (`by_symbol_year`) |
+| coverage kwa symbol/mwaka | ≥ `min_coverage` (0.95 — PD 2026-08-09; ilikuwa 0.995) | `check-l1` → `quality_report.json` (`by_symbol_year`) |
 | partitions zilizofeli §3 ya standard | 0 zinazoingia L2 | `check-l1` (`fail_action: exclude`) |
 | gaps ndani ya session | L0: ≤ `max_gap_seconds` · L2: ≤ `max_gap_bars` | `check-l1` · `build-l2` (`bars.check_bar_gaps`) |
 | ukamilifu wa bid **na** ask | 100% ya bars zinazotumika | `check-l1` check 5 (`crossed`/`zero_spread`/`bei<=0` kando) |

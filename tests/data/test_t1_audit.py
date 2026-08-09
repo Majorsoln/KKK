@@ -182,7 +182,9 @@ def test_threshold_study_inaonyesha_kizingiti_kingefelisha_ngapi(cfg, l0_tree):
 
     coverage = study["checks"]["coverage"]
     assert coverage["direction"] == "min"
-    assert coverage["current_threshold"] == 0.995
+    # Kizingiti kinachoonyeshwa ni cha CONFIG, si namba iliyoandikwa hapa.
+    # PD anabadilisha `min_coverage`; test isivunjike kwa uamuzi wake halali.
+    assert coverage["current_threshold"] == cfg.get("quality.min_coverage")
     assert coverage["failing_now"] == 1
     assert coverage["min"] == 0.5, "siku iliyokatika ina nusu ya dakika"
     assert "EURUSD/2026" in coverage["top_offenders"]
