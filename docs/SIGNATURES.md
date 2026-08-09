@@ -1,6 +1,6 @@
 # SAHIHI ZA PD — kumbukumbu isiyofutika
 
-**PD:** `JINA LAKO <barua@yako>`
+**PD:** `Japhet Joseph Lemma <majorsoln@gmail.com>`
 
 > Mstari hapo juu ni tangazo la **nani ana mamlaka ya kusaini**. Ubadilishe mara
 > moja uwekapo utambulisho wako halisi wa git (`git config user.name/user.email`).
@@ -24,3 +24,5 @@ inakagua kila kitu (lango G14).
 
 | # | Tarehe (UTC) | PD | Kipengele | Uamuzi | config_hash | code_rev | Ushahidi | SHA256 | Sababu |
 |---|---|---|---|---|---|---|---|---|---|
+| 1 | 2026-08-09T18:42:10+00:00 | Japhet joseph lemma <majorsoln@gmail.com> | DF-05 | APPROVED | `sha256:9981eb218` | `7e0795afabef9068` | — | `—` | 2023 ya Toleo B inaondoka: chanzo, si soko; labels za touch zingedanganya |
+| 2 | 2026-08-09T18:42:10+00:00 | Japhet joseph lemma <majorsoln@gmail.com> | DF-05 | APPROVED | `sha256:9981eb218` | `7e0795afabef9068` | — | `—` | min_coverage 0.95 — kizingiti cha 0.995 kilikuwa kinapima ukamilifu wa feed, si biashara |
