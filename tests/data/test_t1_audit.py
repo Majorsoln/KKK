@@ -515,6 +515,125 @@ def test_siku_moja_mbaya_haitupi_mwezi_mzima(cfg, l0_root):
     assert report.excluded_days() == {"XAUUSD": [days[2].isoformat()]}
 
 
+# ===========================================================================
+# Kutolewa nje kwa UAMUZI ULIOANDIKWA, si kwa check (PD 2026-08-09)
+# ===========================================================================
+
+
+def _excluded_range(**kwargs) -> dict:
+    entry = {
+        "symbols": ["XAUUSD"],
+        "from": "2026-08-04",
+        "to": "2026-08-05",
+        "reason": "chanzo kilipungua saa 2 kwa siku",
+    }
+    entry.update(kwargs)
+    return entry
+
+
+def test_kipindi_kilichoondolewa_hakihukumiwi_na_sababu_inasafiri(cfg, l0_tree):
+    """Siku ndani ya kipindi haipimwi hata kidogo; sababu ya PD inabaki nayo.
+
+    Sababu ni sehemu ya deliverable: mtu atakayeona namba za T2 lazima aone
+    pia kilichotolewa na KWA NINI, bila kufungua git log.
+    """
+    from src.data.quality import FAIL_EXCLUDED_BY_PD
+
+    cfg.raw["quality"]["excluded_ranges"] = [_excluded_range()]
+    calendar = build_session_calendar(cfg, l0_tree).calendar
+    report = run_quality_audit(cfg, l0_tree, calendar=calendar, symbols=["XAUUSD"])
+
+    part = report.partitions[0]
+    blocked = {d.day: d for d in part.days if not d.passed}
+    assert set(blocked) == {"2026-08-04", "2026-08-05"}
+    for day in blocked.values():
+        assert [c.name for c in day.checks] == ["excluded"], "hakuna check inayoendeshwa"
+        assert day.fail_reasons == [FAIL_EXCLUDED_BY_PD]
+        assert day.checks[0].detail == "chanzo kilipungua saa 2 kwa siku"
+
+    assert part.usable_days == ["2026-08-03", "2026-08-06"]
+    assert report.reason_counts()[FAIL_EXCLUDED_BY_PD] == 2
+
+
+def test_siku_nje_ya_kipindi_inahukumiwa_kama_kawaida(cfg, l0_tree):
+    """Kifungu ni cha KIPINDI, si swichi ya symbol nzima."""
+    cfg.raw["quality"]["excluded_ranges"] = [_excluded_range(to="2026-08-04")]
+    calendar = build_session_calendar(cfg, l0_tree).calendar
+    report = run_quality_audit(cfg, l0_tree, calendar=calendar, symbols=["XAUUSD"])
+
+    days = {d.day: d for d in report.partitions[0].days}
+    assert days["2026-08-04"].fail_reasons == ["excluded_by_pd"]
+    assert days["2026-08-05"].passed, "siku ya nje ya kipindi bado inapimwa kwa checks"
+    assert [c.name for c in days["2026-08-05"].checks] != ["excluded"]
+
+
+def test_symbol_isiyotajwa_haiguswi(cfg, l0_tree):
+    """EURUSD ni Toleo A; kasoro ya chanzo cha Toleo B haihusiani nayo."""
+    cfg.raw["quality"]["excluded_ranges"] = [_excluded_range()]
+    calendar = build_session_calendar(cfg, l0_tree).calendar
+    report = run_quality_audit(cfg, l0_tree, calendar=calendar, symbols=["EURUSD"])
+
+    reasons = report.reason_counts()
+    assert "excluded_by_pd" not in reasons
+    # Siku ya 3 bado inafeli kwa coverage — checks hazijazimwa kwa bahati mbaya.
+    assert report.excluded_days() == {"EURUSD": [DAYS[2].isoformat()]}
+
+
+def test_kizingiti_hakiwezi_kurudisha_siku_iliyoondolewa_na_pd(cfg, l0_tree):
+    """`--what-if` ni ya VIZINGITI. Uamuzi wa PD hauwezi kulegezwa kwa kizingiti.
+
+    Kama siku ya PD ingehesabiwa `recovered`, jedwali lingemshauri PD kulegeza
+    coverage ili kurudisha siku ambazo yeye mwenyewe alizuia — ushauri wa uwongo.
+    """
+    from src.data.quality import what_if
+
+    cfg.raw["quality"]["excluded_ranges"] = [_excluded_range()]
+    calendar = build_session_calendar(cfg, l0_tree).calendar
+    detail = run_quality_audit(cfg, l0_tree, calendar=calendar, symbols=["XAUUSD"]).to_detail()
+
+    study = what_if(detail, {"coverage": 0.0, "gap_seconds": 1e9, "session_match": 1e9})
+    assert study["failing_after"] == 2, "siku mbili za PD zinabaki zimefeli"
+    assert study["recovered"] == 0
+
+
+def test_kifungu_bila_symbols_kinahusu_zote(cfg, l0_tree):
+    """Kukatika kwa chanzo kunaweza kugusa symbols zote — orodha tupu = zote."""
+    cfg.raw["quality"]["excluded_ranges"] = [_excluded_range(symbols=[])]
+    calendar = build_session_calendar(cfg, l0_tree).calendar
+    report = run_quality_audit(cfg, l0_tree, calendar=calendar)
+
+    assert report.reason_counts()["excluded_by_pd"] == 4  # symbols 2 x siku 2
+
+
+def test_config_ya_repo_inabeba_kipindi_cha_2023_cha_toleo_b(cfg):
+    """Kipimo cha data halisi kikaingia config, si kwenye kumbukumbu ya mtu."""
+    from src.data.quality import excluded_reason
+
+    for symbol in ("EURCHF", "GBPJPY", "XAUUSD"):
+        reason = excluded_reason(cfg, symbol, date(2023, 6, 15))
+        assert "Toleo B" in reason and "2023" in reason
+        assert excluded_reason(cfg, symbol, date(2024, 6, 15)) == ""
+    assert excluded_reason(cfg, "EURUSD", date(2023, 6, 15)) == ""
+
+
+def test_kipindi_kinabadilisha_config_hash(cfg, tmp_path):
+    """Kilichotolewa nje ni sehemu ya `dataset_id`, si mpangilio wa mtumiaji.
+
+    Kubadilisha kipindi KUNALAZIMU `check-l1` kuendeshwa upya (cache inajitupa
+    kwa `config_hash`) na kunabadilisha `dataset_id` ya kila kitu kinachofuata.
+    Hilo ndilo linalofanya uamuzi wa PD uwe wa kudumu badala ya wa dakika.
+    """
+    from src.data.config import load_config
+
+    env = dict(cfg.env)
+    text = cfg.path.read_text(encoding="utf-8")
+    assert "excluded_ranges:" in text
+
+    other = tmp_path / "data.yaml"
+    other.write_text(text.replace('to:      "2023-12-31"', 'to:      "2023-06-30"'), "utf-8")
+    assert load_config(other, env=env).config_hash != cfg.config_hash
+
+
 def test_kizingiti_kinaweza_kuwa_cha_kila_symbol(cfg):
     """Dhahabu ina mapumziko ya kila siku; EURUSD haina."""
     from src.data.quality import _per_symbol

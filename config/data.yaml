@@ -102,7 +102,25 @@ quality:
   spread_outlier_mult: 50               # ... NA ikizidi hii x median ya SIKU yenyewe.
                                         # Krismasi ina median pana yenyewe, kwa hiyo inabaki;
                                         # tick iliyoharibika (mara 1,000) inaondoka.
-  fail_action:         "exclude"        # partition iliyofeli HAIINGII L2
+  fail_action:         "exclude"        # siku iliyofeli HAIINGII L2 (§3)
+  # KUTOLEWA NJE KWA UAMUZI, si kwa check. Checks zinakamata siku moja moja;
+  # zinashindwa pale kasoro ni ya KIPINDI. Kila kifungu kinahitaji sababu, na
+  # kinaingia `config_hash` — hivyo ni sehemu ya `dataset_id`.
+  excluded_ranges:
+    - symbols: [EURCHF, GBPJPY, XAUUSD]
+      from:    "2023-01-01"
+      to:      "2023-12-31"
+      reason: >-
+        Chanzo cha Toleo B kilipungua saa 1-2 KWA SIKU mwaka 2023 pekee, kisha
+        kikarudi 2024 (symbol-profile 2026-08-08: dakika za median 1429->1315,
+        1435->1320, 1380->1319). Symbols hizo tatu hazina kinachofanana kama
+        vyombo vya soko; kinachofanana ni CHANZO — kwa hiyo ni feed, si soko.
+        Gaps check inakamata asilimia 45 pekee; nyingine zina kasoro ile ile
+        ndogo zaidi. Labels za touch (§5) zinatatuliwa kwa PATH YA TICKS, kwa
+        hiyo pengo la saa 2 kila siku lingeficha barrier zilizoguswa humo, na
+        label ingesema `timeout` wakati SL/TP iliguswa. Si kelele — ni jibu la
+        uongo. Gharama: siku 777 kati ya 35,025 (2.2%).
+        INASUBIRI SAHIHI YA PD (`sign.bat DF-05 APPROVED`).
 
 # ---------- L2: BARS ----------
 bars:
