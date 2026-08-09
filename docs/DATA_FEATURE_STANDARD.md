@@ -168,7 +168,7 @@ zingetoweka kwenye training kwa kasoro ya kipimo, si ya data.
 | 2 | **monotonicity** | timestamps zinapanda; **kurudi nyuma = 0 daima**; duplicate ≤ `max_duplicate_frac` (MT5 inatoa quotes mbili kwenye µs moja) | `bad_timestamps` |
 | 3 | **gaps** | L0 (ticks): pengo ≤ `max_gap_seconds` · L2 (bars): ≤ `max_gap_bars`. Kizingiti kinaruhusiwa kuwa cha **kila symbol** — XAUUSD ina mapumziko ya kila siku (~saa 1) ambayo si pengo la data | `intrasession_gap` |
 | 4 | **OHLC sanity** | `low ≤ min(open,close) ≤ max(open,close) ≤ high` — **inakaguliwa L2**, kwa sababu ticks hazina OHLC (§4) | `ohlc_violation` |
-| 5 | **quote sanity** | `bid < ask`, `spread > 0`, `spread ≤ max_plausible` — `crossed` na `zero_spread` zinahesabiwa **kando** | `quote_violation` |
+| 5 | **quote sanity** | quote **isiyowezekana**: `bid > ask`, `bid == ask`, `bei ≤ 0` → FAIL daima. Spread pana → FAIL **tu** ikizidi sakafu **NA** `spread_outlier_mult` × median ya siku | `quote_violation` |
 | 6 | **DST/session** | mabadiliko ya saa yanalingana na kalenda ya broker — mipaka ni median ya **symbol/mwezi**; hatua ya saa 1 kamili inaandikwa kama DST, si FAIL | `session_mismatch` |
 | 7 | **clock drift** | tofauti ya server↔UTC ni thabiti | `clock_drift` |
 | 8 | **flat bars** | mfululizo wa bars zenye `high==low` ≤ `max_flat_bars` — **inakaguliwa L2** · L0 (ticks): quote ile ile kwa `max_stale_seconds` | `stale_feed` |
@@ -193,6 +193,15 @@ na close yake iko **dakika 180** mapema. Ijumaa ni asilimia 20 ya siku zote za t
 kwa wastani wa wiki nzima kunaifelisha kila wiki kwa kipimo kibaya pekee. Matarajio yanatoka kwa
 median ya **majirani wa siku ile ile ya wiki**, na siku yenyewe **haiingii** — vinginevyo siku
 iliyoharibika ingejiwekea kizingiti chake na kupita daima.
+
+**Spread pana si data mbovu — ni gharama.** Kipimo cha 2026-08-08 kilifelisha siku 835 bila
+`crossed` hata moja: GBPJPY siku za Krismasi/Mwaka Mpya na siku za msukosuko (COVID, Omicron),
+na XAUUSD ya 2025–26 ambapo kizingiti cha **200 pips = $2.00 kamili** kilikuwa 16.7 bps dhahabu
+ikiwa $1,200 lakini 5.0 bps ikiwa $4,000 — kizingiti kile kile kikibana **mara tatu zaidi** bei
+ilipopanda. Kilikuwa kinapima bei, si ubora. **Na muhimu zaidi:** kutoa nje siku za spread pana
+kunaondoa hasa siku ambazo gharama ni kubwa; model ya gharama ingejifunza soko lisilo na sikukuu
+wala msukosuko, na kila EV ingekuwa ya matumaini — upendeleo ule ule ambao `cost_stress_mult`
+(§R6) ipo kuupinga. Siku hizo zinabaki, na spread yake inaingia RCE kama ilivyo.
 
 **Ticks zenye timestamp ile ile haziondolewi — zinapangwa kwa mpangilio wa kufika.** Labels za
 touch (§5) zinatatuliwa kwa mfuatano wa ticks, kwa hiyo mpangilio wa ticks zinazoshiriki kipimo

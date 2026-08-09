@@ -91,9 +91,17 @@ quality:
                                         # XAUUSD: mapumziko yale yale ya kila siku yanaonekana
                                         # kama ukimya — ni pengo la kalenda, si feed iliyoganda
   max_flat_bars:       10               # L2: mfululizo wa BARS zenye high==low (§3 check 8)
-  max_plausible_spread_pips:            # kikomo cha akili timamu, si cha trading
-    default:   50.0
-    XAUUSD:   200.0
+  # KIKOMO CHA QUOTE ILIYOHARIBIKA — si cha "spread pana" (PD 2026-08-08).
+  # Kipimo cha kwanza kilifelisha siku 835: GBPJPY siku za Krismasi/msukosuko, na
+  # XAUUSD ya 2025-26. Hakuna `crossed` hata moja. Kutoa nje siku za spread pana
+  # kungeondoa hasa siku ambazo gharama ni kubwa — model ya gharama ingejifunza
+  # soko lisilo na sikukuu, na kila EV ingekuwa ya matumaini. Siku hizo ni DATA.
+  max_plausible_spread_pips:            # sakafu; quote inafeli ikizidi HII **NA** mult
+    default:  300.0
+    XAUUSD:  3000.0                     # $30 — dhahabu ya $4,000 ina spread ya $2 kwa kawaida
+  spread_outlier_mult: 50               # ... NA ikizidi hii x median ya SIKU yenyewe.
+                                        # Krismasi ina median pana yenyewe, kwa hiyo inabaki;
+                                        # tick iliyoharibika (mara 1,000) inaondoka.
   fail_action:         "exclude"        # partition iliyofeli HAIINGII L2
 
 # ---------- L2: BARS ----------

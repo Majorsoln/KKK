@@ -524,3 +524,33 @@ def test_random_split_ni_marufuku(cfg):
 def test_days_of_inatoa_siku_za_kipekee():
     index = pd.date_range("2026-08-03", periods=49, freq="1h", tz="UTC")
     assert days_of(index) == [date(2026, 8, 3), date(2026, 8, 4), date(2026, 8, 5)]
+
+
+def test_check5_spread_pana_ya_sikukuu_haifelishi():
+    """GBPJPY Krismasi: spread inapanuka kwa sababu liquidity inatoweka.
+
+    Siku hizo ni DATA YA THAMANI kwa model ya gharama — kuzitoa kungefundisha
+    soko lisilo na sikukuu, na kila EV ingekuwa ya matumaini.
+    """
+    kawaida = _ticks(datetime(2026, 12, 23, tzinfo=timezone.utc), 600, spread=0.03)   # pips 3
+    assert check_quote_sanity(kawaida, 300.0, pip=0.01, outlier_mult=50).passed
+
+    # Krismasi: spread nzima ya siku ni mara 20 — median nayo inapanda.
+    krismasi = _ticks(datetime(2026, 12, 24, tzinfo=timezone.utc), 600, spread=0.60)  # pips 60
+    result = check_quote_sanity(krismasi, 300.0, pip=0.01, outlier_mult=50)
+    assert result.passed, result.detail
+
+
+def test_check5_tick_iliyoharibika_inaondoka_hata_siku_ya_sikukuu():
+    """Kizingiti ni `sakafu NA mult` — tick ya mara 1,000 inazidi vyote viwili."""
+    frame = _ticks(datetime(2026, 12, 24, tzinfo=timezone.utc), 600, spread=0.60)
+    frame.loc[300, "ask"] = frame.loc[300, "bid"] + 600.0     # pips 60,000
+    result = check_quote_sanity(frame, 300.0, pip=0.01, outlier_mult=50)
+    assert not result.passed and result.reason == FAIL_QUOTE
+
+
+def test_check5_crossed_inafeli_daima_bila_kujali_mult():
+    frame = _ticks(datetime(2026, 8, 3, tzinfo=timezone.utc), 100)
+    frame.loc[50, "ask"] = frame.loc[50, "bid"] - 0.0002
+    result = check_quote_sanity(frame, 300.0, pip=0.0001, outlier_mult=50)
+    assert not result.passed and "crossed=1" in result.detail

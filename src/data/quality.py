@@ -229,7 +229,43 @@ def check_gaps(frame: pd.DataFrame, max_gap_seconds: float) -> CheckResult:
     )
 
 
-def check_quote_sanity(frame: pd.DataFrame, max_spread_pips: float, pip: float) -> CheckResult:
+def check_quote_sanity(
+    frame: pd.DataFrame,
+    max_spread_pips: float,
+    pip: float,
+    outlier_mult: float = 0.0,
+) -> CheckResult:
+    """5 — quote **isiyowezekana**, si quote pana.
+
+    Kipimo cha kwanza (2026-08-08) kilifelisha siku 835 — na `--reason` ilionyesha
+    hakuna `crossed` hata moja. Zilikuwa vitu viwili tofauti kabisa:
+
+    * **GBPJPY siku za sikukuu** (24–28 Desemba, 2 Januari) na siku za msukosuko
+      (23 Machi 2020, 26 Novemba 2021). Spread inapanuka kwa sababu liquidity
+      inatoweka. Hiyo ni **soko**, si data mbovu.
+    * **XAUUSD, hasa 2025–2026.** Kizingiti kilikuwa 200 pips = **$2.00 kamili**.
+      Dhahabu ilipokuwa $1,200 hiyo ni 16.7 bps; ilipofika $4,000 ni 5.0 bps —
+      kizingiti kile kile kinabana **mara tatu zaidi**. Ndiyo maana miaka ya bei
+      ya juu ndiyo iliyofeli zaidi. Kizingiti kilikuwa kinapima bei, si ubora.
+
+    **Na jambo zito kuliko yote:** kutoa nje siku zenye spread pana kunaondoa
+    hasa siku ambazo gharama ni kubwa. Model ya gharama ingejifunza soko lisilo
+    na sikukuu wala msukosuko, na kila EV ingekuwa ya matumaini — upendeleo ule
+    ule ambao `cost_stress_mult` ipo kuupinga. Siku hizo ni **data ya thamani**.
+
+    Kwa hiyo sasa:
+
+    | Hali | Uamuzi |
+    |---|---|
+    | `bid > ask` (crossed) | FAIL — haiwezekani kimwili |
+    | `bid == ask` (zero spread) | FAIL — quote ya `mid` iliyoingizwa mahali pa bid/ask |
+    | `bid <= 0` au `ask <= 0` | FAIL |
+    | spread pana | FAIL **tu** ikizidi kizingiti kamili **NA** `outlier_mult` × median ya SIKU |
+
+    Sharti la mwisho ni la **na**, si la **au**: siku ya Krismasi ina median pana
+    yenyewe, kwa hiyo quote ya pana mara mbili haizidi 50× median na inabaki.
+    Tick iliyoharibika (mara 1,000 ya median) inazidi vyote viwili.
+    """
     """5 — `bid < ask`, `spread > 0`, `spread ≤ max_plausible`.
 
     `crossed` (`bid > ask`) na `zero_spread` (`bid == ask`) zinahesabiwa
@@ -242,10 +278,19 @@ def check_quote_sanity(frame: pd.DataFrame, max_spread_pips: float, pip: float) 
     bid, ask = frame["bid"], frame["ask"]
     crossed = int((bid > ask).sum())
     zero_spread = int((bid == ask).sum())
-    spread_pips = (ask - bid) / pip
-    too_wide = int((spread_pips > max_spread_pips).sum())
     non_positive = int((bid <= 0).sum() + (ask <= 0).sum())
-    bad = crossed + zero_spread + too_wide + non_positive
+
+    spread_pips = (ask - bid) / pip
+    day_median = float(spread_pips.median()) if len(spread_pips) else 0.0
+    if outlier_mult > 0 and day_median > 0:
+        limit = max(max_spread_pips, outlier_mult * day_median)
+    else:
+        limit = max_spread_pips
+    corrupt = int((spread_pips > limit).sum())
+
+    impossible = crossed + zero_spread + non_positive
+    bad = impossible + corrupt
+    widest = float(spread_pips.max()) if len(spread_pips) else 0.0
     return CheckResult(
         name="quote_sanity",
         passed=bad == 0,
@@ -253,8 +298,9 @@ def check_quote_sanity(frame: pd.DataFrame, max_spread_pips: float, pip: float) 
         value=float(bad),
         threshold=0.0,
         detail=(
-            f"crossed={crossed} zero_spread={zero_spread} "
-            f"spread>{max_spread_pips}pips={too_wide} bei<=0={non_positive}"
+            f"crossed={crossed} zero_spread={zero_spread} bei<=0={non_positive} · "
+            f"spread>{limit:.0f}pips={corrupt} "
+            f"(median ya siku {day_median:.1f} · pana zaidi {widest:.1f})"
         ),
     )
 
@@ -414,6 +460,7 @@ def check_partition(
     tolerance = float(cfg.get("quality.session_tolerance_minutes", 15))
     min_coverage = float(cfg.get("quality.min_coverage", 0.995))
     max_dup = float(cfg.get("quality.max_duplicate_frac", 0.0))
+    outlier_mult = float(cfg.get("quality.spread_outlier_mult", 0.0))
 
     for day, group in frame.groupby(frame["timestamp"].dt.date):
         expected = int(
@@ -442,7 +489,7 @@ def check_partition(
                     coverage,
                     check_monotonicity(group, max_dup),
                     check_gaps(group, max_gap),
-                    check_quote_sanity(group, max_spread, pip),
+                    check_quote_sanity(group, max_spread, pip, outlier_mult),
                     session,
                     check_clock_drift(group),
                     check_stale_feed(group, max_stale),
