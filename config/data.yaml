@@ -73,7 +73,13 @@ recorder:
 
 # ---------- L1: MALANGO YA UBORA (spec §3) ----------
 quality:
-  min_coverage:        0.995            # ticks zilizopo / zinazotarajiwa (kalenda ya session)
+  # KIZINGITI CHA BIASHARA, si cha ukamilifu wa feed (PD APPROVED 2026-08-09).
+  # 0.995 ilimaanisha dakika 7 zinazokosekana kwa siku zinatosha kufelisha siku
+  # nzima — kipimo cha jinsi feed ilivyo kamili, si cha kama siku inaweza
+  # kufanyiwa biashara. Ilikuwa sababu kubwa kuliko zote: siku 3,342 (9.54%).
+  # Kwa 0.95, jumla ya kufeli inashuka 4,384 -> 2,001; siku 2,383 zinarudi
+  # (`quality-stats --what-if coverage=0.95`, 2026-08-08).
+  min_coverage:        0.95             # dakika zenye quote / zinazotarajiwa (kalenda ya session)
   max_gap_seconds:                      # pengo ndani ya session (L0 ni TICKS, si bars)
     default:  3600
     XAUUSD:   5400                      # dhahabu ina MAPUMZIKO YA KILA SIKU (~saa 1). Kipimo
@@ -102,7 +108,25 @@ quality:
   spread_outlier_mult: 50               # ... NA ikizidi hii x median ya SIKU yenyewe.
                                         # Krismasi ina median pana yenyewe, kwa hiyo inabaki;
                                         # tick iliyoharibika (mara 1,000) inaondoka.
-  fail_action:         "exclude"        # partition iliyofeli HAIINGII L2
+  fail_action:         "exclude"        # siku iliyofeli HAIINGII L2 (§3)
+  # KUTOLEWA NJE KWA UAMUZI, si kwa check. Checks zinakamata siku moja moja;
+  # zinashindwa pale kasoro ni ya KIPINDI. Kila kifungu kinahitaji sababu, na
+  # kinaingia `config_hash` — hivyo ni sehemu ya `dataset_id`.
+  excluded_ranges:
+    - symbols: [EURCHF, GBPJPY, XAUUSD]
+      from:    "2023-01-01"
+      to:      "2023-12-31"
+      reason: >-
+        Chanzo cha Toleo B kilipungua saa 1-2 KWA SIKU mwaka 2023 pekee, kisha
+        kikarudi 2024 (symbol-profile 2026-08-08: dakika za median 1429->1315,
+        1435->1320, 1380->1319). Symbols hizo tatu hazina kinachofanana kama
+        vyombo vya soko; kinachofanana ni CHANZO — kwa hiyo ni feed, si soko.
+        Gaps check inakamata asilimia 45 pekee; nyingine zina kasoro ile ile
+        ndogo zaidi. Labels za touch (§5) zinatatuliwa kwa PATH YA TICKS, kwa
+        hiyo pengo la saa 2 kila siku lingeficha barrier zilizoguswa humo, na
+        label ingesema `timeout` wakati SL/TP iliguswa. Si kelele — ni jibu la
+        uongo. Gharama: siku 777 kati ya 35,025 (2.2%).
+        PD APPROVED 2026-08-09 (DF-05, ona docs/SIGNATURES.md).
 
 # ---------- L2: BARS ----------
 bars:

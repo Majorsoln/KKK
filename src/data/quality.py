@@ -463,6 +463,24 @@ def check_partition(
     outlier_mult = float(cfg.get("quality.spread_outlier_mult", 0.0))
 
     for day, group in frame.groupby(frame["timestamp"].dt.date):
+        blocked = excluded_reason(cfg, symbol, day)
+        if blocked:
+            # Uamuzi wa PD unatangulia checks: siku haihukumiwi, inatolewa nje
+            # na sababu yake inasafiri nayo kwenye ripoti.
+            result.days.append(
+                DayQuality(
+                    day=day.isoformat(),
+                    checks=[
+                        CheckResult(
+                            name="excluded",
+                            passed=False,
+                            reason=FAIL_EXCLUDED_BY_PD,
+                            detail=blocked,
+                        )
+                    ],
+                )
+            )
+            continue
         expected = int(
             expected_minutes
             if expected_minutes is not None
@@ -497,6 +515,34 @@ def check_partition(
             )
         )
     return result
+
+
+FAIL_EXCLUDED_BY_PD = "excluded_by_pd"
+
+
+def excluded_reason(cfg, symbol: str | None, day) -> str:
+    """Siku iliyotolewa nje kwa **UAMUZI ULIOANDIKWA**, si kwa check.
+
+    Checks zinakamata siku moja moja. Zinashindwa pale kasoro ni ya **kipindi**:
+    kipimo cha 2026-08-08 kilionyesha EURCHF, GBPJPY na XAUUSD — symbols zote
+    tatu za Toleo B, yaani chanzo kimoja — zikipoteza saa 1–2 KWA SIKU mwaka
+    2023 pekee, kisha kurudi 2024. Gaps check inakamata asilimia 45 ya siku
+    hizo; nyingine zinapita ingawa zina kasoro ile ile ndogo zaidi.
+
+    Kipindi kikijulikana, kukiondoa ni **uamuzi wa PD** — unaoandikwa hapa kwa
+    sababu yake, unaingia `config_hash`, na hivyo unakuwa sehemu ya `dataset_id`.
+    Mtu yeyote atakayeona namba za baadaye ataona pia kilichotolewa na kwa nini.
+    """
+    if not symbol:
+        return ""
+    key = day if isinstance(day, str) else day.isoformat()
+    for entry in cfg.get("quality.excluded_ranges", []) or []:
+        symbols = [s.upper() for s in (entry.get("symbols") or [])]
+        if symbols and symbol.upper() not in symbols:
+            continue
+        if str(entry.get("from", "")) <= key <= str(entry.get("to", "9999-12-31")):
+            return str(entry.get("reason", "haijatajwa"))
+    return ""
 
 
 def _per_symbol(cfg, dotted: str, symbol: str | None, default: float) -> float:

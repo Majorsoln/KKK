@@ -208,6 +208,35 @@ touch (§5) zinatatuliwa kwa mfuatano wa ticks, kwa hiyo mpangilio wa ticks zina
 kimoja cha muda ni sehemu ya jibu. Kila `sort` kwenye tabaka hili ni **stable**; kuzifuta
 kungepoteza quotes halisi, na kuzipanga upya kungefanya dataset isizalishike upya (§8).
 
+**Checks zinakamata siku; kasoro ya KIPINDI inaondolewa kwa uamuzi.** Ukaguzi unahukumu siku moja
+moja, kwa hiyo unashindwa kimyakimya pale chanzo kizima kinapoharibika kwa kiasi kidogo lakini kwa
+muda mrefu. Kipimo cha 2026-08-09 (`symbol-profile`) kilionyesha EURCHF, GBPJPY na XAUUSD — symbols
+zote **tatu za Toleo B**, yaani chanzo kimoja — zikipoteza saa 1–2 KWA SIKU mwaka **2023 pekee**,
+kisha kurudi 2024 (median ya dakika 1429→1315→1429, 1435→1320→1435, 1380→1319→1380). Vyombo hivyo
+vitatu havishirikiani chochote kama masoko; kinachoshirikiana ni **chanzo** — kwa hiyo ni feed, si
+soko. `gaps` inakamata takriban asilimia 45 ya siku hizo; nyingine zinapita zikiwa na kasoro ile ile
+ndogo zaidi. Athari si "ubora hafifu": labels za touch (§5) zinatatuliwa kwa **path ya ticks**, kwa
+hiyo pengo la saa 2 kila siku linaficha barrier zilizoguswa humo, na label inasema `timeout` wakati
+SL/TP iliguswa — si kelele, ni **jibu la uongo**.
+
+Kipindi kinachojulikana kinaondolewa kupitia `quality.excluded_ranges`, si kwa kulegeza ukaguzi:
+
+```yaml
+excluded_ranges:
+  - symbols: [EURCHF, GBPJPY, XAUUSD]   # orodha tupu = symbols zote
+    from:    "2023-01-01"
+    to:      "2023-12-31"
+    reason:  "..."                       # LAZIMA — inasafiri hadi kwenye ripoti
+```
+
+Sheria zake nne: (a) siku iliyo ndani ya kipindi **haipimwi kabisa** — inapata `excluded_by_pd`
+pamoja na sababu yake, kwa hiyo haichanganyiki na siku iliyofeli ukaguzi; (b) `--what-if`
+**haiwezi** kuirudisha, kwa sababu si suala la kizingiti — vinginevyo jedwali lingemshauri PD
+kulegeza `min_coverage` ili kurudisha siku alizozizuia mwenyewe; (c) kifungu kinaingia
+`config_hash`, kwa hiyo kinabadilisha `dataset_id` na kinalazimu `check-l1` kuendeshwa upya;
+(d) kinahitaji **sahihi ya PD** (`sign.bat DF-05 APPROVED`) kabla ya kutumika kwenye T2 — kuondoa
+data ni uamuzi wa kudumu, na sababu iliyoandikwa ndiyo inayomruhusu mtu wa baadaye kuupinga.
+
 **Sera ya NaN:** hakuna imputation ya kubuni. Bar isiyokamilika inabeba `is_valid=false` na
 **haitumiki** kama decision point; inaweza kutumika kama history kwa window ndefu **kama** feature
 inaruhusu (imeandikwa kwenye feature card).
