@@ -186,6 +186,29 @@ kikaguliwe kabla ya kuondoa partition hata moja.
 ya mwezi (Toleo B) ina siku ~22; kuikagua kama kipande kimoja kungeita usiku kati ya sessions
 `intrasession_gap` na kulinganisha mipaka ya session na siku ya kwanza pekee.
 
+**Siku moja inaweza kuwa kwenye partitions MBILI — inaunganishwa kabla ya kuhukumiwa.** Toleo B
+halikati mwezi usiku wa manane bali **saa 05:00 UTC**, kwa hiyo tarehe 1 iko nusu kwenye faili ya
+mwezi uliopita (00:00–04:59) na nusu kwenye ya mwezi huu (05:00–23:59). Kipimo cha 2026-08-09
+kilionyesha hili moja kwa moja: EURCHF ilitoa mistari **miwili kwa tarehe ile ile**, tarehe 1 ya
+karibu kila mwezi, mmoja `close ±1140 min` na mwingine `open ±300 min` — na `1140 + 300 = 1440`,
+siku moja kamili. Kila nusu, ikihukumiwa peke yake, inaonekana imevunjika (coverage 5/24 au 19/24,
+mipaka ya session mbali na kalenda); pamoja ni siku nzima yenye afya. Kwa `fail_action: exclude`
+hiyo ilikuwa ikitupa **tarehe 1 ya kila mwezi** kwa symbols zote tatu za Toleo B — siku ~380 za
+biashara halisi, kwa kasoro ya kipimo, si ya data. Ni kasoro ile ile ya "kitengo cha hukumu"
+ikiwa upande wa pili: kwanza faili moja ilikuwa na siku nyingi; hapa siku moja iko kwenye faili
+nyingi. Kinachounganishwa ni **malighafi** (dakika zinajumlishwa, mipaka ya muda inachukua mwanzo
+wa kwanza na mwisho wa mwisho), si majibu — uwiano uliokwishakokotolewa hauwezi kujumlishwa.
+Checks zisizotegemea kalenda zinabaki za kila kipande: kasoro ndani ya nusu moja ni kasoro ya siku
+nzima. Idadi ya vipande vilivyounganishwa inaripotiwa kama `totals.split_day_pieces_merged`.
+
+**Ukaguzi wa 7 (`clock_drift`) unapima siku, si `now()`.** Kipimo cha kwanza kililinganisha tick ya
+mwisho na saa ya sasa; kwenye kumbukumbu ya kihistoria hiyo ni namba ya umri wa faili (p50 =
+−171,679,765 s = −5.4 miaka), na ukaguzi haukuweza kufeli kimuundo — 0/34,089. **Ukaguzi usioweza
+kufeli si ulinzi; ni jina linalotoa hakikisho la uwongo.** Sasa unapima kitu kinachoweza kuwa
+kibovu kwenye kumbukumbu: tick iliyoandikwa nje ya siku ambayo faili linaidai (saa ya server
+iliyopotoka wakati wa kuandika, au faili lililochanganywa). Sehemu ya `tz == UTC` ilikuwa na maana
+tangu mwanzo na inabaki.
+
 **Matarajio (checks 1 na 6) ni ya kila symbol NA kila siku ya wiki.** Kwa symbol: XAUUSD haifanyi
 biashara saa zile zile za EURUSD. Kwa siku ya wiki: soko linafunga **21:00 UTC Ijumaa** wakati
 Jumatatu–Alhamisi zinaendelea hadi usiku wa manane, kwa hiyo Ijumaa ina `21/24 = 87.5%` ya dakika

@@ -37,7 +37,7 @@ from .session_calendar import (
 ProgressFn = Callable[[int, int, str], None]
 
 # 2 = matokeo yamegawanywa kwa SIKU (PD 2026-08-08); 1 = kwa partition.
-CHECK_SCHEMA_VERSION = 2
+CHECK_SCHEMA_VERSION = 3
 
 
 # --------------------------------------------------------------------------
@@ -318,6 +318,16 @@ def run_quality_audit(
         if on_progress:
             on_progress(index, len(partitions), path.name)
 
+    # Siku moja inaweza kuwa imegawanywa kwenye partitions mbili (Toleo B
+    # linakata mwezi saa 05:00 UTC). Kuunganisha KUNAFANYIKA HAPA, si kwenye
+    # cache: cache inahifadhi hukumu ghafi ya kila faili, na kuunganisha ni
+    # kazi ya kukusanya. Hivyo `--resume` inabaki salama.
+    from .quality import merge_split_days
+
+    report.split_days_merged = merge_split_days(
+        report, calendar, float(cfg.get("quality.session_tolerance_minutes", 15))
+    )
+
     if calendar is not None:
         from .calendar import TradingCalendar
 
@@ -383,7 +393,14 @@ def _quality_from_json(payload: dict[str, Any]):
         rows=int(payload.get("rows", 0)),
         checks=_checks_from_json(payload.get("checks")),
         days=[
-            DayQuality(day=d.get("day", "?"), checks=_checks_from_json(d.get("checks")))
+            DayQuality(
+                day=d.get("day", "?"),
+                checks=_checks_from_json(d.get("checks")),
+                observed_minutes=int(d.get("observed_minutes", 0)),
+                expected_minutes=int(d.get("expected_minutes", 0)),
+                first_ts=d.get("first_ts", ""),
+                last_ts=d.get("last_ts", ""),
+            )
             for d in payload.get("days", [])
         ],
     )

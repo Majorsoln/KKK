@@ -134,10 +134,29 @@ def test_check6_session_match_inanasa_dst():
     assert not check_session_match(frame, shifted, expected_close, 15).passed
 
 
-def test_check7_clock_drift_inakataa_tick_ya_baadaye():
-    frame = _ticks(datetime.now(timezone.utc) + timedelta(hours=2), 3)
-    result = check_clock_drift(frame)
+def test_check7_clock_drift_inakataa_tick_iliyo_nje_ya_siku_yake():
+    """Tick iliyoandikwa upande usiofaa wa usiku wa manane = saa iliyopotoka.
+
+    Kipimo cha zamani kilikuwa `tick ya mwisho dhidi ya now()`. Kwenye
+    kumbukumbu ya kihistoria hicho hakiwezi kufeli kimuundo (faili ya 2016
+    inatoa -10.6 miaka), na kipimo cha 2026-08-09 kilithibitisha: 0/34,089
+    kwa p50 ya -171,679,765 s. Ukaguzi usioweza kufeli si ulinzi.
+    """
+    siku = date(2026, 8, 3)
+    safi = _ticks(datetime(2026, 8, 3, 12, 0, tzinfo=timezone.utc), 3)
+    assert check_clock_drift(safi, siku).passed
+
+    nje = _ticks(datetime(2026, 8, 4, 0, 30, tzinfo=timezone.utc), 3)
+    result = check_clock_drift(nje, siku)
     assert not result.passed and result.reason == FAIL_CLOCK_DRIFT
+    assert result.value and result.value >= 1800
+
+
+def test_check7_bila_siku_inakagua_tz_pekee():
+    """Sehemu ya `tz == UTC` ni ukaguzi HALISI — inapita 34,089/34,089."""
+    frame = _ticks(datetime(2026, 8, 3, tzinfo=timezone.utc), 3)
+    result = check_clock_drift(frame)
+    assert result.passed and "tz ni UTC" in result.detail
 
 
 def test_check7_inakataa_timestamp_isiyo_utc():

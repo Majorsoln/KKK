@@ -518,6 +518,119 @@ def test_siku_moja_mbaya_haitupi_mwezi_mzima(cfg, l0_root):
 
 
 # ===========================================================================
+# Siku moja kwenye partitions mbili (PD 2026-08-09)
+# ===========================================================================
+
+
+def _b_partition(root: Path, symbol: str, name: str, frame: pd.DataFrame) -> Path:
+    path = root / "provenance=aggregator" / f"symbol={symbol}" / name
+    path.parent.mkdir(parents=True, exist_ok=True)
+    pd.DataFrame(
+        {
+            "ts": (frame["timestamp"].astype("int64") // 1000).values,
+            "bid": frame["bid"].values,
+            "ask": frame["ask"].values,
+            "bid_volume": frame["bid_vol"].values,
+            "ask_volume": frame["ask_vol"].values,
+        }
+    ).to_parquet(path, index=False)
+    return path
+
+
+def _split_day_tree(root: Path) -> Path:
+    """Toleo B halikati mwezi usiku wa manane bali **saa 05:00 UTC**.
+
+    Kwa hiyo tarehe 1 iko nusu kwenye faili ya mwezi uliopita (00:00–04:59)
+    na nusu kwenye ya mwezi huu (05:00–23:59). Hivi ndivyo data halisi ilivyo.
+    """
+    def ticks(start: datetime, minutes: int) -> pd.DataFrame:
+        stamps = pd.date_range(start, periods=minutes, freq="1min", tz="UTC")
+        bid = pd.Series([2400.0 + (i % 50) * 0.01 for i in range(minutes)])
+        return pd.DataFrame(
+            {
+                "timestamp": stamps.astype("datetime64[us, UTC]"),
+                "bid": bid.values,
+                "ask": (bid + 0.01).values,
+                "bid_vol": [1.0] * minutes,
+                "ask_vol": [2.0] * minutes,
+            }
+        )
+
+    # Julai: siku kamili ya 07-31, kisha mkia wa 08-01 hadi 04:59.
+    julai = pd.concat(
+        [
+            ticks(datetime(2026, 7, 31, 0, 0, tzinfo=timezone.utc), 1440),
+            ticks(datetime(2026, 8, 1, 0, 0, tzinfo=timezone.utc), 300),
+        ]
+    )
+    # Agosti: kichwa cha 08-01 kuanzia 05:00, kisha siku kamili ya 08-02.
+    agosti = pd.concat(
+        [
+            ticks(datetime(2026, 8, 1, 5, 0, tzinfo=timezone.utc), 1140),
+            ticks(datetime(2026, 8, 2, 0, 0, tzinfo=timezone.utc), 1440),
+        ]
+    )
+    _b_partition(root, "XAUUSD", "2026-07.parquet", julai)
+    _b_partition(root, "XAUUSD", "2026-08.parquet", agosti)
+    return root
+
+
+def test_siku_iliyogawanywa_kwenye_faili_mbili_inahukumiwa_kama_moja(cfg, l0_root):
+    """Vipande viwili vya tarehe 1 vinaunganishwa kabla ya kuhukumiwa.
+
+    Kipimo halisi cha 2026-08-09 kilionyesha EURCHF ikitoa mistari MIWILI kwa
+    tarehe ile ile: kimoja `close ±1140 min`, kingine `open ±300 min`.
+    `1140 + 300 = 1440` — siku moja kamili, iliyokatwa saa 05:00 UTC.
+    """
+    _split_day_tree(l0_root)
+    calendar = build_session_calendar(cfg, l0_root).calendar
+    report = run_quality_audit(cfg, l0_root, calendar=calendar, symbols=["XAUUSD"])
+
+    siku = [d for part in report.partitions for d in part.days]
+    tarehe = [d.day for d in siku]
+    assert tarehe.count("2026-08-01") == 1, "tarehe 1 inaonekana MARA MOJA, si mbili"
+    assert report.split_days_merged == 1
+
+    moja = next(d for d in siku if d.day == "2026-08-01")
+    assert moja.observed_minutes == 1440, "dakika za vipande vyote viwili"
+    assert moja.first_ts.startswith("2026-08-01T00:00")
+    assert moja.last_ts.startswith("2026-08-01T23:59")
+    assert "low_coverage" not in moja.fail_reasons
+    assert "session_mismatch" not in moja.fail_reasons
+
+
+def test_bila_kuunganisha_kila_kipande_kingefeli(cfg, l0_root):
+    """Uthibitisho kwamba kasoro ilikuwa ya KWELI, si ya kubuni.
+
+    Hii ndiyo iliyokuwa ikitupa tarehe 1 ya KILA MWEZI kwa symbols zote tatu
+    za Toleo B — siku ~380 za biashara halisi, kwa kasoro ya kipimo.
+    """
+    from src.data.quality import check_partition
+
+    _split_day_tree(l0_root)
+    calendar = build_session_calendar(cfg, l0_root).calendar
+    julai = l0_root / "provenance=aggregator" / "symbol=XAUUSD" / "2026-07.parquet"
+    agosti = l0_root / "provenance=aggregator" / "symbol=XAUUSD" / "2026-08.parquet"
+
+    mkia = next(d for d in check_partition(julai, cfg, calendar=calendar).days
+                if d.day == "2026-08-01")
+    kichwa = next(d for d in check_partition(agosti, cfg, calendar=calendar).days
+                  if d.day == "2026-08-01")
+    assert not mkia.passed and not kichwa.passed
+    assert mkia.observed_minutes + kichwa.observed_minutes == 1440
+
+
+def test_siku_isiyogawanywa_haiguswi(cfg, l0_tree):
+    """Toleo A linaandika kwa SIKU — hakuna cha kuunganisha, na hakuna kinachobadilika."""
+    calendar = build_session_calendar(cfg, l0_tree).calendar
+    report = run_quality_audit(cfg, l0_tree, calendar=calendar, symbols=["EURUSD"])
+
+    assert report.split_days_merged == 0
+    assert report.total_days == len(DAYS)
+    assert report.excluded_days() == {"EURUSD": [DAYS[2].isoformat()]}
+
+
+# ===========================================================================
 # Kutolewa nje kwa UAMUZI ULIOANDIKWA, si kwa check (PD 2026-08-09)
 # ===========================================================================
 

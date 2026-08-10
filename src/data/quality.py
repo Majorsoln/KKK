@@ -27,7 +27,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import asdict, dataclass, field
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -65,10 +65,21 @@ class CheckResult:
 
 @dataclass
 class DayQuality:
-    """Matokeo ya SIKU moja — hiki ndicho kipimo cha kutumika/kutotumika."""
+    """Matokeo ya SIKU moja — hiki ndicho kipimo cha kutumika/kutotumika.
+
+    Malighafi (`observed_minutes` … `last_ts`) inabebwa pamoja na hukumu kwa
+    sababu **siku moja inaweza kuwa imegawanywa kwenye partitions mbili**
+    (§3 — Toleo B linakata mwezi saa 05:00 UTC, si usiku wa manane). Kipande
+    kimoja hakiwezi kuhukumiwa peke yake, na uwiano uliokwishakokotolewa
+    hauwezi kuunganishwa; dakika na mipaka ya muda zinaweza.
+    """
 
     day: str
     checks: list[CheckResult] = field(default_factory=list)
+    observed_minutes: int = 0
+    expected_minutes: int = 0
+    first_ts: str = ""
+    last_ts: str = ""
 
     @property
     def passed(self) -> bool:
@@ -83,6 +94,10 @@ class DayQuality:
             "day": self.day,
             "passed": self.passed,
             "fail_reasons": self.fail_reasons,
+            "observed_minutes": self.observed_minutes,
+            "expected_minutes": self.expected_minutes,
+            "first_ts": self.first_ts,
+            "last_ts": self.last_ts,
             "checks": [c.to_json() for c in self.checks],
         }
 
@@ -345,8 +360,23 @@ def check_session_match(
     )
 
 
-def check_clock_drift(frame: pd.DataFrame, max_future_seconds: float = 60.0) -> CheckResult:
-    """7 — hakuna tick ya baadaye; tz ni UTC (tofauti ya server↔UTC ni thabiti)."""
+def check_clock_drift(
+    frame: pd.DataFrame, day: date | None = None, max_future_seconds: float = 60.0
+) -> CheckResult:
+    """7 — tz ni UTC, na hakuna tick inayotoka nje ya siku yake yenyewe.
+
+    **Kipimo cha kwanza kilikuwa kikilinganisha tick ya mwisho na `now()`.**
+    Kwenye kumbukumbu ya kihistoria hiyo haina maana: faili ya 2016 inatoa
+    −10.6 miaka, p50 ya ripoti nzima ilikuwa −171,679,765 s, na ukaguzi
+    haukuweza kufeli kimuundo (kipimo cha 2026-08-09: 0/34,089). Ukaguzi
+    usioweza kufeli si ulinzi — ni jina linalotoa hakikisho la uwongo.
+
+    Kinachopimwa sasa ni kitu ambacho **kinaweza** kuwa kibovu kwenye
+    kumbukumbu: tick iliyoandikwa nje ya siku ambayo faili linaidai. Saa ya
+    server ikipotoka wakati wa kuandika, au faili likachanganywa, tick
+    inatokea upande usiofaa wa usiku wa manane. Bila `day`, tunakagua tz
+    pekee — nayo ni ukaguzi halisi (inapita 34,089/34,089, na hiyo ni jibu).
+    """
     ts = frame["timestamp"]
     tz = getattr(ts.dtype, "tz", None)
     if tz is None or str(tz) != "UTC":
@@ -356,16 +386,26 @@ def check_clock_drift(frame: pd.DataFrame, max_future_seconds: float = 60.0) -> 
             reason=FAIL_CLOCK_DRIFT,
             detail=f"timestamp si UTC (tz={tz})",
         )
-    now = pd.Timestamp.now(tz="UTC")
-    future = float((ts.max() - now).total_seconds())
-    passed = future <= max_future_seconds
+    if day is None:
+        return CheckResult(
+            name="clock_drift", passed=True, detail="tz ni UTC; hakuna siku ya kulinganisha"
+        )
+    start = pd.Timestamp(day, tz="UTC")
+    outside = float(
+        max(
+            (start - ts.min()).total_seconds(),
+            (ts.max() - (start + pd.Timedelta(days=1))).total_seconds(),
+            0.0,
+        )
+    )
+    passed = outside <= max_future_seconds
     return CheckResult(
         name="clock_drift",
         passed=passed,
         reason="" if passed else FAIL_CLOCK_DRIFT,
-        value=round(future, 2),
+        value=round(outside, 2),
         threshold=max_future_seconds,
-        detail="tick ya baadaye ni dalili ya saa ya server kupotoka",
+        detail=f"tz UTC · nje ya siku {day.isoformat()} kwa {outside:.1f}s",
     )
 
 
@@ -503,18 +543,107 @@ def check_partition(
         result.days.append(
             DayQuality(
                 day=day.isoformat(),
+                observed_minutes=observed,
+                expected_minutes=expected,
+                first_ts=group["timestamp"].min().isoformat(),
+                last_ts=group["timestamp"].max().isoformat(),
                 checks=[
                     coverage,
                     check_monotonicity(group, max_dup),
                     check_gaps(group, max_gap),
                     check_quote_sanity(group, max_spread, pip, outlier_mult),
                     session,
-                    check_clock_drift(group),
+                    check_clock_drift(group, day),
                     check_stale_feed(group, max_stale),
                 ],
             )
         )
     return result
+
+
+def merge_split_days(report: "QualityReport", calendar=None, tolerance_minutes: float = 15.0) -> int:
+    """Siku iliyogawanywa kwenye partitions mbili inahukumiwa **kama siku moja**.
+
+    Kipimo cha 2026-08-09 kilionyesha EURCHF ikitoa mistari **miwili kwa tarehe
+    ile ile** — tarehe 1 ya karibu kila mwezi, kwa miaka yote. Namba zenyewe
+    zinaeleza kilichotokea: kipande kimoja kinafunga dakika **1140** kabla ya
+    wakati (yaani saa 04:59), kingine kinafunguka dakika **300** baada ya wakati
+    (yaani saa 05:00). `1140 + 300 = 1440` — **siku moja kamili**. Toleo B
+    linakata mwezi saa 05:00 UTC, si usiku wa manane, kwa hiyo tarehe 1 iko
+    nusu kwenye faili ya mwezi uliopita na nusu kwenye ya mwezi huu.
+
+    Kila nusu, ikihukumiwa peke yake, inaonekana imevunjika: coverage yake ni
+    5/24 au 19/24, na mipaka yake ya session iko mbali na kalenda. Pamoja, ni
+    siku nzima yenye afya. Kwa `fail_action: exclude` hiyo ilikuwa ikitupa
+    **tarehe 1 ya kila mwezi** kwa symbols zote tatu za Toleo B — siku ~380 za
+    biashara halisi, si kwa kasoro ya data bali ya kipimo changu.
+
+    Hii ni kasoro ile ile ya "kitengo cha hukumu" iliyorekebishwa 2026-08-08,
+    ikiwa upande wa pili: wakati ule faili moja ilikuwa na siku nyingi; hapa
+    siku moja iko kwenye faili nyingi.
+
+    Kinachounganishwa ni **malighafi**, si majibu: dakika zinajumlishwa, mipaka
+    ya muda inachukua mwanzo wa kwanza na mwisho wa mwisho. Uwiano
+    uliokwishakokotolewa hauwezi kujumlishwa. Checks zisizotegemea kalenda
+    (`gaps`, `monotonicity`, `quote_sanity`, `stale_feed`) zinabaki za kila
+    kipande — kasoro ndani ya nusu moja ni kasoro ya siku nzima.
+
+    Inarudisha idadi ya vipande vilivyounganishwa (vilivyoondolewa).
+    """
+    index: dict[tuple[str, str], list[tuple[PartitionQuality, DayQuality]]] = {}
+    for part in report.partitions:
+        for day in part.days:
+            index.setdefault((str(part.symbol), day.day), []).append((part, day))
+
+    merged = 0
+    for (symbol, day_key), pieces in index.items():
+        if len(pieces) < 2:
+            continue
+        # Siku iliyotolewa nje na PD haihukumiwi; kuunganisha kungeirudisha.
+        if any(FAIL_EXCLUDED_BY_PD in d.fail_reasons for _, d in pieces):
+            for part, dayq in pieces[1:]:
+                part.days.remove(dayq)
+                merged += 1
+            continue
+
+        keeper = pieces[0][1]
+        keeper.observed_minutes = sum(d.observed_minutes for _, d in pieces)
+        keeper.expected_minutes = max(d.expected_minutes for _, d in pieces)
+        stamps = [d.first_ts for _, d in pieces if d.first_ts] + [
+            d.last_ts for _, d in pieces if d.last_ts
+        ]
+        keeper.first_ts = min(stamps) if stamps else ""
+        keeper.last_ts = max(stamps) if stamps else ""
+
+        others = [c for _, d in pieces[1:] for c in d.checks]
+        keeper.checks = [c for c in keeper.checks if c.name not in ("coverage", "session_match")]
+        keeper.checks += [c for c in others if c.name not in ("coverage", "session_match")]
+
+        min_coverage = next(
+            (c.threshold for _, d in pieces for c in d.checks
+             if c.name == "coverage" and c.threshold is not None),
+            0.95,
+        )
+        keeper.checks.insert(
+            0, check_coverage(keeper.observed_minutes, keeper.expected_minutes, float(min_coverage))
+        )
+        bounds = (
+            calendar.expected_session(symbol, date.fromisoformat(day_key))
+            if calendar is not None
+            else None
+        )
+        if bounds and keeper.first_ts and keeper.last_ts:
+            span = pd.DataFrame(
+                {"timestamp": pd.to_datetime([keeper.first_ts, keeper.last_ts], utc=True)}
+            )
+            keeper.checks.append(
+                check_session_match(span, bounds[0], bounds[1], tolerance_minutes, hour_step_ok=True)
+            )
+        for part, dayq in pieces[1:]:
+            part.days.remove(dayq)
+            merged += 1
+
+    return merged
 
 
 FAIL_EXCLUDED_BY_PD = "excluded_by_pd"
@@ -609,6 +738,7 @@ class QualityReport:
     config_hash: str = ""
     thresholds: dict[str, Any] = field(default_factory=dict)
     calendar_comparison: dict[str, Any] = field(default_factory=dict)
+    split_days_merged: int = 0
     coverage_by_symbol: dict[str, Any] = field(default_factory=dict)
 
     @property
@@ -685,6 +815,10 @@ class QualityReport:
                 "days": self.total_days,
                 "days_failed": self.failed_days,
                 "days_passed": self.total_days - self.failed_days,
+                # Vipande vya siku iliyogawanywa kwenye partitions mbili,
+                # vilivyounganishwa kabla ya kuhesabu (§3). Sifuri = hakuna
+                # partition inayokatiza siku; namba kubwa = Toleo B lipo.
+                "split_day_pieces_merged": self.split_days_merged,
             },
             "fail_reasons": self.reason_counts(),
             "by_symbol_year": self.by_symbol_year(),
