@@ -25,7 +25,13 @@ from typing import Any, Callable, Iterable, Sequence
 import pandas as pd
 
 from .manifest import iter_partitions, symbol_from_path
-from .quality import QualityReport, _pip_size, check_partition, new_report
+from .quality import (
+    CHECK_SCHEMA_VERSION,
+    QualityReport,
+    _pip_size,
+    check_partition,
+    new_report,
+)
 from .session_calendar import (
     DayObservation,
     SessionCalendar,
@@ -35,10 +41,6 @@ from .session_calendar import (
 )
 
 ProgressFn = Callable[[int, int, str], None]
-
-# 2 = matokeo yamegawanywa kwa SIKU (PD 2026-08-08); 1 = kwa partition.
-CHECK_SCHEMA_VERSION = 3
-
 
 # --------------------------------------------------------------------------
 # Kuchagua partitions

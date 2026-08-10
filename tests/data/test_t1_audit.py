@@ -8,6 +8,7 @@ kuendelea baada ya kukatika.
 
 from __future__ import annotations
 
+import json
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
@@ -767,12 +768,49 @@ def test_what_if_inakataa_ripoti_ya_muundo_wa_zamani(cfg, l0_tree):
 
     calendar = build_session_calendar(cfg, l0_tree).calendar
     report = run_quality_audit(cfg, l0_tree, calendar=calendar).to_detail()
-    assert report["schema"] == 2
+    from src.data.quality import CHECK_SCHEMA_VERSION
+
+    assert report["schema"] == CHECK_SCHEMA_VERSION, "ripoti inapigwa chapa toleo la CODE"
     assert what_if(report, {"coverage": 0.9})["days"] > 0
 
     zamani = {**report, "schema": 1}
     with pytest.raises(ValueError, match="muundo wa zamani"):
         what_if(zamani, {"coverage": 0.9})
+
+
+def test_ripoti_ya_code_ya_zamani_inatambulika(cfg, l0_tree, tmp_path, capsys):
+    """Ripoti ya code ya zamani inaonekana SAWA KABISA na ya mpya.
+
+    Namba ni halali, jedwali ni kamili, na hakuna kinachotofautiana kwa macho.
+    2026-08-09 hilo lilipoteza saa nane: `audit.bat` iliendeshwa kabla ya
+    `git pull`, matokeo yakawa ya code ya zamani, na `r0-summary` ikayaonyesha
+    kama kawaida. Chapa ya toleo + onyo ndizo zinazofanya hilo lionekane.
+    """
+    from src.data.cli import main
+    from src.data.quality import (
+        CHECK_SCHEMA_VERSION,
+        render_threshold_study,
+        schema_warning,
+        threshold_study,
+    )
+
+    calendar = build_session_calendar(cfg, l0_tree).calendar
+    report = run_quality_audit(cfg, l0_tree, calendar=calendar)
+    assert schema_warning(report.to_json()) == "", "ripoti ya sasa hailalamiki"
+
+    zamani = {**report.to_json(), "schema": CHECK_SCHEMA_VERSION - 1}
+    onyo = schema_warning(zamani)
+    assert "muundo" in onyo and "audit.bat" in onyo
+
+    out_dir = tmp_path / "ripoti"
+    out_dir.mkdir()
+    (out_dir / "quality_report.json").write_text(json.dumps(zamani), encoding="utf-8")
+    main(["r0-summary", "--out-dir", str(out_dir)])
+    assert "ONYO" in capsys.readouterr().err, "onyo linatoka KABLA ya namba"
+
+    study = threshold_study({**report.to_detail(), "schema": CHECK_SCHEMA_VERSION - 1})
+    assert study["legacy"] is False, "si muundo wa hukumu-kwa-faili"
+    assert "ONYO" in render_threshold_study(study)
 
 
 def test_threshold_study_inaonya_ripoti_ya_zamani(cfg, l0_tree):

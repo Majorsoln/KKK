@@ -47,6 +47,28 @@ FAIL_STALE_FEED = "stale_feed"
 # Kina cha kila siku — kikubwa, hakiingii git (ona `.gitignore`).
 DETAIL_NAME = "quality_detail.json"
 
+# Muundo NA MAANA ya matokeo. 1 = hukumu kwa faili · 2 = kwa siku (2026-08-08)
+# · 3 = siku iliyogawanywa kwenye faili mbili inaunganishwa, na `clock_drift`
+# inapima siku badala ya `now()` (2026-08-09).
+#
+# Ripoti inapigwa CHAPA namba hii, na kila msomaji analinganisha na yake. Bila
+# hilo, ripoti ya code ya zamani inaonekana sawa kabisa na ya mpya — kipimo cha
+# 2026-08-09 kilipoteza saa nane hasa hivyo: matokeo yalikuwa ya zamani, namba
+# zilikuwa halali, na hakuna kilichosema tofauti.
+CHECK_SCHEMA_VERSION = 3
+
+
+def schema_warning(report: dict) -> str:
+    """Onyo kama ripoti iliandikwa na code ya zamani kuliko hii. Tupu = sawa."""
+    stamped = int(report.get("schema", 1))
+    if stamped >= CHECK_SCHEMA_VERSION:
+        return ""
+    return (
+        f"ONYO: ripoti hii ina muundo {stamped}, code ina {CHECK_SCHEMA_VERSION}. "
+        "Iliandikwa na toleo la zamani la checks — namba hapa chini SI za code "
+        "iliyopo sasa. Endesha `scripts\\audit.bat` tena."
+    )
+
 
 @dataclass
 class CheckResult:
@@ -804,7 +826,7 @@ class QualityReport:
         return {
             # Muundo wa ripoti. 2 = hukumu kwa SIKU; 1 = kwa faili (kabla ya
             # 2026-08-08). Wasomaji wanaikagua badala ya kukisia kwa umbo.
-            "schema": 2,
+            "schema": CHECK_SCHEMA_VERSION,
             "built_at": self.built_at,
             "config_hash": self.config_hash,
             "thresholds": self.thresholds,
@@ -831,7 +853,7 @@ class QualityReport:
     def to_detail(self) -> dict[str, Any]:
         """Kina cha kila siku — malighafi ya `quality-stats` na `--what-if`."""
         return {
-            "schema": 2,
+            "schema": CHECK_SCHEMA_VERSION,
             "built_at": self.built_at,
             "config_hash": self.config_hash,
             "partitions": [p.to_json() for p in self.partitions],
@@ -905,6 +927,7 @@ def threshold_study(report: dict[str, Any]) -> dict[str, Any]:
     kwa kila kizingiti kinachopendekezwa. PD ndiye anayechagua.
     """
     legacy = int(report.get("schema", 1)) < 2
+    stale = schema_warning(report)
     quantiles = [0.001, 0.01, 0.05, 0.10, 0.50, 0.90, 0.95, 0.99, 0.999]
     values: dict[str, list[float]] = {}
     thresholds: dict[str, set[float]] = {}
@@ -945,6 +968,7 @@ def threshold_study(report: dict[str, Any]) -> dict[str, Any]:
         "partitions": len(report.get("partitions", [])),
         "unit": "faili (muundo wa zamani)" if legacy else "siku",
         "legacy": legacy,
+        "stale": stale,
         "checks": {},
     }
     for name, series in sorted(values.items()):
@@ -1053,6 +1077,8 @@ def render_threshold_study(study: dict[str, Any]) -> str:
             "inahesabiwa mara moja ingawa ina siku ~22 — namba hapa chini zina upendeleo "
             "dhidi ya Toleo B. Endesha `check-l1` tena."
         )
+    elif study.get("stale"):
+        lines.append(f"  {study['stale']}")
     lines.append("")
     for name, entry in study["checks"].items():
         arrow = "chini ni mbaya" if entry["direction"] == "min" else "juu ni mbaya"

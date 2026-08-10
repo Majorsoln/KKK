@@ -644,6 +644,16 @@ def cmd_r0_summary(args: argparse.Namespace) -> int:
         print("quality_report.json haipo — endesha `scripts\\audit.bat`.", file=sys.stderr)
         return 2
 
+    from .quality import schema_warning
+
+    stale = schema_warning(quality)
+    if stale:
+        # Ripoti ya code ya zamani inaonekana sawa kabisa na ya mpya: namba ni
+        # halali, jedwali ni kamili, na hakuna kinachotofautiana kwa macho.
+        # Ndiyo maana onyo lazima liwe hapa juu, kabla ya namba yoyote.
+        print(stale, file=sys.stderr)
+        print("", file=sys.stderr)
+
     rows: list[tuple[str, str, str]] = []
     attention = 0
 
