@@ -737,6 +737,11 @@ def cmd_r0_summary(args: argparse.Namespace) -> int:
         print(f"  {kigezo:<{width}}  {namba:<34}  {mark}")
     print(f"\nvinavyohitaji uamuzi wako: {attention}")
     print(f"config_hash: {quality.get('config_hash', '')[:16]}")
+    # Vizingiti NA code. Ripoti isiyosema code ilikuwa ipi haiwezi kuzalishwa
+    # upya wala kukanushwa — na ndiyo ilivyoruhusu run ya code ya zamani
+    # kuonekana halali kabisa (2026-08-09).
+    print(f"code_rev   : {quality.get('code_rev', 'haijulikani')[:16]}")
+    print(f"iliandikwa : {quality.get('built_at', 'haijulikani')}")
     print(
         "\nSahihi ya T1 (baada ya kupitia):\n"
         f"  scripts\\sign.bat DF-05 VERIFIED --evidence {out_dir / 'quality_report.json'} "

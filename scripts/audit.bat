@@ -22,6 +22,26 @@ if not exist "research\reports\quality" mkdir "research\reports\quality"
 powercfg /change standby-timeout-ac 0 >nul 2>&1
 powercfg /change monitor-timeout-ac 15 >nul 2>&1
 echo Kumbukumbu: %LOG%
+
+:: Code ya zamani + saa 9 = saa 9 zilizopotea, na matokeo yanayoonekana
+:: halali kabisa (2026-08-09). Kuuliza kabla ni sekunde 3.
+set "BEHIND="
+set "BRANCH="
+for /f %%b in ('git rev-parse --abbrev-ref HEAD 2^>nul') do set "BRANCH=%%b"
+if not "%BRANCH%"=="" (
+  git fetch origin %BRANCH% >nul 2>&1
+  for /f %%c in ('git rev-list HEAD..FETCH_HEAD --count 2^>nul') do set "BEHIND=%%c"
+)
+if not "%BEHIND%"=="" if not "%BEHIND%"=="0" (
+  echo(
+  echo   ONYO: branch yako iko NYUMA kwa commits %BEHIND%.
+  echo   Ukiendelea, saa 9 zitatumia CODE YA ZAMANI, na ripoti itakayotoka
+  echo   itaonekana halali kabisa. Hivyo ndivyo saa 9 zilivyopotea 2026-08-09.
+  echo(
+  echo   Simamisha kwa Ctrl+C, kisha:  git pull origin %BRANCH%
+  echo(
+  pause
+)
 echo(
 
 echo === 1/6  KALENDA — sessions kutoka DATA (RS-03) ===

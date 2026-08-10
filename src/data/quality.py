@@ -761,6 +761,7 @@ class QualityReport:
     thresholds: dict[str, Any] = field(default_factory=dict)
     calendar_comparison: dict[str, Any] = field(default_factory=dict)
     split_days_merged: int = 0
+    code_rev: str = ""
     coverage_by_symbol: dict[str, Any] = field(default_factory=dict)
 
     @property
@@ -829,6 +830,10 @@ class QualityReport:
             "schema": CHECK_SCHEMA_VERSION,
             "built_at": self.built_at,
             "config_hash": self.config_hash,
+            # Commit iliyozalisha namba hizi. `config_hash` inasema vizingiti
+            # vilikuwa vipi; hii inasema CODE ilikuwa ipi. Bila zote mbili,
+            # ripoti haiwezi kuzalishwa upya wala kukanushwa.
+            "code_rev": self.code_rev,
             "thresholds": self.thresholds,
             "totals": {
                 "partitions": len(self.partitions),
@@ -1108,8 +1113,11 @@ def new_report(cfg) -> QualityReport:
     # Vizingiti VYOTE vya `quality:`, si vilivyochaguliwa. R0 inaulizwa "dhidi ya
     # vizingiti vya data.yaml" — ripoti isiyoonyesha kizingiti kimoja
     # kilichotumika ni ripoti isiyoweza kukaguliwa.
+    from .manifest import code_rev
+
     return QualityReport(
         built_at=datetime.now(timezone.utc).isoformat(timespec="seconds"),
         config_hash=getattr(cfg, "config_hash", ""),
+        code_rev=code_rev(),
         thresholds=dict(cfg.get("quality", {}) or {}),
     )
