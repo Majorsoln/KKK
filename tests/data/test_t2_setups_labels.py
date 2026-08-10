@@ -374,9 +374,9 @@ def test_detect_setups_inaandika_ushahidi_wa_pre_registration(cfg, tmp_path, mon
     assert "EURUSD" in summary["per_symbol"]
 
 
-def _day_ticks_for_l2(day: int) -> pd.DataFrame:
+def _day_ticks_for_l2(day: int, month: int = 8, year: int = 2026) -> pd.DataFrame:
     stamps = pd.date_range(
-        datetime(2026, 8, day, 0, 0, tzinfo=timezone.utc), periods=1440, freq="1min", tz="UTC"
+        datetime(year, month, day, 0, 0, tzinfo=timezone.utc), periods=1440, freq="1min", tz="UTC"
     )
     bid = pd.Series([1.10 + (i % 60) * 0.0001 for i in range(1440)])
     return pd.DataFrame(
@@ -388,3 +388,49 @@ def _day_ticks_for_l2(day: int) -> pd.DataFrame:
             "ask_vol": [2.0] * 1440,
         }
     )
+
+
+def test_rate_inahesabiwa_kwa_train_val_pekee(cfg, tmp_path, monkeypatch):
+    """Numerator na denominator lazima ziwe za DIRISHA MOJA.
+
+    Kipimo cha kwanza kilitoa setups bila holdout lakini eligible NAYO —
+    holdout ni ~miaka 2 kati ya 10.6, kwa hiyo rate iliyoripotiwa ilikuwa
+    imeshushwa kwa ~20% kimya. Namba iliyo sahihi kwa nusu ni namba mbaya.
+    """
+    import json as _json
+
+    from src.data.audit import build_l2
+    from src.data.cli import main
+
+    for key, value in cfg.env.items():
+        monkeypatch.setenv(key, value)
+
+    # Siku 2 kabla ya holdout_start (2024-04-01) na 2 baada yake.
+    root = tmp_path / "L0"
+    path = root / "provenance=aggregator" / "symbol=EURUSD" / "2024"
+    path.mkdir(parents=True)
+    for month, day in ((3, 26), (3, 27), (4, 2), (4, 3)):
+        frame = _day_ticks_for_l2(day, month=month, year=2024)
+        frame.to_parquet(path / f"2024-{month:02d}-{day:02d}.parquet", index=False)
+    build_l2(cfg, root, cfg.l2_root, symbols=["EURUSD"])
+    main(["detect-setups", "--symbols", "EURUSD"])
+
+    summary = _json.loads(
+        (cfg.path_of("storage.reports_root") / "r1" / "setup_rates.json").read_text(encoding="utf-8")
+    )
+    tv = summary["per_symbol"]["EURUSD"]["train_val"]
+    setups_path = (
+        cfg.research_root / "data" / "L4_labels" / "setups" / "symbol=EURUSD" / "setups.parquet"
+    )
+    frame = pd.read_parquet(setups_path)
+    train = frame[~frame["in_holdout"]]
+
+    assert tv["eligible"] == int(train["eligible"].sum()), "denominator ni TRAIN+VAL"
+    assert tv["setups"] == int(train["is_setup"].sum()), "numerator ni TRAIN+VAL"
+    assert frame["in_holdout"].any() and (~frame["in_holdout"]).any(), "sampuli ina pande zote"
+    assert summary["pooled_setups_train_val"] == tv["setups"]
+    assert set(summary["gate_rejects_train_val"]) == {
+        "fail_spread",
+        "fail_atr_band",
+        "fail_trigger",
+    }

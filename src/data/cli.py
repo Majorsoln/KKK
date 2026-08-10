@@ -1062,7 +1062,8 @@ def cmd_detect_setups(args: argparse.Namespace) -> int:
     out_root = cfg.research_root / "data" / "L4_labels" / "setups"
 
     per_symbol: dict[str, dict] = {}
-    pooled_setups = pooled_eligible = pooled_holdout = 0
+    pooled = {"setups": 0, "eligible": 0, "holdout": 0, "controls": 0}
+    gates = {"fail_spread": 0, "fail_atr_band": 0, "fail_trigger": 0}
     for symbol in symbols:
         try:
             bars = read_bars(cfg.l2_root, symbol, "H1")
@@ -1081,13 +1082,38 @@ def cmd_detect_setups(args: argparse.Namespace) -> int:
         path.parent.mkdir(parents=True, exist_ok=True)
         frame.to_parquet(path)
 
-        per_symbol[symbol] = {**result.stats, "setups_holdout": n_holdout}
-        pooled_setups += result.stats["setups"] - n_holdout
-        pooled_eligible += result.stats["eligible"]
-        pooled_holdout += n_holdout
-        print(result.render() + f" · holdout {n_holdout}")
+        # RATE INAHESABIWA KWA TRAIN+VAL PEKEE — hesabu na mwenzake.
+        # Kipimo cha kwanza kilitoa numerator bila holdout lakini denominator
+        # NAYO — holdout ni ~miaka 2 kati ya 10.6, kwa hiyo rate ilikuwa
+        # imeshushwa kwa ~20% kimya (2026-08-11).
+        train = frame[~frame["in_holdout"]]
+        tv = {
+            "eligible": int(train["eligible"].sum()),
+            "setups": int(train["is_setup"].sum()),
+            "controls": int(train["is_control"].sum()),
+            "fail_spread": int((train["eligible"] & ~train["spread_ok"]).sum()),
+            "fail_atr_band": int((train["eligible"] & ~train["atr_ok"]).sum()),
+            "fail_trigger": int((train["eligible"] & ~train["trigger_ok"]).sum()),
+        }
+        tv["rate"] = tv["setups"] / tv["eligible"] if tv["eligible"] else 0.0
+
+        per_symbol[symbol] = {**result.stats, "setups_holdout": n_holdout, "train_val": tv}
+        pooled["setups"] += tv["setups"]
+        pooled["eligible"] += tv["eligible"]
+        pooled["controls"] += tv["controls"]
+        pooled["holdout"] += n_holdout
+        for key in gates:
+            gates[key] += tv[key]
+        print(
+            f"{symbol} · {result.rule_id} · TRAIN+VAL: eligible {tv['eligible']} · "
+            f"setups {tv['setups']} ({tv['rate']:.2%}) · control {tv['controls']} · "
+            f"holdout (zimetengwa) {n_holdout}"
+        )
 
     target = float(cfg.get("setups.target_rate"))
+    pooled_setups = pooled["setups"]
+    pooled_eligible = pooled["eligible"]
+    pooled_holdout = pooled["holdout"]
     pooled_rate = pooled_setups / pooled_eligible if pooled_eligible else 0.0
     summary = {
         "rule_id": str(cfg.get("setups.rule_id")),
@@ -1100,6 +1126,10 @@ def cmd_detect_setups(args: argparse.Namespace) -> int:
         "pooled_rate_train_val": pooled_rate,
         "pooled_setups_train_val": pooled_setups,
         "pooled_setups_holdout": pooled_holdout,
+        "pooled_controls_train_val": pooled["controls"],
+        # Kila gate PEKE YAKE kati ya bars zenye viashiria (TRAIN+VAL). Hizi
+        # ndizo namba za kutuna: gate inayokataa chache ndiyo iliyolegea.
+        "gate_rejects_train_val": gates,
         "per_symbol": per_symbol,
     }
     report_path = cfg.path_of("storage.reports_root") / "r1" / "setup_rates.json"
@@ -1110,6 +1140,10 @@ def cmd_detect_setups(args: argparse.Namespace) -> int:
         f"\npooled (TRAIN+VAL): setups {pooled_setups} / eligible {pooled_eligible} "
         f"= {pooled_rate:.2%} · lengo ~{target:.0%} · holdout (zimetengwa) {pooled_holdout}"
     )
+    print("gate inayokataa NGAPI (peke yake, kati ya eligible za TRAIN+VAL):")
+    for name, count in gates.items():
+        share = count / pooled_eligible if pooled_eligible else 0.0
+        print(f"  {name:<16} {count:>9,}  ({share:.1%} zinakataliwa)")
     print(f"ushahidi: {report_path}")
     # Rate iliyo mbali mara mbili na lengo ni dalili ya vigezo vibaya — ONYO,
     # si kizuizi: PD ndiye anayeamua kutuna (kabla ya labels) au kukubali.
