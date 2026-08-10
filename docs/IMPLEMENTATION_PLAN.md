@@ -559,8 +559,50 @@ muda peke yake hauwezi kutofautisha **feed iliyoganda** (ticks zinakuja, quote h
 **pengo** (hakuna ticks kabisa), na suluhisho la kila moja ni tofauti. `stale_feed` sasa
 inahesabu ticks zilizo ndani ya dirisha na kusema ni ipi.
 
-**Kinachofuata:** `audit.bat` kwa symbols zote 12 (~saa 2 kwa `check-l1`) → PD kupitia
-`reports/quality/` → sahihi ya exit ya T1.
+**Kipimo cha tatu — DATA YOTE (2026-08-09).** `audit.bat` kamili: partitions **25,510**, siku
+**35,025**, symbols 12, 2016-01-04 → 2026-08-07. Vipimo viwili vya kwanza vilikuwa vya sampuli;
+hiki ndicho cha kweli, na kila namba hapa chini imepimwa, si kukisiwa.
+
+| | kipimo cha 2 (2026-08-08) | kipimo cha 3 (2026-08-09) |
+|---|---|---|
+| siku zilizopita | 31,370 / 35,025 (89.6%) | **33,227 / 35,025 (94.9%)** |
+| `low_coverage` | 3,342 | **687** |
+| `session_mismatch` | 679 | 568 |
+| `stale_feed` | 518 | 213 |
+| `intrasession_gap` | 479 | 178 |
+| `bad_timestamps` | 36 | 33 |
+| `quote_violation` | 6 | 6 |
+| `excluded_by_pd` | — | **936** |
+
+Maamuzi mawili ya PD (DF-05 APPROVED, sahihi #3–#4) yalisababisha mabadiliko haya:
+`min_coverage` 0.995 → 0.95, na `excluded_ranges` ya 2023 ya Toleo B. Kupungua kwa
+`stale_feed`, `intrasession_gap` na `session_mismatch` **hakukuwa kwa kulegeza kizingiti chao** —
+vizingiti vyao havijabadilika hata kimoja; siku zilezile za 2023 zilizokuwa zikifeli kwa sababu
+kadhaa sasa zimeondolewa kwa uamuzi mmoja ulioandikwa. Hiyo ndiyo tofauti kati ya kuficha kasoro
+na kuitaja: sababu moja badala ya nne, na sababu yenyewe iko kwenye config.
+
+`excluded_by_pd` = 936, si 777 kama ilivyokadiriwa. Tofauti ni siku za Jumapili/nusu za 2023
+(~52 kwa symbol) ambazo `symbol-profile` haizihesabu kwa sababu inaonyesha siku **kamili** pekee.
+Kifungu kinafunika mwaka wa kalenda mzima, kwa hiyo namba ya 936 ndiyo sahihi. Uthibitisho kwamba
+kutolewa nje ni sahihi kabisa: denominator ya `gaps` = 34,089 = 35,025 − 936 kamili.
+
+**Vinavyobaki wazi baada ya kipimo hiki:**
+
+1. **`clock_drift` haipimi chochote kwenye kumbukumbu ya kihistoria.** Inalinganisha tick ya
+   mwisho na `now()`; kwenye faili ya 2016 hiyo ni −10.6 miaka, kwa hiyo p50 = −171,679,765 s.
+   Haiwezi kufeli kimuundo. Sehemu yake yenye maana — `tz == UTC` — INAFANYA kazi na inapita
+   34,089/34,089. Corruption ya tick ya baadaye bado inanaswa na `gaps`, `coverage` na
+   ugawaji wa siku, kwa hiyo si pengo la ulinzi; ni jina linalodanganya na percentiles zisizo na
+   maana. Kurekebisha kunahitaji `CHECK_SCHEMA_VERSION` kuongezwa → kipimo cha saa 8 kingine.
+2. **Siku 1,594 (4.7%) hazihukumiwi kwa `coverage` wala `session_match`** — kalenda haina
+   matarajio kwao (`expected == 0`, siku zisizo `full`). Zinapita kwa checks 6 kati ya 8.
+3. `session_mismatch` 568, ikiongozwa na **XAUUSD ~21 kwa mwaka, kila mwaka**. p99 = 300.01 dk =
+   **saa 5 kamili** — hatua ya saa kamili, si kuteleza. Idadi thabiti ya kila mwaka inaelekeza
+   kwenye kalenda (sikukuu za COMEX / kufunga mapema), si kasoro ya data.
+4. Jumamosi/sikukuu zenye ticks: **16**.
+
+**Kinachofuata:** PD kupitia `reports/quality/` → sahihi ya exit ya T1 (DF-05/06/07/08/14, RS-03
+→ VERIFIED, zikiwa na `--evidence quality_report.json`).
 
 ---
 
