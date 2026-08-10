@@ -1056,12 +1056,30 @@ def cmd_detect_setups(args: argparse.Namespace) -> int:
     from .manifest import code_rev
     import pandas as pd
 
-    from .setups import SETUP_SCHEMA_VERSION, detect_setups, sweep_trigger
+    from .setups import (
+        SETUP_SCHEMA_VERSION,
+        detect_setups,
+        load_excluded_days,
+        sweep_trigger,
+    )
     from .splits import SplitPlan
 
     symbols = _symbol_list(args) or cfg.symbols
     holdout_start = SplitPlan.from_config(cfg).holdout_start
     out_root = cfg.research_root / "data" / "L4_labels" / "setups"
+
+    # §3 `fail_action: exclude` — hukumu ya R0 inapakwa HAPA. Bila hii, siku
+    # 912 ulizoziondoa (2023 ya Toleo B) na siku zote zilizofeli checks
+    # zingeingia kwenye decision points kimya, na uamuzi wako ungekuwa bure.
+    report_path = cfg.quality_reports_dir / "quality_report.json"
+    excluded = load_excluded_days(report_path)
+    if not excluded:
+        print(
+            f"ONYO: `{report_path}` haipo au haina siku zilizofeli — decision "
+            "points zitajumuisha siku ZOTE, ikiwemo zilizofeli §3. Endesha "
+            "`scripts\\audit.bat` kwanza.",
+            file=sys.stderr,
+        )
 
     if args.sweep:
         # Kutuna kwa RATE, kutoka kwenye mgawanyo — si mezani (§4.3 sheria 2).
@@ -1077,8 +1095,11 @@ def cmd_detect_setups(args: argparse.Namespace) -> int:
                 print(f"{symbol}: bars za H1 hazipo — `build-l2` kwanza", file=sys.stderr)
                 return 2
             bars = bars[bars.index < pd.Timestamp(holdout_start, tz="UTC")]  # G2
-            rows = sweep_trigger(cfg, bars, symbol, mults)
-            eligible_all += int(detect_setups(cfg, bars, symbol).frame["eligible"].sum())
+            blocked = excluded.get(symbol.upper(), set())
+            rows = sweep_trigger(cfg, bars, symbol, mults, excluded_days=blocked)
+            eligible_all += int(
+                detect_setups(cfg, bars, symbol, excluded_days=blocked).frame["eligible"].sum()
+            )
             for row in rows:
                 totals[row["min_atr_mult"]] += row["setups"]
             print(
@@ -1106,7 +1127,7 @@ def cmd_detect_setups(args: argparse.Namespace) -> int:
         except FileNotFoundError:
             print(f"{symbol}: bars za H1 hazipo — `build-l2` kwanza", file=sys.stderr)
             return 2
-        result = detect_setups(cfg, bars, symbol)
+        result = detect_setups(cfg, bars, symbol, excluded_days=excluded.get(symbol.upper(), set()))
         frame = result.frame
 
         # G2: decision points za HOLDOUT zinawekwa alama SASA — mjenzi wa
@@ -1124,6 +1145,7 @@ def cmd_detect_setups(args: argparse.Namespace) -> int:
         # imeshushwa kwa ~20% kimya (2026-08-11).
         train = frame[~frame["in_holdout"]]
         tv = {
+            "bars_day_excluded": int(train["day_excluded"].sum()),
             "eligible": int(train["eligible"].sum()),
             "setups": int(train["is_setup"].sum()),
             "controls": int(train["is_control"].sum()),
@@ -1143,7 +1165,7 @@ def cmd_detect_setups(args: argparse.Namespace) -> int:
         print(
             f"{symbol} · {result.rule_id} · TRAIN+VAL: eligible {tv['eligible']} · "
             f"setups {tv['setups']} ({tv['rate']:.2%}) · control {tv['controls']} · "
-            f"holdout (zimetengwa) {n_holdout}"
+            f"holdout {n_holdout} · siku zilizofeli §3 {tv['bars_day_excluded']} bars"
         )
 
     target = float(cfg.get("setups.target_rate"))
@@ -1158,6 +1180,8 @@ def cmd_detect_setups(args: argparse.Namespace) -> int:
         "config_hash": cfg.config_hash,
         "code_rev": code_rev(),
         "holdout_start": holdout_start.isoformat(),
+        "quality_report": str(report_path),
+        "excluded_symbols_with_days": {k: len(v) for k, v in sorted(excluded.items())},
         "target_rate": target,
         "pooled_rate_train_val": pooled_rate,
         "pooled_setups_train_val": pooled_setups,

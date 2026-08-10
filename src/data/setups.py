@@ -23,7 +23,9 @@ bila kujali subset gani inachakatwa (reproducibility §8).
 from __future__ import annotations
 
 import hashlib
+import json
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
 
 import pandas as pd
@@ -75,12 +77,43 @@ def _control_pick(seed: int, symbol: str, stamp: pd.Timestamp, frac: float) -> b
     return int.from_bytes(digest[:8], "big") / 2**64 < frac
 
 
-def detect_setups(cfg, bars_h1: pd.DataFrame, symbol: str) -> SetupResult:
+def load_excluded_days(report_path: Path) -> dict[str, set[str]]:
+    """Siku zilizofeli §3, kutoka `quality_report.json` ya R0.
+
+    **Kwa nini kwenye kusoma, si kwenye kujenga L2.** Config inasema "siku
+    iliyofeli HAIINGII L2", lakini L2 ni artifact ya masaa 5 na vizingiti vya
+    §3 vimebadilika mara mbili tayari (`min_coverage` 0.995→0.95,
+    `excluded_ranges` ya 2023). Kuipaka hukumu ya ubora ndani ya bars
+    kungelazimu ujenzi upya kila PD anapotuna kizingiti.
+
+    Bars zinabaki kama zilivyojengwa kutoka ticks; hukumu ya §3 inapakwa
+    juu yake wakati wa kusoma. Matokeo ni yale yale, na sera ya NaN ya §3
+    inaruhusu: bar ya siku iliyofeli **haitumiki kama decision point**,
+    lakini inabaki kama historia ya windows ndefu (ATR haitobolewi shimo).
+    """
+    if not report_path.is_file():
+        return {}
+    payload = json.loads(report_path.read_text(encoding="utf-8"))
+    return {
+        str(symbol).upper(): set(days)
+        for symbol, days in (payload.get("excluded_days") or {}).items()
+    }
+
+
+def detect_setups(
+    cfg,
+    bars_h1: pd.DataFrame,
+    symbol: str,
+    excluded_days: set[str] | None = None,
+) -> SetupResult:
     """SETUP-v1 juu ya bars za H1 za symbol moja (index = open time ya bar).
 
     Kila kipimo kinatumia bars ZILIZOFUNGWA pekee, na kila rolling ni ya nyuma
     — kwa hiyo uamuzi wa bar `t` haubadiliki data ya baada ya `t` ikibadilika
     (mali ya prefix; sentinel §4.2 na test vinathibitisha).
+
+    `excluded_days`: siku zilizofeli §3 (`fail_action: exclude`). Bars zake
+    haziwi decision points wala control — lakini zinabaki kwenye historia.
     """
     rule_id = str(cfg.get("setups.rule_id"))
     mult = float(cfg.get("setups.spread_gate_mult"))
@@ -126,6 +159,14 @@ def detect_setups(cfg, bars_h1: pd.DataFrame, symbol: str) -> SetupResult:
         lambda d: 0 if pd.isna(d) or d == 0 else (1 if d > 0 else -1)
     ).astype("int8")
 
+    # §3 `fail_action: exclude` — siku iliyofeli haiwi decision point.
+    # Hukumu ni ya SIKU ya decision_time (wakati trade ingefunguliwa), si ya
+    # open ya bar: bar ya 23:00 inafunga 00:00 ya siku inayofuata, na ndipo
+    # uamuzi unapofanyika.
+    blocked = set(excluded_days or ())
+    day_of_decision = out["decision_time"].dt.strftime("%Y-%m-%d")
+    out["day_excluded"] = day_of_decision.isin(blocked)
+
     eligible = (
         out["atr"].notna()
         & spread_median.notna()
@@ -133,6 +174,7 @@ def detect_setups(cfg, bars_h1: pd.DataFrame, symbol: str) -> SetupResult:
         & out["impulse_atr"].notna()
         & (out["direction"] != 0)
         & bars["is_valid"].fillna(False)
+        & ~out["day_excluded"]
     )
     out["eligible"] = eligible
     out["is_setup"] = eligible & out["spread_ok"] & out["atr_ok"] & out["trigger_ok"]
@@ -151,6 +193,7 @@ def detect_setups(cfg, bars_h1: pd.DataFrame, symbol: str) -> SetupResult:
         "rule_id": rule_id,
         "schema": SETUP_SCHEMA_VERSION,
         "bars": int(len(bars)),
+        "bars_day_excluded": int(out["day_excluded"].sum()),
         "eligible": n_eligible,
         "setups": int(out["is_setup"].sum()),
         "setup_rate": float(out["is_setup"].sum() / n_eligible) if n_eligible else 0.0,
@@ -164,7 +207,13 @@ def detect_setups(cfg, bars_h1: pd.DataFrame, symbol: str) -> SetupResult:
     return SetupResult(symbol=symbol, rule_id=rule_id, frame=out, stats=stats)
 
 
-def sweep_trigger(cfg, bars_h1: pd.DataFrame, symbol: str, multipliers) -> list[dict[str, Any]]:
+def sweep_trigger(
+    cfg,
+    bars_h1: pd.DataFrame,
+    symbol: str,
+    multipliers,
+    excluded_days: set[str] | None = None,
+) -> list[dict[str, Any]]:
     """Rate ingekuwaje kwa kila `min_atr_mult` — kwa PASS MOJA juu ya bars.
 
     §4.3 sheria 2 inaruhusu kutuna kufikia RATE, na **kabla ya labels pekee**.
@@ -175,7 +224,7 @@ def sweep_trigger(cfg, bars_h1: pd.DataFrame, symbol: str, multipliers) -> list[
     Ni utaratibu ule ule wa `quality-stats` wa T1: kizingiti kinachotokana na
     mgawanyo wa data ni uamuzi; kilichobuniwa mezani ni nadhani.
     """
-    result = detect_setups(cfg, bars_h1, symbol)
+    result = detect_setups(cfg, bars_h1, symbol, excluded_days=excluded_days)
     frame = result.frame
     base = frame["eligible"] & frame["spread_ok"] & frame["atr_ok"]
     eligible = int(frame["eligible"].sum())

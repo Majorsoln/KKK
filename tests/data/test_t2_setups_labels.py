@@ -456,3 +456,53 @@ def test_sweep_inaonyesha_rate_kwa_kila_kizingiti(setup_cfg):
     baseline = detect_setups(setup_cfg, bars, "EURUSD")
     at_config = next(r for r in rows if r["min_atr_mult"] == configured)
     assert at_config["setups"] == baseline.stats["setups"]
+
+
+def test_siku_iliyofeli_r0_haiwi_decision_point(setup_cfg):
+    """§3 `fail_action: exclude` — hukumu ya R0 lazima ifike kwenye setups.
+
+    Bila kiungo hiki, siku 912 alizoziondoa PD (2023 ya Toleo B) na kila siku
+    iliyofeli checks zingeingia kwenye decision points KIMYA, na uamuzi
+    ulioandikwa ungekuwa bure. Ushahidi kwamba haukuwepo: EURCHF ilikuwa na
+    bars ZAIDI ya EURUSD, ingawa mwaka mzima wa 2023 ulikuwa umeondolewa.
+    """
+    # Kizingiti cha uzalishaji (2.5) hakitoi setup kwenye random walk ya
+    # majaribio; legeza ili kuwe na kitu cha kupotea.
+    setup_cfg.raw["setups"]["trigger"]["min_atr_mult"] = 1.0
+    bars = _bars(900)
+    bila = detect_setups(setup_cfg, bars, "EURUSD").frame
+    siku_mbaya = sorted({str(d.date()) for d in bila.index[400:600]})
+    na = detect_setups(setup_cfg, bars, "EURUSD", excluded_days=set(siku_mbaya)).frame
+
+    assert na["day_excluded"].sum() > 0
+    assert not (na["day_excluded"] & na["eligible"]).any(), "siku iliyofeli si eligible"
+    assert not (na["day_excluded"] & na["is_setup"]).any()
+    assert not (na["day_excluded"] & na["is_control"]).any(), "wala control"
+    assert na["is_setup"].sum() < bila["is_setup"].sum(), "setups zinapungua"
+
+    # Bars ZINABAKI kama historia (§3 sera ya NaN): ATR haitobolewi shimo.
+    pd.testing.assert_series_equal(bila["atr"], na["atr"])
+
+
+def test_hukumu_ni_ya_siku_ya_decision_time(setup_cfg):
+    """Bar ya 23:00 inafunga 00:00 — inahukumiwa kwa siku INAYOFUNGA."""
+    bars = _bars(900)
+    frame = detect_setups(setup_cfg, bars, "EURUSD", excluded_days={"2026-01-10"}).frame
+    zilizozuiwa = frame[frame["day_excluded"]]
+    assert (zilizozuiwa["decision_time"].dt.strftime("%Y-%m-%d") == "2026-01-10").all()
+    # Bar ya 23:00 ya tarehe 9 inafunga 00:00 ya tarehe 10 → inazuiwa.
+    assert any(stamp.hour == 23 and stamp.day == 9 for stamp in zilizozuiwa.index)
+
+
+def test_load_excluded_days_inasoma_ripoti_ya_r0(tmp_path):
+    import json as _json
+
+    from src.data.setups import load_excluded_days
+
+    path = tmp_path / "quality_report.json"
+    path.write_text(
+        _json.dumps({"excluded_days": {"eurchf": ["2023-06-01", "2023-06-02"]}}), encoding="utf-8"
+    )
+    loaded = load_excluded_days(path)
+    assert loaded == {"EURCHF": {"2023-06-01", "2023-06-02"}}, "symbol inakuwa herufi kubwa"
+    assert load_excluded_days(tmp_path / "haipo.json") == {}
