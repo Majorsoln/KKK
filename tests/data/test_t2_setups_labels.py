@@ -434,3 +434,19 @@ def test_rate_inahesabiwa_kwa_train_val_pekee(cfg, tmp_path, monkeypatch):
         "fail_atr_band",
         "fail_trigger",
     }
+
+
+def test_sweep_inaonyesha_rate_kwa_kila_kizingiti(setup_cfg):
+    """Kutuna kunahitaji kuona mgawanyo — utaratibu ule ule wa `quality-stats`."""
+    from src.data.setups import sweep_trigger
+
+    bars = _bars(900)
+    rows = sweep_trigger(setup_cfg, bars, "EURUSD", [0.5, 1.0, 2.0, 3.0])
+    rates = [r["rate"] for r in rows]
+    assert rates == sorted(rates, reverse=True), "kizingiti kikipanda, rate inashuka"
+    # Kizingiti cha config kinalingana na `detect_setups` — chanzo kimoja.
+    from src.data.setups import detect_setups
+
+    baseline = detect_setups(setup_cfg, bars, "EURUSD")
+    at_one = next(r for r in rows if r["min_atr_mult"] == 1.0)
+    assert at_one["setups"] == baseline.stats["setups"]

@@ -162,3 +162,31 @@ def detect_setups(cfg, bars_h1: pd.DataFrame, symbol: str) -> SetupResult:
         "fail_trigger": int((eligible & ~out["trigger_ok"]).sum()),
     }
     return SetupResult(symbol=symbol, rule_id=rule_id, frame=out, stats=stats)
+
+
+def sweep_trigger(cfg, bars_h1: pd.DataFrame, symbol: str, multipliers) -> list[dict[str, Any]]:
+    """Rate ingekuwaje kwa kila `min_atr_mult` — kwa PASS MOJA juu ya bars.
+
+    §4.3 sheria 2 inaruhusu kutuna kufikia RATE, na **kabla ya labels pekee**.
+    Kutuna kunahitaji kuona mgawanyo, si kubahatisha: hii inarudisha rate ya
+    kila kizingiti bila kuhesabu viashiria upya (ni kizingiti kimoja tu
+    kinachobadilika — `impulse_atr` ile ile inatumika kwa vyote).
+
+    Ni utaratibu ule ule wa `quality-stats` wa T1: kizingiti kinachotokana na
+    mgawanyo wa data ni uamuzi; kilichobuniwa mezani ni nadhani.
+    """
+    result = detect_setups(cfg, bars_h1, symbol)
+    frame = result.frame
+    base = frame["eligible"] & frame["spread_ok"] & frame["atr_ok"]
+    eligible = int(frame["eligible"].sum())
+    out = []
+    for mult in multipliers:
+        passed = int((base & (frame["impulse_atr"].abs() >= mult)).sum())
+        out.append(
+            {
+                "min_atr_mult": float(mult),
+                "setups": passed,
+                "rate": passed / eligible if eligible else 0.0,
+            }
+        )
+    return out

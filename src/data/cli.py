@@ -1054,12 +1054,48 @@ def cmd_detect_setups(args: argparse.Namespace) -> int:
 
     from .bars import read_bars
     from .manifest import code_rev
-    from .setups import SETUP_SCHEMA_VERSION, detect_setups
+    import pandas as pd
+
+    from .setups import SETUP_SCHEMA_VERSION, detect_setups, sweep_trigger
     from .splits import SplitPlan
 
     symbols = _symbol_list(args) or cfg.symbols
     holdout_start = SplitPlan.from_config(cfg).holdout_start
     out_root = cfg.research_root / "data" / "L4_labels" / "setups"
+
+    if args.sweep:
+        # Kutuna kwa RATE, kutoka kwenye mgawanyo — si mezani (§4.3 sheria 2).
+        # HAKUNA parquet inayoandikwa hapa: hii ni hatua ya kuchagua kizingiti,
+        # si ya kuzalisha decision points.
+        mults = [float(x) for x in args.sweep.split(",")]
+        totals: dict[float, int] = {m: 0 for m in mults}
+        eligible_all = 0
+        for symbol in symbols:
+            try:
+                bars = read_bars(cfg.l2_root, symbol, "H1")
+            except FileNotFoundError:
+                print(f"{symbol}: bars za H1 hazipo — `build-l2` kwanza", file=sys.stderr)
+                return 2
+            bars = bars[bars.index < pd.Timestamp(holdout_start, tz="UTC")]  # G2
+            rows = sweep_trigger(cfg, bars, symbol, mults)
+            eligible_all += int(detect_setups(cfg, bars, symbol).frame["eligible"].sum())
+            for row in rows:
+                totals[row["min_atr_mult"]] += row["setups"]
+            print(
+                f"{symbol}: "
+                + " · ".join(f"{r['min_atr_mult']}→{r['rate']:.1%}" for r in rows)
+            )
+        target = float(cfg.get("setups.target_rate"))
+        print(f"\npooled (TRAIN+VAL, eligible {eligible_all:,}) · lengo ~{target:.0%}")
+        for mult in mults:
+            rate = totals[mult] / eligible_all if eligible_all else 0.0
+            mark = "  <== karibu na lengo" if abs(rate - target) <= 0.02 else ""
+            print(f"  min_atr_mult {mult:<5} → setups {totals[mult]:>9,}  rate {rate:>7.2%}{mark}")
+        print(
+            "\nChagua kizingiti, kiweke `setups.trigger.min_atr_mult` kwenye config, "
+            "kisha endesha `detect-setups` bila `--sweep`."
+        )
+        return 0
 
     per_symbol: dict[str, dict] = {}
     pooled = {"setups": 0, "eligible": 0, "holdout": 0, "controls": 0}
@@ -1461,6 +1497,11 @@ def build_parser() -> argparse.ArgumentParser:
         parents=[common],
     )
     p_setups.add_argument("--symbols", help="orodha ya symbols, comma separated")
+    p_setups.add_argument(
+        "--sweep",
+        help="rate kwa kila min_atr_mult (mf. 1.0,1.5,2.0,2.5) — kuchagua kizingiti; "
+        "haiandiki decision points",
+    )
     p_setups.set_defaults(func=cmd_detect_setups)
 
     p_split = subparsers.add_parser(
