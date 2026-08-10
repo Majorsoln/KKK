@@ -143,9 +143,12 @@ def test_control_inazalishika_upya_na_haigusi_setups(setup_cfg):
     pd.testing.assert_series_equal(first["is_control"], second["is_control"])
 
     assert not (first["is_setup"] & first["is_control"]).any(), "control ni ZISIZO setup"
+    # Sehemu inatoka CONFIG, si namba iliyoandikwa hapa: PD anaituna (kabla
+    # ya labels), na test isivunjike kwa uamuzi wake halali.
+    target = float(setup_cfg.get("setups.control_sample_frac"))
     eligible_non_setup = (first["eligible"] & ~first["is_setup"]).sum()
     frac = first["is_control"].sum() / eligible_non_setup
-    assert 0.05 < frac < 0.16, f"control frac={frac:.3f} — mbali na 10%"
+    assert abs(frac - target) < 0.6 * target, f"control frac={frac:.3f} vs lengo {target}"
 
     # Symbol tofauti → chaguo tofauti (seed ile ile haitoi ulinganifu wa uwongo).
     other = detect_setups(setup_cfg, bars, "XAUUSD").frame
@@ -440,13 +443,16 @@ def test_sweep_inaonyesha_rate_kwa_kila_kizingiti(setup_cfg):
     """Kutuna kunahitaji kuona mgawanyo — utaratibu ule ule wa `quality-stats`."""
     from src.data.setups import sweep_trigger
 
-    bars = _bars(900)
-    rows = sweep_trigger(setup_cfg, bars, "EURUSD", [0.5, 1.0, 2.0, 3.0])
-    rates = [r["rate"] for r in rows]
-    assert rates == sorted(rates, reverse=True), "kizingiti kikipanda, rate inashuka"
-    # Kizingiti cha config kinalingana na `detect_setups` — chanzo kimoja.
     from src.data.setups import detect_setups
 
+    bars = _bars(900)
+    configured = float(setup_cfg.get("setups.trigger.min_atr_mult"))
+    rows = sweep_trigger(setup_cfg, bars, "EURUSD", [0.5, 1.0, configured, 3.5])
+    rates = [r["rate"] for r in rows]
+    assert rates == sorted(rates, reverse=True), "kizingiti kikipanda, rate inashuka"
+
+    # Sweep kwenye kizingiti cha CONFIG lazima itoe jibu lile lile la
+    # `detect_setups` — chanzo kimoja, si hesabu mbili zinazoweza kutofautiana.
     baseline = detect_setups(setup_cfg, bars, "EURUSD")
-    at_one = next(r for r in rows if r["min_atr_mult"] == 1.0)
-    assert at_one["setups"] == baseline.stats["setups"]
+    at_config = next(r for r in rows if r["min_atr_mult"] == configured)
+    assert at_config["setups"] == baseline.stats["setups"]

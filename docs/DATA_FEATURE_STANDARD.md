@@ -338,11 +338,16 @@ ukweli, na hakuna kinga ya kiufundi inayoliona. Kinga pekee ni utaratibu huu:
    `dataset_id` — kubadilisha sheria = dataset MPYA, si tweak.
 2. Kutuna vigezo ili kufikia **rate** (~5%) inaruhusiwa KABLA ya labels kuonekana — rate
    haitumii matokeo. Kutuna kwa outcome yoyote ya label = selection leakage, marufuku (RS-01).
-3. **CONTROL SAMPLE:** 10% ya bars zisizo setup, kwa nasibu (seed kwenye config), zinapata
-   labels PIA zikiwa na `is_control=true`. Bila control, hatutajua kamwe kama filter inatupa
-   trades bora kuliko inazochukua — filter ni MODEL ya hatua ya kwanza, na hii ndiyo njia
-   pekee ya kuipima (R1 inalinganisha base rates; R7 inailinganisha kwa EV). Control
-   **haiingii training** — ni kipimo cha filter tu.
+3. **CONTROL SAMPLE:** sehemu ya bars zisizo setup, kwa nasibu (`control_sample_frac` +
+   seed kwenye config), zinapata labels PIA zikiwa na `is_control=true`. Bila control,
+   hatutajua kamwe kama filter inatupa trades bora kuliko inazochukua — filter ni MODEL ya
+   hatua ya kwanza, na hii ndiyo njia pekee ya kuipima (R1 inalinganisha base rates; R7
+   inailinganisha kwa EV). Control **haiingii training** — ni kipimo cha filter tu.
+   **Sehemu ni 0.05, si 0.10** (PD 2026-08-11, kabla ya labels): kichujio kilipofikia 4.46%,
+   10% ilitoa control 56,471 dhidi ya setups 26,390 — mara mbili ya kile kinachopimwa. Nguvu
+   ya ulinganisho inategemea kundi **dogo**; control ya ziada haikuwa inanunua chochote,
+   ilikuwa inagharimu 68% ya kazi ya kutatua paths. Sehemu ikitunwa tena, iwe **kabla ya
+   labels** na kwa hoja ya nguvu ya kitakwimu — kamwe kwa outcome.
 4. Filter inapimwa na sentinel §4.2 kama feature nyingine yoyote (ni function ya bars
    zilizofungwa — shuffle ya baadaye isibadilishe uamuzi wa setup).
 5. **R1 haianzi** kabla sheria hii haijasainiwa na PD (pre-registration, RS-01).
