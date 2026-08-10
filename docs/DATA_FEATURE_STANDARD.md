@@ -176,6 +176,16 @@ zingetoweka kwenye training kwa kasoro ya kipimo, si ya data.
 **Weekend, holiday na rollover si "gaps"** — ni kalenda. Kalenda inatengenezwa kwa data yenyewe
 (bars zinazoonekana) na kuthibitishwa, si kudhaniwa.
 
+**Sikukuu si "soko limefungwa" — ni "soko jembamba".** Kipimo cha 2026-08-10 kilipata siku 16 zenye
+ticks ambazo kalenda ya kudhaniwa ilisema zimefungwa, na **zote 16** zilikuwa 25 Desemba (9) au
+1 Januari (7) — hakuna ubaguzi hata mmoja. Soko la FX halifungwi siku hizo; linabaki wazi likiwa na
+ukwasi mwembamba sana na spread pana. Dhana ndiyo ilikuwa mbaya, si data. Siku hizo **zinabaki**,
+kwa sheria ile ile ya `quote_sanity`: siku ghali ndizo model ya gharama inazohitaji zaidi, na
+kuziondoa kungefanya kila EV iwe ya matumaini. Kwa hiyo `compare_with_assumed` ina makundi mawili
+tofauti — `holiday_thin` (inaeleweka) na `unexpected_active` (**Jumamosi** yenye ticks, inayohitaji
+maelezo). Kuziunganisha kungeficha swali halisi ndani ya 16 zinazoeleweka; jibu la swali hilo ni
+**sifuri**. Kama siku hizo zinafaa kufanyiwa biashara ni swali la §4.3 (setup), si la ubora wa data.
+
 **Vizingiti vinatoka kwenye mgawanyo wa data, si mezani.** Baada ya `check-l1`, `quality-stats`
 inaonyesha kwa kila ukaguzi thamani halisi zilivyotawanyika na ni partitions ngapi zingefeli kwa
 kila kizingiti kinachopendekezwa. PD anachagua kutoka hapo na kuandika `config/data.yaml`.

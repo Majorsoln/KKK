@@ -698,9 +698,14 @@ def cmd_r0_summary(args: argparse.Namespace) -> int:
             not calendar.get("silent_but_expected"),
         )
         _add(
-            "Jumamosi/sikukuu zenye ticks (zinahitaji maelezo)",
+            "Jumamosi zenye ticks (zinahitaji maelezo)",
             str(len(calendar.get("unexpected_active", []))),
             not calendar.get("unexpected_active"),
+        )
+        _add(
+            "sikukuu zenye ticks (25 Des / 1 Jan — soko jembamba)",
+            str(len(calendar.get("holiday_thin", []))),
+            None,
         )
         _add(
             "Jumapili zenye ticks (ufunguzi wa wiki)",

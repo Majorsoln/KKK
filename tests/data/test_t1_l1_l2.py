@@ -305,6 +305,28 @@ def test_kalenda_ya_data_dhidi_ya_ya_kudhaniwa():
     assert "2026-08-09" not in diff["unexpected_active"]
 
 
+def test_sikukuu_yenye_ticks_haifichi_jumamosi_yenye_ticks():
+    """25 Des / 1 Jan zenye ticks si hitilafu; Jumamosi yenye ticks ni swali.
+
+    Kipimo cha 2026-08-10: siku 16 zilizoripotiwa `INAHITAJI MAELEZO` zilikuwa
+    ZOTE 25 Desemba (9) au 1 Januari (7) — hakuna ubaguzi. Soko la FX
+    halifungwi siku hizo; linabaki wazi likiwa jembamba. Dhana ndiyo ilikuwa
+    mbaya, si data. Zikichanganywa na Jumamosi, swali halisi — je kuna
+    Jumamosi yenye ticks? — linazama ndani ya 16.
+    """
+    from src.data.calendar import TradingCalendar
+
+    obs = [
+        DayObservation(date(2024, 12, 25), ticks=900, first_ts=None, last_ts=None),  # Jumatano
+        DayObservation(date(2025, 1, 1), ticks=900, first_ts=None, last_ts=None),    # Jumatano
+        DayObservation(date(2024, 12, 28), ticks=900, first_ts=None, last_ts=None),  # Jumamosi
+    ]
+    diff = compare_with_assumed(build_calendar(obs), TradingCalendar())
+
+    assert diff["holiday_thin"] == ["2024-12-25", "2025-01-01"]
+    assert diff["unexpected_active"] == ["2024-12-28"], "Jumamosi PEKEE ndiyo swali"
+
+
 # ===========================================================================
 # DF-06 — L2 bars kutoka ticks (spec §4)
 # ===========================================================================

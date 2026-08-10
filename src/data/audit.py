@@ -157,7 +157,9 @@ class CalendarBuild:
             f"kutoka partitions {self.partitions} (zilizotumika tena: {self.reused})",
             f"  siku tulizodhani zina data lakini hazina : {len(self.comparison['silent_but_expected'])}",
             f"  Jumapili zenye ticks (ufunguzi wa wiki — inatarajiwa): {len(self.comparison['weekend_open'])}",
-            f"  Jumamosi/sikukuu zenye ticks (INAHITAJI MAELEZO): {len(self.comparison['unexpected_active'])}",
+            f"  sikukuu zenye ticks (25 Des / 1 Jan — soko jembamba, si hitilafu): "
+            f"{len(self.comparison.get('holiday_thin', []))}",
+            f"  JUMAMOSI zenye ticks (INAHITAJI MAELEZO): {len(self.comparison['unexpected_active'])}",
             f"  siku za nusu (zilizogunduliwa na data): {len(self.comparison['partial_days'])}",
         ]
         for name, entry in sorted(self.by_variant.items()):

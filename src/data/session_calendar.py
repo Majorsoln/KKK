@@ -405,16 +405,25 @@ def compare_with_assumed(calendar: SessionCalendar, assumed) -> dict[str, Any]:
     * `silent_but_expected` — tulidhani ni siku kamili, data haina ticks;
     * `weekend_open` — Jumapili yenye ticks: soko linafunguka jioni (~22:00 UTC).
       Si hitilafu; ni sehemu ya kalenda inayotarajiwa (`is_trading_day`);
-    * `unexpected_active` — Jumamosi au sikukuu yenye ticks. **Hii ndiyo
-      inayohitaji maelezo**: kalenda ya kudhaniwa inasema soko limefungwa kabisa;
+    * `holiday_thin` — **sikukuu** yenye ticks. Kipimo cha 2026-08-10 kilionyesha
+      siku 16 zenye ticks ambazo kalenda ilidhani zimefungwa, na **zote 16**
+      zilikuwa 25 Desemba (9) au 1 Januari (7) — hakuna ubaguzi hata mmoja.
+      Soko la FX halifungwi siku hizo; linabaki wazi likiwa na ukwasi mwembamba
+      na spread pana. Dhana ndiyo ilikuwa mbaya, si data. Siku hizo ZINABAKI
+      (§3, sheria ile ile ya `quote_sanity`: siku ghali ndizo model ya gharama
+      inazohitaji zaidi; kuziondoa kungefanya kila EV iwe ya matumaini);
+    * `unexpected_active` — **Jumamosi** yenye ticks. Hii ndiyo inayohitaji
+      maelezo: soko limefungwa kweli, kwa hiyo ticks hapo ni swali;
     * `partial_days` — siku za nusu zilizogunduliwa kwa data.
 
-    Kutenganisha mbili za katikati ni muhimu: kwenye miaka 10, Jumapili ni ~550.
-    Zikichanganywa na Jumamosi/sikukuu, ripoti inaonyesha "hitilafu 547" wakati
-    kuna sifuri, na hitilafu ya kweli — Jumamosi moja yenye ticks — inazama.
+    Kutenganisha ni muhimu mara mbili. Kwenye miaka 10, Jumapili ni ~550;
+    zikichanganywa, ripoti inaonyesha "hitilafu 547" wakati kuna sifuri.
+    Vivyo hivyo sikukuu 16 zinazoeleweka zilikuwa zikificha swali halisi —
+    kama kuna Jumamosi yenye ticks au la. Jibu: **hakuna.**
     """
     silent: list[str] = []
     weekend_open: list[str] = []
+    holiday_thin: list[str] = []
     unexpected: list[str] = []
     observed = set(calendar.days)
 
@@ -429,11 +438,17 @@ def compare_with_assumed(calendar: SessionCalendar, assumed) -> dict[str, Any]:
         day = date.fromisoformat(key)
         if not entry.ticks or assumed.is_full_trading_day(day):
             continue
-        (weekend_open if assumed.is_trading_day(day) else unexpected).append(key)
+        if assumed.is_trading_day(day):
+            weekend_open.append(key)
+        elif assumed.is_holiday(day):
+            holiday_thin.append(key)
+        else:
+            unexpected.append(key)
 
     return {
         "silent_but_expected": sorted(silent),
         "weekend_open": sorted(weekend_open),
+        "holiday_thin": sorted(holiday_thin),
         "unexpected_active": sorted(unexpected),
         "partial_days": calendar.partial_days(),
     }
