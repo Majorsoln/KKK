@@ -756,7 +756,7 @@ def cmd_r0_summary(args: argparse.Namespace) -> int:
     print(
         "\nSahihi ya T1 (baada ya kupitia):\n"
         f"  scripts\\sign.bat DF-05 VERIFIED --evidence {out_dir / 'quality_report.json'} "
-        '--reason "..."'
+        '--reason "<namba ulizoziona, na kwa nini zinatosha>"'
     )
     return 0 if attention == 0 else 1
 

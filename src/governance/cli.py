@@ -1,6 +1,6 @@
 """CLI ya usimamizi — sahihi ya PD (§0 ya IMPLEMENTATION_PLAN).
 
-    python -m src.governance.cli sign DF-05 VERIFIED --evidence <faili> --reason "..."
+    python -m src.governance.cli sign DF-05 VERIFIED --evidence <faili> --reason "<ulichokiona>"
     python -m src.governance.cli verify          # lango G14 (CI)
     python -m src.governance.cli pending         # ni nini kinasubiri sahihi yangu?
     python -m src.governance.cli show            # sahihi zote zilizowekwa
@@ -36,6 +36,25 @@ def cmd_sign(args: argparse.Namespace) -> int:
     root = _repo_root()
     from src.data.config import load_config
     from src.data.manifest import code_rev
+
+    # SABABU NDIYO SAHIHI YENYEWE. Namba, muda na hash zinathibitisha KWAMBA
+    # mtu alisaini; sababu peke yake ndiyo inayosema **alichokiona**. Mstari
+    # wa `...` unapita lango G14 (sababu si tupu) na hauambii kizazi kijacho
+    # chochote — ni mhuri, si ukaguzi. Alama hiyo ya mfano ilikuwa kwenye
+    # msaada wangu mwenyewe, na PD aliinakili; kuikataa hapa ni haki.
+    if not any(ch.isalnum() for ch in args.reason):
+        print(
+            f'sababu `{args.reason}` haina neno hata moja — ni alama ya mfano, si ukaguzi.\n'
+            "Andika ULICHOKIONA kwenye ushahidi: namba zenyewe na kwa nini zinatosha.",
+            file=sys.stderr,
+        )
+        return 2
+    if args.decision == "VERIFIED" and len(args.reason.strip()) < 20:
+        print(
+            f"ONYO: sababu ya VERIFIED ina herufi {len(args.reason.strip())} pekee. "
+            "Mtu wa mwaka ujao ataisoma bila kumbukumbu yako.",
+            file=sys.stderr,
+        )
 
     try:
         config_hash = load_config(args.config).config_hash

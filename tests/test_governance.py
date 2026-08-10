@@ -207,6 +207,22 @@ def test_mtekelezaji_hawezi_kujisainia_verified(ledger, evidence):
     assert "DF-06" not in report.verified_items, "hadhi haipandi kwa sahihi isiyo halali"
 
 
+def test_sababu_ya_alama_ya_mfano_inakataliwa(tmp_path, capsys):
+    """`--reason "..."` inapita G14 (si tupu) na haisemi chochote.
+
+    Namba, muda na hash zinathibitisha KWAMBA mtu alisaini; sababu peke yake
+    ndiyo inayosema **alichokiona**. Alama ya mfano ilikuwa kwenye msaada
+    wangu mwenyewe, kwa hiyo PD aliinakili — 2026-08-10.
+    """
+    from src.governance.cli import main
+
+    ushahidi = tmp_path / "quality_report.json"
+    ushahidi.write_text("{}", encoding="utf-8")
+    rc = main(["sign", "DF-05", "VERIFIED", "--evidence", str(ushahidi), "--reason", "..."])
+    assert rc == 2
+    assert "alama ya mfano" in capsys.readouterr().err
+
+
 # ===========================================================================
 # Utambulisho: barua pepe ndiyo mamlaka, jina ni mapambo (PD 2026-08-09)
 # ===========================================================================
