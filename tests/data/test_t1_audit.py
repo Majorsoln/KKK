@@ -490,6 +490,26 @@ def test_r0_summary_inaonyesha_vipande_vilivyounganishwa(cfg, l0_root, tmp_path,
     assert "nakala:" in printed
 
 
+def test_sentinel_inaacha_ushahidi_wa_kushikiliwa(cfg, tmp_path):
+    """Lango la G1 lazima liache artifact — sahihi haiwezi kushikilia mstari.
+
+    2026-08-10: sahihi #9 (DF-08) ilielekeza `splits.json` kwa sababu sentinel
+    ilikuwa inachapisha mstari mmoja na kutoweka. SHA256 ya sahihi ilikuwa
+    inashikilia faili lisilohusika — kinga kubwa kuliko zote bila ushahidi.
+    """
+    from src.data.cli import main
+
+    out = tmp_path / "sentinel.json"
+    rc = main(["sentinel", "--synthetic", "--points", "60", "--out", str(out)])
+    assert rc == 0
+
+    payload = json.loads(out.read_text(encoding="utf-8"))
+    assert payload["passed"] is True and payload["leaked"] == 0
+    assert payload["points"] > 0 and payload["features"] > 0
+    # Ushahidi lazima ujitambulishe: code_rev + config_hash + muda.
+    assert payload["code_rev"] and payload["config_hash"] and payload["built_at"]
+
+
 def test_r0_summary_inakataa_bila_ripoti(cfg, tmp_path, capsys):
     from src.data.cli import main
 

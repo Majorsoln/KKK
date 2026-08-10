@@ -63,7 +63,7 @@ echo === 4/6  L2 — bars za TF 7 kutoka ticks (DF-06) ===
 python -m src.data.cli build-l2 %SYMS% 2>&1 | powershell -NoProfile -Command "$input | Tee-Object -Append '%LOG%'"
 
 echo === 5/6  SENTINEL + SPLITS — malango G1 na G2 (DF-08, DF-14) ===
-python -m src.data.cli sentinel 2>&1 | powershell -NoProfile -Command "$input | Tee-Object -Append '%LOG%'"
+python -m src.data.cli sentinel --out research\reports\quality\sentinel.json 2>&1 | powershell -NoProfile -Command "$input | Tee-Object -Append '%LOG%'"
 python -m src.data.cli splits --out research\reports\quality\splits.json 2>&1 | powershell -NoProfile -Command "$input | Tee-Object -Append '%LOG%'"
 
 echo(

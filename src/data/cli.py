@@ -991,6 +991,38 @@ def cmd_sentinel(args: argparse.Namespace) -> int:
     print(f"{label} · {result.summary()}")
     for item in result.leaked[:10]:
         print(f"  ! {item['feature']} @ {item['decision_time']}", file=sys.stderr)
+
+    # SENTINEL LAZIMA IACHE ALAMA. Ni lango la G1 — kinga kuu dhidi ya uvujaji —
+    # lakini ilikuwa inachapisha mstari mmoja na kutoweka. Sahihi ya `VERIFIED`
+    # inahitaji faili la kushikilia SHA256 yake; bila artifact, sahihi
+    # ingelazimika kuelekeza faili lisilohusika (2026-08-10, sahihi #9).
+    if args.out:
+        from datetime import datetime, timezone
+
+        from .manifest import code_rev
+
+        out = Path(args.out).expanduser()
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text(
+            json.dumps(
+                {
+                    "built_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+                    "code_rev": code_rev(),
+                    "config_hash": getattr(cfg, "config_hash", ""),
+                    "source": label,
+                    "timeframes": timeframes,
+                    "points": result.checked_points,
+                    "features": result.features,
+                    "leaked": len(result.leaked),
+                    "passed": result.passed,
+                    "detail": result.leaked[:50],
+                },
+                indent=2,
+                default=str,
+            ),
+            encoding="utf-8",
+        )
+        print(f"ushahidi: {out}")
     return 0 if result.passed else 1
 
 
@@ -1301,6 +1333,10 @@ def build_parser() -> argparse.ArgumentParser:
         "--synthetic",
         action="store_true",
         help="data ya kutengeneza badala ya L2 — lango la CI linalofanya kazi bila storage",
+    )
+    p_sent.add_argument(
+        "--out",
+        help="andika ushahidi (sentinel.json) — sahihi ya VERIFIED inahitaji faili la kushikilia",
     )
     p_sent.set_defaults(func=cmd_sentinel)
 
