@@ -612,13 +612,22 @@ def merge_split_days(report: "QualityReport", calendar=None, tolerance_minutes: 
 
     Inarudisha idadi ya vipande vilivyounganishwa (vilivyoondolewa).
     """
-    index: dict[tuple[str, str], list[tuple[PartitionQuality, DayQuality]]] = {}
+    # PROVENANCE IKO KWENYE UFUNGUO. Siku inagawanywa kati ya faili mbili za
+    # CHANZO KIMOJA (miezi miwili mfululizo). Aggregator na broker wakiwa na
+    # siku ile ile — ndivyo ilivyo kwenye siku 5 zinazopishana (§2.2) — hizo ni
+    # **vipimo viwili huru vya siku moja**, si nusu mbili. Kuviunganisha
+    # kungejumlisha dakika za vyanzo viwili (coverage 2.0), kungefuta kimoja
+    # kwenye ripoti, na kungeondoa uwezekano wa kuvilinganisha — ambao ndio
+    # msingi wa swali kubwa la R0. Alama yake ilikuwa `coverage max = 2.0084`.
+    index: dict[tuple[str, str, str], list[tuple[PartitionQuality, DayQuality]]] = {}
     for part in report.partitions:
         for day in part.days:
-            index.setdefault((str(part.symbol), day.day), []).append((part, day))
+            index.setdefault((str(part.symbol), str(part.provenance), day.day), []).append(
+                (part, day)
+            )
 
     merged = 0
-    for (symbol, day_key), pieces in index.items():
+    for (symbol, _provenance, day_key), pieces in index.items():
         if len(pieces) < 2:
             continue
         # Siku iliyotolewa nje na PD haihukumiwi; kuunganisha kungeirudisha.

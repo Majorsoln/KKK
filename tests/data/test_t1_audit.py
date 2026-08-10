@@ -673,6 +673,57 @@ def test_kuunganisha_kunavumilia_precision_mbili_kwenye_siku_moja(cfg, l0_root):
     assert [c.name for c in moja.checks].count("session_match") == 1
 
 
+def test_vyanzo_viwili_vya_siku_moja_havichanganywi(cfg, l0_root):
+    """Aggregator na broker wenye siku ile ile ni vipimo VIWILI HURU.
+
+    Si nusu mbili za siku moja. Kuviunganisha kungejumlisha dakika za vyanzo
+    viwili — alama yake ilikuwa `coverage max = 2.0084` kwenye data halisi —
+    kungefuta kimoja kwenye ripoti, na kungeondoa uwezekano wa
+    kuvilinganisha, ambao ndio msingi wa swali kubwa la R0 (§2.2).
+    """
+    def siku(day: date) -> pd.DataFrame:
+        stamps = pd.date_range(
+            datetime(day.year, day.month, day.day, tzinfo=timezone.utc),
+            periods=1440,
+            freq="1min",
+            tz="UTC",
+        )
+        bid = pd.Series([2400.0 + (i % 50) * 0.01 for i in range(1440)])
+        return pd.DataFrame(
+            {
+                "timestamp": stamps.astype("datetime64[us, UTC]"),
+                "bid": bid.values,
+                "ask": (bid + 0.01).values,
+                "bid_vol": [1.0] * 1440,
+                "ask_vol": [2.0] * 1440,
+            }
+        )
+
+    pamoja = pd.concat([siku(date(2026, 8, d)) for d in (3, 4)])
+    for chanzo in ("aggregator", "broker"):
+        path = l0_root / f"provenance={chanzo}" / "symbol=XAUUSD" / "2026-08.parquet"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        pd.DataFrame(
+            {
+                "ts": (pamoja["timestamp"].astype("int64") // 1000).values,
+                "bid": pamoja["bid"].values,
+                "ask": pamoja["ask"].values,
+                "bid_volume": pamoja["bid_vol"].values,
+                "ask_volume": pamoja["ask_vol"].values,
+            }
+        ).to_parquet(path, index=False)
+
+    calendar = build_session_calendar(cfg, l0_root).calendar
+    report = run_quality_audit(cfg, l0_root, calendar=calendar, symbols=["XAUUSD"])
+
+    assert report.split_days_merged == 0, "vyanzo viwili si vipande viwili"
+    assert report.total_days == 4, "siku 2 x vyanzo 2 — zote zinabaki"
+    kwa_siku = [d for part in report.partitions for d in part.days if d.day == "2026-08-03"]
+    assert len(kwa_siku) == 2
+    for d in kwa_siku:
+        assert d.observed_minutes == 1440, "dakika HAZIJAJUMLISHWA kati ya vyanzo"
+
+
 def test_siku_isiyogawanywa_haiguswi(cfg, l0_tree):
     """Toleo A linaandika kwa SIKU — hakuna cha kuunganisha, na hakuna kinachobadilika."""
     calendar = build_session_calendar(cfg, l0_tree).calendar
