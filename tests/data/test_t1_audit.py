@@ -467,6 +467,29 @@ def test_r0_summary_inasoma_ripoti_bila_kuhesabu_upya(cfg, l0_tree, tmp_path, ca
     assert rc == 1, "siku 4 si miaka 10 — inahitaji uamuzi wa PD"
 
 
+def test_r0_summary_inaonyesha_vipande_vilivyounganishwa(cfg, l0_root, tmp_path, capsys):
+    """Namba iliyopo kwenye ripoti lakini isiyoonekana ni sawa na isiyokuwepo.
+
+    Kipimo cha 2026-08-10: mstari uliongezwa kwenye `rows` BAADA ya jedwali
+    kuchapishwa, kwa hiyo haukuonekana kamwe — na namba niliyokuwa
+    naiomba haikufika kwa PD.
+    """
+    from src.data.cli import main
+
+    _split_day_tree(l0_root)
+    out_dir = tmp_path / "quality"
+    build = build_session_calendar(cfg, l0_root)
+    build.calendar.save(out_dir / "session_calendar.json")
+    report = run_quality_audit(cfg, l0_root, calendar=build.calendar, symbols=["XAUUSD"])
+    assert report.split_days_merged == 1
+    report.save(out_dir / "quality_report.json")
+
+    main(["r0-summary", "--out-dir", str(out_dir)])
+    printed = capsys.readouterr().out
+    assert "vipande vya siku vilivyounganishwa" in printed
+    assert "nakala:" in printed
+
+
 def test_r0_summary_inakataa_bila_ripoti(cfg, tmp_path, capsys):
     from src.data.cli import main
 
