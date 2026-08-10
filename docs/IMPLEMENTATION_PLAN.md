@@ -642,9 +642,33 @@ kwenye siku moja, faili zinazopishana, vyanzo viwili vya siku moja). Pia: ripoti
 ya toleo la code** na `code_rev`, kwa sababu ripoti ya code ya zamani inaonekana sawa kabisa na ya
 mpya — hilo lilipoteza saa nane tarehe 2026-08-09.
 
-**Kinachofuata:** PD kupitia `reports/quality/` → sahihi ya exit ya T1 (DF-05/06/07/08/14, RS-03
-→ VERIFIED, zikiwa na `--evidence quality_report.json`). Kinachobaki wazi: Jumamosi/sikukuu
-**16** zenye ticks.
+**Swali la mwisho lililokuwa wazi, limejibiwa (2026-08-10).** Siku 16 zilizoripotiwa `INAHITAJI
+MAELEZO` zilikuwa **zote 16** ni 25 Desemba (9) au 1 Januari (7). Soko la FX halifungwi siku hizo;
+linabaki wazi likiwa jembamba. Dhana ya kalenda ndiyo ilikuwa mbaya, si data. Baada ya kutenganisha
+`holiday_thin` na `unexpected_active`, swali halisi limepata jibu lake: **Jumamosi zenye ticks =
+0.**
+
+**HALI YA MWISHO YA R0 — vigezo vyote:**
+
+| Kigezo cha §R0 | Namba | |
+|---|---|---|
+| siku zilizopita §3 | **33,440 / 34,781 (96.1%)** | — |
+| miaka ≥ `min_years` (10) | ndogo kuliko zote **10.6** · zilizopungua 0 | PASS |
+| siku zilizotarajiwa bila data | **0** | PASS |
+| Jumamosi zenye ticks | **0** | PASS |
+| sikukuu zenye ticks (25 Des / 1 Jan) | 16 — soko jembamba | — |
+| Toleo A ↔ B: schema moja | **True** | PASS |
+| spread broker ÷ aggregator | **1.0** kwa siku 5 | PASS |
+| `clock_drift` | p1…p99 = **0.0**, max 0.0 | PASS |
+| kufeli zote saba za §3 | ≤ 0.72% kila moja | PASS |
+
+`vinavyohitaji uamuzi wako: 1` — na hicho ni `excluded_by_pd` (912), uamuzi wa PD mwenyewe
+uliokwishasainiwa (#3). Hakuna kigezo cha R0 kilichobaki bila jibu.
+
+`config_hash` `sha256:8110cb5bd` · `code_rev` `58e6f74` · ripoti `2026-08-10T21:18:02Z`.
+
+**T1 imekamilika.** Kinachofuata: sahihi ya exit (DF-05/06/07/08/14, RS-03 → VERIFIED, zikiwa na
+`--evidence quality_report.json`), kisha T2 (L3 features + L4 labels).
 
 ---
 
