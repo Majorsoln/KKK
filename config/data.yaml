@@ -150,12 +150,22 @@ features:
 setups:
   rule_id:             "SETUP-v1"       # inaingia dataset_id — kubadilisha = dataset MPYA
   spread_gate_mult:    1.5              # spread_p50 ya bar <= hii x median ya symbol/mwezi
+  # "Mwezi" wa spread gate ni dirisha la NYUMA la bars za H1 (~siku 22 za
+  # trading x 24). Median ya mwezi wa KALENDA ingejumuisha bars za BAADAYE za
+  # mwezi ule ule — uvujaji ambao sentinel ingeukamata. Rolling ya nyuma pekee.
+  spread_median_window_bars: 528
   atr_band_pct:        [0.20, 0.95]     # ATR14 ndani ya percentile band ya rolling
   atr_band_window_months: 6
   trigger:
     kind:              "momentum_impulse"
     lookback_bars:     4                # |close - close[k]| ...
     min_atr_mult:      1.0              # ... >= hii x ATR14
+    # MWELEKEO wa trade unatoka kwenye ISHARA ya impulse ile ile: close >
+    # close[k] -> BUY, chini -> SELL. Labels (§5) zinahitaji upande, na §4.3
+    # haikuutaja — sheria yoyote nyingine ingekuwa hukumu isiyo mechanical.
+    # Control bars (§4.3 sheria 3) hazina impulse ya kutosha lakini ishara
+    # ile ile ndogo inatumika — mechanical, point-in-time, bila upendeleo.
+    direction:         "impulse_sign"
   target_rate:         0.05             # kutuna kufikia RATE inaruhusiwa KABLA ya labels (§4.3)
   control_sample_frac: 0.10             # bars zisizo setup zinazopata labels (is_control=true)
   control_seed:        20260807         # nasibu inayozalishika upya

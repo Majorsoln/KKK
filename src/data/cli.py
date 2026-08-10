@@ -1042,6 +1042,87 @@ def _reference_features(bars_by_tf, t):
     return out
 
 
+def cmd_detect_setups(args: argparse.Namespace) -> int:
+    """DF-20 — SETUP-v1 juu ya bars za H1 za L2 (spec §4.3).
+
+    Hii ndiyo hatua ya PRE-REGISTRATION: rate inaonekana HAPA, kabla ya label
+    yoyote. Kutuna vigezo kufikia ~5% kunaruhusiwa sasa (§4.3 sheria 2);
+    baada ya labels, kutuna kwa lolote ni selection leakage.
+    """
+    cfg = _load(args)
+    from datetime import datetime, timezone
+
+    from .bars import read_bars
+    from .manifest import code_rev
+    from .setups import SETUP_SCHEMA_VERSION, detect_setups
+    from .splits import SplitPlan
+
+    symbols = _symbol_list(args) or cfg.symbols
+    holdout_start = SplitPlan.from_config(cfg).holdout_start
+    out_root = cfg.research_root / "data" / "L4_labels" / "setups"
+
+    per_symbol: dict[str, dict] = {}
+    pooled_setups = pooled_eligible = pooled_holdout = 0
+    for symbol in symbols:
+        try:
+            bars = read_bars(cfg.l2_root, symbol, "H1")
+        except FileNotFoundError:
+            print(f"{symbol}: bars za H1 hazipo — `build-l2` kwanza", file=sys.stderr)
+            return 2
+        result = detect_setups(cfg, bars, symbol)
+        frame = result.frame
+
+        # G2: decision points za HOLDOUT zinawekwa alama SASA — mjenzi wa
+        # labels anazikataa. Kuchuja hapa kungeficha ukubwa wa holdout.
+        frame["in_holdout"] = frame["decision_time"].dt.date >= holdout_start
+        n_holdout = int((frame["is_setup"] & frame["in_holdout"]).sum())
+
+        path = out_root / f"symbol={symbol}" / "setups.parquet"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        frame.to_parquet(path)
+
+        per_symbol[symbol] = {**result.stats, "setups_holdout": n_holdout}
+        pooled_setups += result.stats["setups"] - n_holdout
+        pooled_eligible += result.stats["eligible"]
+        pooled_holdout += n_holdout
+        print(result.render() + f" · holdout {n_holdout}")
+
+    target = float(cfg.get("setups.target_rate"))
+    pooled_rate = pooled_setups / pooled_eligible if pooled_eligible else 0.0
+    summary = {
+        "rule_id": str(cfg.get("setups.rule_id")),
+        "schema": SETUP_SCHEMA_VERSION,
+        "built_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "config_hash": cfg.config_hash,
+        "code_rev": code_rev(),
+        "holdout_start": holdout_start.isoformat(),
+        "target_rate": target,
+        "pooled_rate_train_val": pooled_rate,
+        "pooled_setups_train_val": pooled_setups,
+        "pooled_setups_holdout": pooled_holdout,
+        "per_symbol": per_symbol,
+    }
+    report_path = cfg.path_of("storage.reports_root") / "r1" / "setup_rates.json"
+    report_path.parent.mkdir(parents=True, exist_ok=True)
+    report_path.write_text(json.dumps(summary, indent=2), encoding="utf-8")
+
+    print(
+        f"\npooled (TRAIN+VAL): setups {pooled_setups} / eligible {pooled_eligible} "
+        f"= {pooled_rate:.2%} · lengo ~{target:.0%} · holdout (zimetengwa) {pooled_holdout}"
+    )
+    print(f"ushahidi: {report_path}")
+    # Rate iliyo mbali mara mbili na lengo ni dalili ya vigezo vibaya — ONYO,
+    # si kizuizi: PD ndiye anayeamua kutuna (kabla ya labels) au kukubali.
+    if pooled_rate > 2 * target or pooled_rate < target / 2:
+        print(
+            f"ONYO: rate {pooled_rate:.2%} iko mbali na lengo {target:.0%} — "
+            "tuna vigezo vya config (§4.3 inaruhusu KABLA ya labels), au kubali kwa maandishi.",
+            file=sys.stderr,
+        )
+        return 1
+    return 0
+
+
 def cmd_splits(args: argparse.Namespace) -> int:
     """DF-14 / lango G2 — mpango wa splits kutoka config PEKEE (spec §7)."""
     cfg = _load(args)
@@ -1339,6 +1420,14 @@ def build_parser() -> argparse.ArgumentParser:
         help="andika ushahidi (sentinel.json) — sahihi ya VERIFIED inahitaji faili la kushikilia",
     )
     p_sent.set_defaults(func=cmd_sentinel)
+
+    p_setups = subparsers.add_parser(
+        "detect-setups",
+        help="DF-20 — SETUP-v1: decision points + control (§4.3) — KABLA ya labels",
+        parents=[common],
+    )
+    p_setups.add_argument("--symbols", help="orodha ya symbols, comma separated")
+    p_setups.set_defaults(func=cmd_detect_setups)
 
     p_split = subparsers.add_parser(
         "splits", help="DF-14 / G2 — mpango wa splits + holdout guard (§7)", parents=[common]
