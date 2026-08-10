@@ -601,8 +601,50 @@ kutolewa nje ni sahihi kabisa: denominator ya `gaps` = 34,089 = 35,025 − 936 k
    kwenye kalenda (sikukuu za COMEX / kufunga mapema), si kasoro ya data.
 4. Jumamosi/sikukuu zenye ticks: **16**.
 
+**Kipimo cha nne — cha mwisho (2026-08-10).** Vipengele vinne vya kipimo cha tatu vilikuwa vibaya,
+vyote kwa upande wa **kitengo cha hukumu**, si data. Kila kimoja kilianikwa na namba isiyowezekana,
+si na nadhani:
+
+| Kilichoonekana | Kilichokuwa kimeharibika | Jibu |
+|---|---|---|
+| `session_mismatch` = 21 kwa mwaka, kila mwaka, kwa Toleo B pekee | Toleo B linakata mwezi saa **05:00 UTC**; tarehe 1 iko nusu kwenye kila faili. Mistari **miwili kwa tarehe ile ile**: `close ±1140` na `open ±300` — `1140 + 300 = 1440` | vipande vinaunganishwa kabla ya kuhukumiwa |
+| `clock_drift` p50 = **−171,679,765 s** | Ilikuwa inalinganisha tick ya mwisho na `now()` — umri wa faili, si ubora. Haikuweza kufeli kimuundo | inapima tick iliyo nje ya siku yake. Sasa: `p1…p99 = 0.0`, max `0.0` |
+| `coverage max` = **2.0084** | Ufunguo wa kuunganisha ulikuwa `(symbol, day)` bila provenance — aggregator na broker walichanganywa | provenance kwenye ufunguo → siku **51** zilirudi |
+| `coverage max` = **2.0028** (bado) | Kujumlisha kunadhani vipande **havipishani**. Faili mbili zenye siku ile ile ni **nakala**, si nusu | muda wa kipande unatofautisha: vinavyofuatana vinajumlishwa, vinavyopishana vinachukua `max` → **1.2018** |
+
+Matokeo ya mwisho: **33,440 / 34,781 siku (96.1%)** · `code_rev` `bbfcfdf` · `config_hash`
+`sha256:8110cb5bd`.
+
+| kufeli | siku | % |
+|---|---|---|
+| `excluded_by_pd` (uamuzi wa PD) | 912 | 2.62 |
+| `low_coverage` | 250 | 0.72 |
+| `stale_feed` | 213 | 0.61 |
+| `intrasession_gap` | 178 | 0.51 |
+| `session_mismatch` | 131 | 0.38 |
+| `bad_timestamps` | 33 | 0.09 |
+| `quote_violation` | 6 | 0.02 |
+
+Hesabu inafungika kila upande: `35,025 − 244 = 34,781` (vipande vya siku vilivyounganishwa), na
+`295 − 51 = 244` (vipande vya kweli baada ya kutoa nakala za provenance). `session_mismatch`
+imeshuka **568 → 131** bila kizingiti chake kuguswa hata mara moja.
+
+**Nakala: 1.** Siku **moja** pekee kati ya 34,781 ina data inayojirudia kwenye faili mbili. Hilo
+lina athari moja inayojulikana: `build_l2` haiondoi nakala, kwa hiyo `n_ticks` ya siku hiyo ni
+mara mbili (OHLC, `spread_*` na `n_m1_bars` hazibadiliki — nakala kamili ina median, max na
+mean zile zile). Siku 1 kati ya 34,781 = **0.003%**; kujenga upya bars (~saa 5) kwa ajili yake
+si biashara nzuri. Imeandikwa, haijafichwa.
+
+**Kilichojifunzwa (LESSON, si kasoro).** Kila moja ya kasoro nne ilipita tests zote na kuonekana
+tu kwenye data halisi, kwa sababu data ya majaribio ilikuwa **safi kupita kiasi**: precision moja,
+faili zisizopishana, chanzo kimoja. Tests sasa zinabeba data chafu kwa makusudi (precision mbili
+kwenye siku moja, faili zinazopishana, vyanzo viwili vya siku moja). Pia: ripoti inapigwa **chapa
+ya toleo la code** na `code_rev`, kwa sababu ripoti ya code ya zamani inaonekana sawa kabisa na ya
+mpya — hilo lilipoteza saa nane tarehe 2026-08-09.
+
 **Kinachofuata:** PD kupitia `reports/quality/` → sahihi ya exit ya T1 (DF-05/06/07/08/14, RS-03
-→ VERIFIED, zikiwa na `--evidence quality_report.json`).
+→ VERIFIED, zikiwa na `--evidence quality_report.json`). Kinachobaki wazi: Jumamosi/sikukuu
+**16** zenye ticks.
 
 ---
 
