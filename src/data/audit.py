@@ -326,7 +326,7 @@ def run_quality_audit(
     # kazi ya kukusanya. Hivyo `--resume` inabaki salama.
     from .quality import merge_split_days
 
-    report.split_days_merged = merge_split_days(
+    report.split_days_merged, report.overlapping_days = merge_split_days(
         report, calendar, float(cfg.get("quality.session_tolerance_minutes", 15))
     )
 

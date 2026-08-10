@@ -610,7 +610,10 @@ def merge_split_days(report: "QualityReport", calendar=None, tolerance_minutes: 
     (`gaps`, `monotonicity`, `quote_sanity`, `stale_feed`) zinabaki za kila
     kipande — kasoro ndani ya nusu moja ni kasoro ya siku nzima.
 
-    Inarudisha idadi ya vipande vilivyounganishwa (vilivyoondolewa).
+    Inarudisha `(vilivyounganishwa, vinavyopishana)` — cha pili ni siku ambazo
+    faili mbili zina data ILE ILE, si nusu mbili. Hiyo si hukumu bali kipimo:
+    chanzo kinachojirudia kinaathiri pia `n_ticks` za L2, kwa hiyo namba yake
+    lazima ionekane badala ya kufichwa.
     """
     # PROVENANCE IKO KWENYE UFUNGUO. Siku inagawanywa kati ya faili mbili za
     # CHANZO KIMOJA (miezi miwili mfululizo). Aggregator na broker wakiwa na
@@ -627,6 +630,7 @@ def merge_split_days(report: "QualityReport", calendar=None, tolerance_minutes: 
             )
 
     merged = 0
+    overlapping = 0
     for (symbol, _provenance, day_key), pieces in index.items():
         if len(pieces) < 2:
             continue
@@ -638,7 +642,27 @@ def merge_split_days(report: "QualityReport", calendar=None, tolerance_minutes: 
             continue
 
         keeper = pieces[0][1]
-        keeper.observed_minutes = sum(d.observed_minutes for _, d in pieces)
+        # KUJUMLISHA KUNADHANI VIPANDE HAVIPISHANI. Kipimo cha 2026-08-10
+        # kilionyesha `coverage max = 2.0028` — siku yenye dakika MARA MBILI
+        # ya zinazotarajiwa, jambo lisilowezekana. Maana yake faili mbili si
+        # nusu mbili za siku bali zina siku ile ile IKIJIRUDIA. Kujumlisha
+        # hapo ni kuhesabu dakika ile ile mara mbili.
+        #
+        # Muda wa kila kipande unatuambia lipi ni lipi: vipande vinavyofuatana
+        # (`last` ya kwanza < `first` ya pili) ni nusu za kweli, zinajumlishwa;
+        # vinavyopishana ni nakala, na `max` ndiyo jibu la chini kabisa la
+        # kuaminika (muungano hauwezi kuwa chini ya kipande kikubwa zaidi).
+        spans = sorted(
+            ((d.first_ts, d.last_ts) for _, d in pieces if d.first_ts and d.last_ts)
+        )
+        inapishana = any(
+            spans[i][1] >= spans[i + 1][0] for i in range(len(spans) - 1)
+        )
+        if inapishana:
+            overlapping += 1
+            keeper.observed_minutes = max(d.observed_minutes for _, d in pieces)
+        else:
+            keeper.observed_minutes = sum(d.observed_minutes for _, d in pieces)
         keeper.expected_minutes = max(d.expected_minutes for _, d in pieces)
         stamps = [d.first_ts for _, d in pieces if d.first_ts] + [
             d.last_ts for _, d in pieces if d.last_ts
@@ -684,7 +708,7 @@ def merge_split_days(report: "QualityReport", calendar=None, tolerance_minutes: 
             part.days.remove(dayq)
             merged += 1
 
-    return merged
+    return merged, overlapping
 
 
 FAIL_EXCLUDED_BY_PD = "excluded_by_pd"
@@ -780,6 +804,7 @@ class QualityReport:
     thresholds: dict[str, Any] = field(default_factory=dict)
     calendar_comparison: dict[str, Any] = field(default_factory=dict)
     split_days_merged: int = 0
+    overlapping_days: int = 0
     code_rev: str = ""
     coverage_by_symbol: dict[str, Any] = field(default_factory=dict)
 
@@ -865,6 +890,9 @@ class QualityReport:
                 # vilivyounganishwa kabla ya kuhesabu (§3). Sifuri = hakuna
                 # partition inayokatiza siku; namba kubwa = Toleo B lipo.
                 "split_day_pieces_merged": self.split_days_merged,
+                # Kati ya hivyo, vingapi vilikuwa NAKALA (faili mbili zenye
+                # data ile ile) badala ya nusu mbili. Kipimo, si hukumu.
+                "overlapping_day_pieces": self.overlapping_days,
             },
             "fail_reasons": self.reason_counts(),
             "by_symbol_year": self.by_symbol_year(),

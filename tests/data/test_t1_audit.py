@@ -673,6 +673,52 @@ def test_kuunganisha_kunavumilia_precision_mbili_kwenye_siku_moja(cfg, l0_root):
     assert [c.name for c in moja.checks].count("session_match") == 1
 
 
+def test_faili_mbili_zenye_siku_ILE_ILE_hazijumlishwi(cfg, l0_root):
+    """Nusu mbili zinajumlishwa; NAKALA mbili haziwezi kujumlishwa.
+
+    Kipimo cha 2026-08-10 kilionyesha `coverage max = 2.0028` — siku yenye
+    dakika MARA MBILI ya zinazotarajiwa, jambo lisilowezekana. Maana yake
+    faili mbili zina siku ile ile ikijirudia, si nusu mbili. Muda wa kila
+    kipande ndio unaotofautisha: vinavyofuatana ni nusu, vinavyopishana ni
+    nakala.
+    """
+    def ticks(start: datetime, minutes: int) -> pd.DataFrame:
+        stamps = pd.date_range(start, periods=minutes, freq="1min", tz="UTC")
+        bid = pd.Series([2400.0 + (i % 50) * 0.01 for i in range(minutes)])
+        return pd.DataFrame(
+            {
+                "timestamp": stamps.astype("datetime64[us, UTC]"),
+                "bid": bid.values,
+                "ask": (bid + 0.01).values,
+                "bid_vol": [1.0] * minutes,
+                "ask_vol": [2.0] * minutes,
+            }
+        )
+
+    # Faili zote MBILI zina 2026-08-01 nzima — chanzo kinajirudia.
+    nzima = ticks(datetime(2026, 8, 1, 0, 0, tzinfo=timezone.utc), 1440)
+    _b_partition(
+        l0_root, "XAUUSD", "2026-07.parquet",
+        pd.concat([ticks(datetime(2026, 7, 31, tzinfo=timezone.utc), 1440), nzima]),
+    )
+    _b_partition(
+        l0_root, "XAUUSD", "2026-08.parquet",
+        pd.concat([nzima, ticks(datetime(2026, 8, 2, tzinfo=timezone.utc), 1440)]),
+    )
+
+    calendar = build_session_calendar(cfg, l0_root).calendar
+    report = run_quality_audit(cfg, l0_root, calendar=calendar, symbols=["XAUUSD"])
+
+    assert report.split_days_merged == 1
+    assert report.overlapping_days == 1, "nakala inatambulika na kuhesabiwa"
+    moja = next(
+        d for part in report.partitions for d in part.days if d.day == "2026-08-01"
+    )
+    assert moja.observed_minutes == 1440, "dakika 1440, si 2880"
+    coverage = next(c for c in moja.checks if c.name == "coverage")
+    assert coverage.value is not None and coverage.value <= 1.0
+
+
 def test_vyanzo_viwili_vya_siku_moja_havichanganywi(cfg, l0_root):
     """Aggregator na broker wenye siku ile ile ni vipimo VIWILI HURU.
 

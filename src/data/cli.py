@@ -736,6 +736,14 @@ def cmd_r0_summary(args: argparse.Namespace) -> int:
     for kigezo, namba, mark in rows:
         print(f"  {kigezo:<{width}}  {namba:<34}  {mark}")
     print(f"\nvinavyohitaji uamuzi wako: {attention}")
+    totals_extra = quality.get("totals", {})
+    if totals_extra.get("split_day_pieces_merged"):
+        _add(
+            "  vipande vya siku vilivyounganishwa",
+            f"{totals_extra['split_day_pieces_merged']} "
+            f"(nakala: {totals_extra.get('overlapping_day_pieces', 0)})",
+            None,
+        )
     print(f"config_hash: {quality.get('config_hash', '')[:16]}")
     # Vizingiti NA code. Ripoti isiyosema code ilikuwa ipi haiwezi kuzalishwa
     # upya wala kukanushwa — na ndiyo ilivyoruhusu run ya code ya zamani
