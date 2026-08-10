@@ -655,8 +655,18 @@ def merge_split_days(report: "QualityReport", calendar=None, tolerance_minutes: 
             else None
         )
         if bounds and keeper.first_ts and keeper.last_ts:
+            # `format="ISO8601"` si mapambo. `isoformat()` inaacha sehemu ya
+            # sekunde ikiwa ni sifuri, kwa hiyo tick ya `00:00:00.070000` na ya
+            # `23:59:54` zinatoa maumbo MAWILI tofauti kwenye orodha ile ile.
+            # Bila hii, pandas inakisia umbo kutoka kwa kipengele cha KWANZA na
+            # kufeli kwa cha pili. Data ya majaribio ilikuwa na precision moja
+            # kila wakati; data halisi haina — na saa nane zilikwenda hapo.
             span = pd.DataFrame(
-                {"timestamp": pd.to_datetime([keeper.first_ts, keeper.last_ts], utc=True)}
+                {
+                    "timestamp": pd.to_datetime(
+                        [keeper.first_ts, keeper.last_ts], utc=True, format="ISO8601"
+                    )
+                }
             )
             keeper.checks.append(
                 check_session_match(span, bounds[0], bounds[1], tolerance_minutes, hour_step_ok=True)

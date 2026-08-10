@@ -621,6 +621,58 @@ def test_bila_kuunganisha_kila_kipande_kingefeli(cfg, l0_root):
     assert mkia.observed_minutes + kichwa.observed_minutes == 1440
 
 
+def test_kuunganisha_kunavumilia_precision_mbili_kwenye_siku_moja(cfg, l0_root):
+    """`isoformat()` inaacha sehemu ya sekunde ikiwa ni sifuri.
+
+    Tick ya `00:00:00.070000` na ya `23:59:54` zinatoa maumbo MAWILI tofauti.
+    Data ya majaribio ilikuwa na precision moja kila wakati, kwa hiyo hii
+    ilipita tests zote na kufeli kwenye data halisi:
+
+        ValueError: time data "2016-02-01T23:59:54+00:00" doesn't match
+        format "%Y-%m-%dT%H:%M:%S.%f%z"
+    """
+    def kipande(start: datetime, minutes: int, offset_us: int) -> pd.DataFrame:
+        stamps = pd.date_range(start, periods=minutes, freq="1min", tz="UTC") + pd.Timedelta(
+            microseconds=offset_us
+        )
+        bid = pd.Series([2400.0 + (i % 50) * 0.01 for i in range(minutes)])
+        return pd.DataFrame(
+            {
+                "timestamp": stamps.astype("datetime64[us, UTC]"),
+                "bid": bid.values,
+                "ask": (bid + 0.01).values,
+                "bid_vol": [1.0] * minutes,
+                "ask_vol": [2.0] * minutes,
+            }
+        )
+
+    # Mkia una µs (70000); kichwa hakina — hasa kama data halisi ilivyo.
+    julai = pd.concat(
+        [
+            kipande(datetime(2026, 7, 31, 0, 0, tzinfo=timezone.utc), 1440, 0),
+            kipande(datetime(2026, 8, 1, 0, 0, tzinfo=timezone.utc), 300, 70000),
+        ]
+    )
+    agosti = pd.concat(
+        [
+            kipande(datetime(2026, 8, 1, 5, 0, tzinfo=timezone.utc), 1140, 0),
+            kipande(datetime(2026, 8, 2, 0, 0, tzinfo=timezone.utc), 1440, 0),
+        ]
+    )
+    _b_partition(l0_root, "XAUUSD", "2026-07.parquet", julai)
+    _b_partition(l0_root, "XAUUSD", "2026-08.parquet", agosti)
+
+    calendar = build_session_calendar(cfg, l0_root).calendar
+    report = run_quality_audit(cfg, l0_root, calendar=calendar, symbols=["XAUUSD"])
+
+    assert report.split_days_merged == 1
+    moja = next(
+        d for part in report.partitions for d in part.days if d.day == "2026-08-01"
+    )
+    assert "." in moja.first_ts and moja.last_ts.endswith("+00:00")
+    assert [c.name for c in moja.checks].count("session_match") == 1
+
+
 def test_siku_isiyogawanywa_haiguswi(cfg, l0_tree):
     """Toleo A linaandika kwa SIKU — hakuna cha kuunganisha, na hakuna kinachobadilika."""
     calendar = build_session_calendar(cfg, l0_tree).calendar
