@@ -104,6 +104,16 @@ def _first_geq(prefix_max: np.ndarray, price: float) -> int:
     return int(np.searchsorted(prefix_max, price, side="left"))
 
 
+def epoch_us(stamps: pd.Series) -> np.ndarray:
+    """Timestamps → µs za epoch (int64).
+
+    Ulinganisho unafanyika kwa int64, si datetime64: timestamps za tz-aware
+    hazilinganishwi na numpy moja kwa moja (T2 ilianguka hapa siku ya kwanza),
+    na int64 ni sawa kwa matoleo yote mawili ya precision (§2.1).
+    """
+    return stamps.astype("datetime64[us, UTC]").astype("int64").to_numpy()
+
+
 def resolve_point(
     ticks: pd.DataFrame,
     decision_time: pd.Timestamp,
@@ -113,29 +123,56 @@ def resolve_point(
     sl_grid: list[float],
     tp_grid: list[float],
 ) -> PointLabels | None:
-    """Grid nzima ya barrier + L-A kwa decision point MOJA.
+    """Grid nzima ya barrier + L-A kwa decision point MOJA (njia ya DataFrame).
 
-    `ticks` ni schema ya kawaida (§2.1) yenye [decision_time, horizon_end] —
-    mpangilio thabiti (stable sort umeshafanyika tabaka la chini, §3).
-    Inarudisha None kama hakuna tick ndani ya dirisha (hakuna soko = hakuna
-    label; §5.5 inakataza data baada ya t+H, na kubuni entry ni marufuku).
+    Rahisi kusoma na kujaribu. Kwa kazi ya decision points 52,000 tumia
+    `resolve_arrays` — hii inabadilisha timestamps kuwa int64 **kila wito**,
+    ambayo ni O(n) juu ya buffer nzima; kwa buffer ya ticks milioni 13 na
+    points 4,400 hiyo peke yake ingekuwa siku, si masaa.
+    """
+    return resolve_arrays(
+        epoch_us(ticks["timestamp"]),
+        ticks["bid"].to_numpy(),
+        ticks["ask"].to_numpy(),
+        decision_time,
+        horizon_end,
+        direction,
+        atr_price,
+        sl_grid,
+        tp_grid,
+    )
+
+
+def resolve_arrays(
+    stamps: np.ndarray,
+    bid_all: np.ndarray,
+    ask_all: np.ndarray,
+    decision_time: pd.Timestamp,
+    horizon_end: pd.Timestamp,
+    direction: int,
+    atr_price: float,
+    sl_grid: list[float],
+    tp_grid: list[float],
+) -> PointLabels | None:
+    """Kiini: arrays zilizoshaandaliwa mara moja kwa buffer nzima.
+
+    `stamps` ni µs za epoch (`epoch_us`), zikiwa zimepangwa. Dirisha ni
+    `[decision_time, horizon_end]`; hakuna tick humo → None (hakuna soko =
+    hakuna label; §5.5 inakataza data baada ya t+H, na kubuni entry ni
+    marufuku).
     """
     if direction not in (1, -1):
         raise ValueError(f"direction lazima iwe +1/-1, si {direction!r}")
     if not atr_price or atr_price <= 0 or np.isnan(atr_price):
         return None
 
-    # Ulinganisho kwa µs za epoch — si datetime64. Timestamps za tz-aware
-    # hazilinganishwi na numpy moja kwa moja (T2 ilianguka hapa siku ya
-    # kwanza), na int64 ni sawa kwa matoleo yote mawili ya precision (§2.1).
-    stamps = ticks["timestamp"].astype("datetime64[us, UTC]").astype("int64").to_numpy()
     lo = int(np.searchsorted(stamps, pd.Timestamp(decision_time).value // 1_000, side="left"))
     hi = int(np.searchsorted(stamps, pd.Timestamp(horizon_end).value // 1_000, side="right"))
     if lo >= hi:
         return None
 
-    bid = ticks["bid"].to_numpy()[lo:hi]
-    ask = ticks["ask"].to_numpy()[lo:hi]
+    bid = bid_all[lo:hi]
+    ask = ask_all[lo:hi]
 
     entry_trade = float(ask[0] if direction == 1 else bid[0])
     entry_mid = float((bid[0] + ask[0]) / 2.0)

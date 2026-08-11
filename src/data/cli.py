@@ -23,6 +23,8 @@ T1 — ukaguzi wa R0 (mfuatano huu, si mwingine):
     python -m src.data.cli compare-variants   # RS-03 — Toleo A ↔ Toleo B baada ya normalization
     python -m src.data.cli compare-provenance # R0   — aggregator ↔ broker, siku zinazopishana
     python -m src.data.cli build-l2           # DF-06 — bars za TF 7 kutoka ticks
+    python -m src.data.cli detect-setups      # DF-20 — SETUP-v1 decision points (§4.3)
+    python -m src.data.cli build-labels       # DF-09/10/11 — L4 labels kwa path ya ticks
     python -m src.data.cli sentinel           # DF-08 / G1 — sentinel ya uvujaji
     python -m src.data.cli splits             # DF-14 / G2 — mpango wa splits + holdout guard
 
@@ -1217,6 +1219,147 @@ def cmd_detect_setups(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_build_labels(args: argparse.Namespace) -> int:
+    """DF-09/10/11 — L4: labels kwa path ya ticks (spec §5).
+
+    TRAIN+VAL PEKEE (G2). Inaendelea ilipoishia: hali ni ya `(symbol, mwaka)`,
+    kwa hiyo kukatika kunapoteza mwaka mmoja, si kazi ya masaa.
+    """
+    cfg = _load(args)
+    from datetime import datetime, timezone
+
+    import pandas as pd
+
+    from .label_build import (
+        LABEL_BUILD_VERSION,
+        build_labels_for_symbol,
+        holdout_guard,
+        load_state,
+        save_state,
+        split_by_year,
+    )
+    from .manifest import code_rev
+    from .splits import SplitPlan
+
+    # DF-20 (§4.3 sheria 5): "R1 haianzi kabla sheria hii haijasainiwa na PD".
+    # Hii ndiyo kinga ya darasa la tatu la uvujaji; haiwezi kuwa ya hiari.
+    if not args.skip_signature_check:
+        from src.governance.signatures import LEDGER, load as load_signatures
+
+        root = Path(__file__).resolve().parents[2]
+        signed = {
+            s.item
+            for s in load_signatures(root / LEDGER)
+            if s.decision in ("APPROVED", "VERIFIED")
+        }
+        if "DF-20" not in signed:
+            print(
+                "DF-20 haijasainiwa. Sheria ya setup ni PRE-REGISTRATION (§4.3 sheria 5): "
+                "label ikihesabiwa kabla ya sahihi, kila namba ya R1+ ni ya baada ya "
+                "ukweli.\n  scripts\\sign.bat DF-20 APPROVED --evidence "
+                "research\\reports\\r1\\setup_rates.json --reason \"...\"",
+                file=sys.stderr,
+            )
+            return 2
+
+    symbols = _symbol_list(args) or cfg.symbols
+    holdout_start = SplitPlan.from_config(cfg).holdout_start
+    setups_root = cfg.research_root / "data" / "L4_labels" / "setups"
+    out_root = cfg.research_root / "data" / "L4_labels" / "labels"
+    state_path = out_root / "_label_state.json"
+
+    state = load_state(state_path)
+    if state.get("config_hash") not in (None, cfg.config_hash) and not args.no_resume:
+        print(
+            f"ONYO: hali iliyohifadhiwa ni ya config nyingine "
+            f"({str(state.get('config_hash'))[:16]} vs {cfg.config_hash[:16]}) — "
+            "inaanza upya.",
+            file=sys.stderr,
+        )
+        state = {}
+    done: set[str] = set() if args.no_resume else set(state.get("done", []))
+
+    on_progress, started = _progress_printer(args.progress_every)
+    totals = {"points": 0, "cells": 0, "setups": 0, "controls": 0, "ties": 0, "timeouts": 0}
+    per_symbol: dict[str, Any] = {}
+
+    for symbol in symbols:
+        setups_path = setups_root / f"symbol={symbol}" / "setups.parquet"
+        if not setups_path.is_file():
+            print(f"{symbol}: setups hazipo — `detect-setups` kwanza", file=sys.stderr)
+            return 2
+        frame = pd.read_parquet(setups_path)
+        frame = holdout_guard(frame, holdout_start)   # G2, mara ya pili
+
+        for year, chunk in split_by_year(frame).items():
+            key = f"{symbol}/{year}"
+            target = out_root / f"symbol={symbol}"
+            if key in done and (target / f"points-{year}.parquet").is_file():
+                continue
+            result = build_labels_for_symbol(
+                cfg, cfg.l0_root, symbol, chunk, on_progress=on_progress
+            )
+            target.mkdir(parents=True, exist_ok=True)
+            if not result.points.empty:
+                result.points.to_parquet(target / f"points-{year}.parquet", index=False)
+                result.barriers.to_parquet(target / f"barriers-{year}.parquet", index=False)
+            done.add(key)
+            save_state(state_path, done, cfg.config_hash)
+            print(f"  {year}: {result.render()}")
+
+            s = result.stats
+            totals["points"] += s["points"]
+            totals["cells"] += s["cells"]
+            totals["setups"] += s["setups"]
+            totals["controls"] += s["controls"]
+            totals["ties"] += s["tie_breaks"]
+            totals["timeouts"] += s["timeouts"]
+            per_symbol.setdefault(symbol, {"years": {}})["years"][str(year)] = s
+
+    tie_frac = totals["ties"] / totals["cells"] if totals["cells"] else 0.0
+    timeout_frac = totals["timeouts"] / totals["cells"] if totals["cells"] else 0.0
+    summary = {
+        "version": LABEL_BUILD_VERSION,
+        "built_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "config_hash": cfg.config_hash,
+        "code_rev": code_rev(),
+        "holdout_start": holdout_start.isoformat(),
+        "totals": {**totals, "tie_break_frac": tie_frac, "timeout_frac": timeout_frac},
+        "per_symbol": per_symbol,
+    }
+    report_path = cfg.path_of("storage.reports_root") / "r1" / "label_build.json"
+    report_path.parent.mkdir(parents=True, exist_ok=True)
+    report_path.write_text(json.dumps(summary, indent=2, default=str), encoding="utf-8")
+
+    print(
+        f"\njumla: points {totals['points']:,} (setup {totals['setups']:,} · control "
+        f"{totals['controls']:,}) · cells {totals['cells']:,} · "
+        f"timeout {timeout_frac:.1%} · tie-break {tie_frac:.2%} · "
+        f"{time.monotonic() - started:.0f}s"
+    )
+    print(f"ushahidi: {report_path}")
+
+    rc = 0
+    max_timeout = float(cfg.get("labels.barrier.max_timeout_frac"))
+    if timeout_frac > max_timeout:
+        print(
+            f"ONYO: timeout {timeout_frac:.1%} > kikomo {max_timeout:.0%} — setup nyingi "
+            "hazifiki popote ndani ya horizon (§5.5).",
+            file=sys.stderr,
+        )
+        rc = 1
+    if tie_frac > 0.01:
+        # §5.2: "R1 inaripoti mara ngapi tie-break ilitumika; ikizidi 1% ya
+        # labels, inapanda kwa PD — sheria isiyopimwa mzunguko wake ni dhana."
+        print(
+            f"ONYO: tie-break {tie_frac:.2%} > 1% — sheria ya SL-kwanza inagusa "
+            "labels nyingi kuliko ilivyotarajiwa; inapanda kwa PD (§5.2).",
+            file=sys.stderr,
+        )
+        rc = 1
+    return rc
+
+
 def cmd_splits(args: argparse.Namespace) -> int:
     """DF-14 / lango G2 — mpango wa splits kutoka config PEKEE (spec §7)."""
     cfg = _load(args)
@@ -1527,6 +1670,21 @@ def build_parser() -> argparse.ArgumentParser:
         "haiandiki decision points",
     )
     p_setups.set_defaults(func=cmd_detect_setups)
+
+    p_labels = subparsers.add_parser(
+        "build-labels",
+        help="DF-09/10/11 — L4: labels kwa path ya ticks (§5). TRAIN+VAL pekee",
+        parents=[common],
+    )
+    p_labels.add_argument("--symbols", help="orodha ya symbols, comma separated")
+    p_labels.add_argument("--no-resume", action="store_true", help="anza upya, puuza hali")
+    p_labels.add_argument("--progress-every", type=int, default=1000)
+    p_labels.add_argument(
+        "--skip-signature-check",
+        action="store_true",
+        help="kwa tests pekee — DF-20 ni pre-registration ya lazima (§4.3 sheria 5)",
+    )
+    p_labels.set_defaults(func=cmd_build_labels)
 
     p_split = subparsers.add_parser(
         "splits", help="DF-14 / G2 — mpango wa splits + holdout guard (§7)", parents=[common]

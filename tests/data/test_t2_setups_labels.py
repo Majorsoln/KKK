@@ -506,3 +506,175 @@ def test_load_excluded_days_inasoma_ripoti_ya_r0(tmp_path):
     loaded = load_excluded_days(path)
     assert loaded == {"EURCHF": {"2023-06-01", "2023-06-02"}}, "symbol inakuwa herufi kubwa"
     assert load_excluded_days(tmp_path / "haipo.json") == {}
+
+
+# ===========================================================================
+# Mjenzi wa labels — kazi ya masaa (DF-09/10/11)
+# ===========================================================================
+
+
+def _l0_tree_for_labels(root, days: int = 30, start_day: int = 5) -> None:
+    """Siku `days` za ticks za dakika, kuanzia 2024-01-05 (kabla ya holdout)."""
+    base = root / "provenance=aggregator" / "symbol=EURUSD" / "2024"
+    base.mkdir(parents=True, exist_ok=True)
+    price = 1.1000
+    for offset in range(days):
+        day = datetime(2024, 1, start_day, tzinfo=timezone.utc) + pd.Timedelta(days=offset)
+        stamps = pd.date_range(day, periods=1440, freq="1min", tz="UTC")
+        rng = np.random.RandomState(offset)
+        bid = price + np.cumsum(rng.normal(0, 0.00012, 1440))
+        price = float(bid[-1])
+        pd.DataFrame(
+            {
+                "timestamp": stamps.astype("datetime64[us, UTC]"),
+                "bid": bid,
+                "ask": bid + 0.0001,
+                "bid_vol": 1.0,
+                "ask_vol": 2.0,
+            }
+        ).to_parquet(base / f"{day:%Y-%m-%d}.parquet", index=False)
+
+
+def test_horizon_ni_bars_si_masaa():
+    """Ijumaa jioni, bars 24 zinavuka wikendi — dirisha ni siku 3, si saa 24.
+
+    Kwa `timedelta(hours=24)` tungeishia Jumamosi, soko limefungwa, na label
+    ingesoma `timeout` kwa sababu ya KALENDA badala ya soko.
+    """
+    from src.data.label_build import horizon_ends
+
+    ijumaa = pd.date_range("2024-01-05 12:00", periods=4, freq="1h", tz="UTC")
+    jumatatu = pd.date_range("2024-01-08 00:00", periods=30, freq="1h", tz="UTC")
+    decision = pd.Series(ijumaa.append(jumatatu))
+    ends = horizon_ends(decision, 24)
+
+    assert ends.iloc[0] - decision.iloc[0] > pd.Timedelta(hours=24), "wikendi imo ndani"
+    assert ends.iloc[-1] is pd.NaT or pd.isna(ends.iloc[-1]), "bars za mwisho hazina horizon"
+
+
+def test_mjenzi_unatoa_points_na_barriers(cfg, tmp_path, monkeypatch):
+    """Mzunguko mzima: setups → ticks → grid 5×5 kwa kila point."""
+    from src.data.audit import build_l2
+    from src.data.cli import main
+    from src.data.setups import detect_setups
+
+    for key, value in cfg.env.items():
+        monkeypatch.setenv(key, value)
+    cfg.raw["setups"]["spread_median_window_bars"] = 48
+    cfg.raw["setups"]["atr_band_window_months"] = 1
+    cfg.raw["setups"]["trigger"]["min_atr_mult"] = 0.5
+    cfg.raw["labels"]["horizon_bars"] = 6
+
+    root = cfg.l0_root
+    _l0_tree_for_labels(root)
+    build_l2(cfg, root, cfg.l2_root, symbols=["EURUSD"])
+
+    from src.data.bars import read_bars
+
+    result = detect_setups(cfg, read_bars(cfg.l2_root, "EURUSD", "H1"), "EURUSD")
+    out = cfg.research_root / "data" / "L4_labels" / "setups" / "symbol=EURUSD"
+    out.mkdir(parents=True, exist_ok=True)
+    result.frame.to_parquet(out / "setups.parquet")
+    assert result.frame["is_setup"].sum() > 0, "sampuli haina setup — test isingepima kitu"
+
+    monkeypatch.setattr("src.data.cli._load", lambda args: cfg)
+    assert main(["build-labels", "--symbols", "EURUSD", "--skip-signature-check"]) in (0, 1)
+
+    labels = cfg.research_root / "data" / "L4_labels" / "labels" / "symbol=EURUSD"
+    points = pd.read_parquet(labels / "points-2024.parquet")
+    barriers = pd.read_parquet(labels / "barriers-2024.parquet")
+
+    assert len(points) > 0
+    assert len(barriers) == len(points) * 25, "grid 5×5 kwa KILA point"
+    assert set(barriers["outcome"]) <= {TP_FIRST, SL_FIRST, TIMEOUT}
+    assert (points["direction"].isin([1, -1])).all()
+    assert (points["is_setup"] | points["is_control"]).all()
+    # Malighafi ya L-D ipo, lakini GHARAMA haipo — RCE ndiyo mamlaka (§6.2 F6).
+    assert {"spread_entry_pips", "atr_pips"} <= set(points.columns)
+    assert "sl_pips" in barriers.columns
+    assert not any("cost" in c or "r_net" in c for c in barriers.columns)
+
+
+def test_mjenzi_hauna_ruhusa_bila_sahihi_ya_df20(cfg, tmp_path, monkeypatch):
+    """§4.3 sheria 5: R1 haianzi kabla PD hajasaini sheria ya setup."""
+    from src.data.cli import main
+
+    for key, value in cfg.env.items():
+        monkeypatch.setenv(key, value)
+    monkeypatch.setattr("src.data.cli._load", lambda args: cfg)
+    monkeypatch.setattr("src.governance.signatures.load", lambda *a, **k: [])
+
+    assert main(["build-labels", "--symbols", "EURUSD"]) == 2
+
+
+def test_holdout_haiingii_kwenye_labels(cfg):
+    """G2 — ukaguzi wa PILI kwenye mpaka wenyewe, si kwenye alama pekee."""
+    from datetime import date as _date
+
+    from src.data.label_build import holdout_guard
+
+    stamps = pd.to_datetime(
+        ["2024-03-30", "2024-03-31", "2024-04-01", "2024-04-02"], utc=True
+    )
+    frame = pd.DataFrame({"decision_time": stamps})
+    kept = holdout_guard(frame, _date(2024, 4, 1))
+    assert list(kept["decision_time"].dt.strftime("%Y-%m-%d")) == ["2024-03-30", "2024-03-31"]
+
+
+def test_kuendelea_hakujengi_upya_mwaka_uliokwisha(cfg, tmp_path, monkeypatch):
+    """Kazi ya masaa ikikatika, inaendelea ilipoishia — si kuanza upya."""
+    from src.data.audit import build_l2
+    from src.data.cli import main
+    from src.data.label_build import load_state
+    from src.data.setups import detect_setups
+
+    for key, value in cfg.env.items():
+        monkeypatch.setenv(key, value)
+    cfg.raw["setups"]["spread_median_window_bars"] = 48
+    cfg.raw["setups"]["atr_band_window_months"] = 1
+    cfg.raw["setups"]["trigger"]["min_atr_mult"] = 0.5
+    cfg.raw["labels"]["horizon_bars"] = 6
+
+    root = cfg.l0_root
+    _l0_tree_for_labels(root, days=20)
+    build_l2(cfg, root, cfg.l2_root, symbols=["EURUSD"])
+    from src.data.bars import read_bars
+
+    out = cfg.research_root / "data" / "L4_labels" / "setups" / "symbol=EURUSD"
+    out.mkdir(parents=True, exist_ok=True)
+    detect_setups(cfg, read_bars(cfg.l2_root, "EURUSD", "H1"), "EURUSD").frame.to_parquet(
+        out / "setups.parquet"
+    )
+    monkeypatch.setattr("src.data.cli._load", lambda args: cfg)
+
+    main(["build-labels", "--symbols", "EURUSD", "--skip-signature-check"])
+    labels = cfg.research_root / "data" / "L4_labels" / "labels"
+    state = load_state(labels / "_label_state.json")
+    assert "EURUSD/2024" in state["done"]
+    assert state["config_hash"] == cfg.config_hash
+
+    stamp = (labels / "symbol=EURUSD" / "points-2024.parquet").stat().st_mtime_ns
+    main(["build-labels", "--symbols", "EURUSD", "--skip-signature-check"])
+    after = (labels / "symbol=EURUSD" / "points-2024.parquet").stat().st_mtime_ns
+    assert after == stamp, "mwaka uliokwisha haujengwi upya"
+
+
+def test_buffer_inatupa_kilichopita(cfg, tmp_path):
+    """Bila `trim`, buffer ingekua hadi L0 nzima — GB, si MB."""
+    from src.data.audit import select_partitions
+    from src.data.label_build import TickWindow
+
+    root = tmp_path / "L0"
+    _l0_tree_for_labels(root, days=6)
+    window = TickWindow(cfg, select_partitions(cfg, root, ["EURUSD"]))
+
+    window.ensure(pd.Timestamp("2024-01-09", tz="UTC"))
+    kubwa = window.rows
+    assert kubwa > 0 and window.partitions_read >= 4
+
+    window.trim(pd.Timestamp("2024-01-09", tz="UTC"))
+    assert window.rows < kubwa, "frames zilizoisha zimetupwa"
+    # Kusoma hakurudi nyuma: partitions zilizosomwa hazisomwi tena.
+    before = window.partitions_read
+    window.ensure(pd.Timestamp("2024-01-09", tz="UTC"))
+    assert window.partitions_read == before
