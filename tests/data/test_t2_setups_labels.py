@@ -10,6 +10,7 @@ ikibadilika).
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -678,3 +679,49 @@ def test_buffer_inatupa_kilichopita(cfg, tmp_path):
     before = window.partitions_read
     window.ensure(pd.Timestamp("2024-01-09", tz="UTC"))
     assert window.partitions_read == before
+
+
+def test_ensure_inasimama_ikishafunika_haisomi_l0_nzima(cfg, tmp_path):
+    """Kasoro iliyofungua `MemoryError`: ticks milioni 289 kwenye buffer.
+
+    `last_stamp` ilikuwa ikisasishwa BAADA ya kitanzi, kwa hiyo sharti la
+    `ensure` halikubadilika kamwe na kitanzi kilisoma kila partition ya symbol
+    nzima. Test hii inashikilia kile ambacho `MemoryError` iliniambia.
+    """
+    from src.data.audit import select_partitions
+    from src.data.label_build import TickWindow
+
+    root = cfg.l0_root
+    _l0_tree_for_labels(root, days=20)
+    paths = select_partitions(cfg, root, ["EURUSD"])
+    assert len(paths) == 20
+
+    window = TickWindow(cfg, paths)
+    window.ensure(pd.Timestamp("2024-01-06 12:00", tz="UTC"))
+    assert window.partitions_read <= 3, f"ilisoma {window.partitions_read} kati ya 20"
+    assert window.last_stamp > 0, "`last_stamp` inasasishwa ndani ya kitanzi"
+
+
+def test_seek_inaruka_partitions_bila_kuzisoma(cfg, tmp_path):
+    """Decision point ya kwanza iko miezi ~6 ndani — kuzisoma ni kupoteza muda."""
+    from src.data.audit import select_partitions
+    from src.data.label_build import TickWindow, _partition_end
+
+    root = cfg.l0_root
+    _l0_tree_for_labels(root, days=20)
+    window = TickWindow(cfg, select_partitions(cfg, root, ["EURUSD"]))
+
+    window.seek(pd.Timestamp("2024-01-18", tz="UTC"))
+    assert window.partitions_skipped > 5
+    assert window.partitions_read == 0, "kuruka HAKUSOMI parquet"
+
+    window.ensure(pd.Timestamp("2024-01-19", tz="UTC"))
+    stamps, _, _ = window.arrays()
+    assert len(stamps) > 0
+
+    # Kadirio la njia ni la JUU — bora kusoma isiyohitajika kuliko kuruka
+    # inayohitajika. Faili ya siku inaisha ndani ya siku 3 za kadirio lake.
+    daily = _partition_end(Path("provenance=aggregator/symbol=EURUSD/year=2024/month=01/day=15/ticks.parquet"))
+    assert daily is not None and daily >= pd.Timestamp("2024-01-16", tz="UTC")
+    monthly = _partition_end(Path("provenance=aggregator/symbol=XAUUSD/year=2020/month=03/ticks-2020-03.parquet"))
+    assert monthly is not None and monthly >= pd.Timestamp("2020-04-01", tz="UTC")

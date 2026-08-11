@@ -23,6 +23,7 @@ pale mawazo ya gharama yanapotajwa wazi.
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass, field
 from datetime import date, datetime, timezone
 from pathlib import Path
@@ -53,14 +54,20 @@ class TickWindow:
         self._paths = list(paths)
         self._next = 0
         self._frames: list[pd.DataFrame] = []
+        self._ends: list[int] = []          # µs ya tick ya mwisho ya kila frame
         self._stamps = np.empty(0, dtype="int64")
         self._bid = np.empty(0, dtype="float64")
         self._ask = np.empty(0, dtype="float64")
+        # Muhimu: hii inasasishwa KILA frame inapoingia, si baada ya kitanzi.
+        # Ikisasishwa baada, sharti la `ensure` halibadiliki kamwe na kitanzi
+        # kinasoma L0 NZIMA — ticks milioni 289 na `MemoryError` (2026-08-11).
+        self._last = -(2**62)
         self.partitions_read = 0
+        self.partitions_skipped = 0
 
     @property
     def last_stamp(self) -> int:
-        return int(self._stamps[-1]) if len(self._stamps) else -(2**62)
+        return self._last
 
     @property
     def rows(self) -> int:
@@ -72,7 +79,11 @@ class TickWindow:
             self._bid = np.empty(0, dtype="float64")
             self._ask = np.empty(0, dtype="float64")
             return
-        joined = pd.concat(self._frames, ignore_index=True) if len(self._frames) > 1 else self._frames[0]
+        joined = (
+            pd.concat(self._frames, ignore_index=True)
+            if len(self._frames) > 1
+            else self._frames[0]
+        )
         # `kind="stable"`: ticks zenye timestamp ILE ILE zinabaki kwa mpangilio
         # wa kufika. Tie-break ya §5.2 inategemea "ya kwanza" kuwa na maana moja.
         joined = joined.sort_values("timestamp", kind="stable", ignore_index=True)
@@ -80,19 +91,40 @@ class TickWindow:
         self._bid = joined["bid"].to_numpy()
         self._ask = joined["ask"].to_numpy()
 
+    def seek(self, start: pd.Timestamp) -> None:
+        """Ruka partitions zinazoishia kabla ya `start` BILA kuzisoma.
+
+        Decision point ya kwanza iko miezi ~6 ndani ya data (ATR band
+        inahitaji historia). Bila hii, `ensure` ingesoma partitions 130 za
+        Januari–Juni ili tu kuzitupa mara moja. Tarehe inatoka kwenye NJIA —
+        parquet haiguswi hata kidogo.
+        """
+        if self._frames:
+            return   # buffer ina data; kuruka sasa kungetoboa shimo
+        limit = pd.Timestamp(start)
+        while self._next < len(self._paths):
+            end = _partition_end(self._paths[self._next])
+            if end is None or end >= limit:
+                break
+            self._next += 1
+            self.partitions_skipped += 1
+
     def ensure(self, end: pd.Timestamp) -> None:
         """Soma partitions hadi buffer ifunike `end` (au L0 iishe)."""
         from .schema import read_quotes
 
         target = pd.Timestamp(end).value // 1_000
         grew = False
-        while self.last_stamp < target and self._next < len(self._paths):
+        while self._last < target and self._next < len(self._paths):
             frame = read_quotes(self._paths[self._next], self._cfg)
             self._next += 1
             self.partitions_read += 1
             if frame.empty:
                 continue
+            stamps = epoch_us(frame["timestamp"])
             self._frames.append(frame.loc[:, ["timestamp", "bid", "ask"]])
+            self._ends.append(int(stamps[-1]))
+            self._last = max(self._last, int(stamps[-1]))
             grew = True
         if grew:
             self._rebuild()
@@ -101,16 +133,52 @@ class TickWindow:
         """Tupa frames zilizoisha kabla ya `start` — hazitahitajika tena.
 
         Points zinachakatwa kwa mpangilio wa muda, kwa hiyo kilichopita
-        hakirudi. Bila hii, buffer ingekua hadi L0 nzima.
+        hakirudi. Bila hii, buffer ingekua hadi L0 nzima. Mwisho wa kila frame
+        umehifadhiwa wakati wa kusoma; kuuhesabu upya hapa kungekuwa O(n) kwa
+        kila decision point.
         """
         cut = pd.Timestamp(start).value // 1_000
-        keep = [f for f in self._frames if epoch_us(f["timestamp"])[-1] >= cut]
+        keep = [(f, e) for f, e in zip(self._frames, self._ends) if e >= cut]
         if len(keep) != len(self._frames):
-            self._frames = keep
+            self._frames = [f for f, _ in keep]
+            self._ends = [e for _, e in keep]
             self._rebuild()
 
     def arrays(self) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         return self._stamps, self._bid, self._ask
+
+
+_HIVE = re.compile(r"year=(\d{4}).*?month=(\d{2})(?:.*?day=(\d{2}))?", re.DOTALL)
+_IN_NAME = re.compile(r"(\d{4})-(\d{2})(?:-(\d{2}))?")
+
+
+def _partition_end(path: Path) -> pd.Timestamp | None:
+    """Kadirio la JUU la tick ya mwisho ya partition, kutoka NJIA yake.
+
+    L0 ina mipangilio miwili (`iter_partitions` inakubali yote): Hive
+    (`year=2016/month=07/day=14/ticks.parquet`) na ya jina
+    (`2016/2016-07-14.parquet`). Zote mbili zinashughulikiwa **kwa uwazi** —
+    regex moja ya kubahatisha ilikuwa inasoma `2024/2024-01-15` kama mwezi wa
+    20 na kurudisha None kimya, kwa hiyo hakuna kilichorukwa.
+
+    Kadirio linaongezwa **siku 3**: Toleo B ni la mwezi na linaingia siku ya
+    kwanza ya mwezi unaofuata (linakata saa 05:00 UTC, §3). Bora kusoma
+    partition isiyohitajika kuliko kuruka inayohitajika. Isipoeleweka → None,
+    na hakuna kinachorukwa.
+    """
+    text = str(path).replace("\\", "/")
+    match = _HIVE.search(text) or _IN_NAME.search(Path(text).name)
+    if not match:
+        return None
+    year, month, day = match.group(1), match.group(2), match.group(3)
+    try:
+        if day:
+            stamp = pd.Timestamp(int(year), int(month), int(day), tz="UTC")
+        else:
+            stamp = pd.Timestamp(int(year), int(month), 1, tz="UTC") + pd.offsets.MonthEnd(1)
+    except (ValueError, TypeError):
+        return None
+    return stamp + pd.Timedelta(days=3)
 
 
 @dataclass
@@ -173,6 +241,7 @@ def build_labels_for_symbol(
     for index, (stamp, row) in enumerate(wanted.iterrows(), start=1):
         decision_time = pd.Timestamp(row["decision_time"])
         horizon_end = pd.Timestamp(row["horizon_end"])
+        window.seek(decision_time)
         window.ensure(horizon_end)
         window.trim(decision_time)
         stamps, bid, ask = window.arrays()
@@ -242,6 +311,7 @@ def build_labels_for_symbol(
         # §5.2: R1 inaripoti mzunguko wa tie-break; > 1% ya labels → inapanda kwa PD.
         "tie_break_frac": ties / len(barriers) if len(barriers) else 0.0,
         "partitions_read": window.partitions_read,
+        "partitions_skipped": window.partitions_skipped,
     }
     return SymbolLabels(symbol=symbol, points=points, barriers=barriers, stats=stats)
 
