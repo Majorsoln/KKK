@@ -667,8 +667,56 @@ uliokwishasainiwa (#3). Hakuna kigezo cha R0 kilichobaki bila jibu.
 
 `config_hash` `sha256:8110cb5bd` · `code_rev` `58e6f74` · ripoti `2026-08-10T21:18:02Z`.
 
-**T1 imekamilika.** Kinachofuata: sahihi ya exit (DF-05/06/07/08/14, RS-03 → VERIFIED, zikiwa na
-`--evidence quality_report.json`), kisha T2 (L3 features + L4 labels).
+**T1 imekamilika.** Sahihi ya exit imewekwa 2026-08-10 (DF-05/06/07/08/14, RS-03 → VERIFIED,
+sahihi #5–#10; lango G14 PASS · vipengele VERIFIED 6).
+
+---
+
+### 3.6 T2 — SETUP-v1 imetunwa na kupimwa (2026-08-11)
+
+**Kutuna kwa RATE, kabla ya labels (§4.3 sheria 2).** `--sweep` juu ya TRAIN+VAL yote:
+
+| `min_atr_mult` | 1.0 | 1.5 | 2.0 | **2.5** | 3.0 |
+|---|---|---|---|---|---|
+| rate | 26.33% | 15.21% | 8.42% | **4.46%** | 2.32% |
+
+1.0 haikuwa inachuja hata kidogo: bei inatembea ~2σ ndani ya bars 4 na ATR14 ni ~1.3σ, kwa hiyo
+"msukumo wa 1 ATR" ni **wa kawaida**. Gate pekee inayomaanisha "kuna fursa" ilikuwa haina meno.
+**2.5** inatua kwenye 5% ambayo bajeti nzima ya §0.1 ilijengwa juu yake.
+
+**Kigezo ni scale-free — imepimwa, si kudhaniwa.** Kwa 2.5, symbols zote 12 ziko kati ya **3.9%
+na 4.9%**: EURCHF (tulivu kabisa) na XAUUSD (ya wazimu) zinatoa namba ile ile. Namba zingetawanyika,
+kigezo kingekuwa kinapima **bei**, si fursa — kasoro ile ile ya `quote_sanity` ya T1.
+
+**Control 0.10 → 0.05.** Kichujio kilipofikia 4.46%, "10% ya bars zisizo setup" ilitoa control
+56,471 dhidi ya setups 26,390 — mara mbili ya kinachopimwa. Nguvu ya ulinganisho inategemea kundi
+**dogo**, kwa hiyo control ya ziada haikuwa inanunua chochote; ilikuwa inagharimu 68% ya kazi.
+
+**KASORO ILIYOKUTWA KABLA YA SAHIHI: hukumu ya R0 haikuwa ikifika popote.** Hakuna faili lililokuwa
+likisoma `quality_report.json` — wala `build_l2`, wala `detect_setups`, wala `bars.py`. Siku zote
+zilizofeli §3 zilikuwa zinaingia kwenye decision points **kimya**, ikiwemo siku 912 zilizoondolewa
+kwa sahihi ya PD (#3). Ushahidi ulikuwa kwenye output yenyewe: EURCHF eligible **49,598** — zaidi
+ya EURUSD **49,393** — ingawa mwaka mzima wa 2023 ulikuwa umeondolewa. Siku nane za kazi ya T1
+zilikuwa hazina athari yoyote.
+
+Baada ya kuunganishwa (`load_excluded_days` + `detect_setups(excluded_days=…)`):
+
+| | kabla | baada | zilizofeli §3 |
+|---|---|---|---|
+| EURCHF | 49,598 | **43,544** | 6,088 bars |
+| GBPJPY | 49,648 | **43,812** | 5,886 bars |
+| XAUUSD | 47,259 | **40,645** | 6,681 bars |
+| EURUSD (Toleo A) | 49,393 | 49,027 | 368 bars |
+
+~6,000 kwa kila symbol ya Toleo B = siku 259 × bars 24 — hasa mwaka wa 2023. **Rate ya pooled
+inabaki 4.46%**: kichujio hakikubadilika, ni denominator iliyosafishwa.
+
+Hukumu inapakwa **wakati wa kusoma**, si ndani ya L2: L2 ni artifact ya masaa 5 na vizingiti vya §3
+vimebadilika mara mbili tayari. Sera ya NaN ya §3 inaruhusu — bar ya siku iliyofeli haitumiki kama
+decision point, lakini inabaki kama historia (ATR haitobolewi shimo).
+
+**Hali ya mwisho:** setups **25,374** · control **27,089** · jumla ya decision points **52,463** ·
+holdout imetengwa **7,366** · `config_hash` `sha256:4ce1768`.
 
 ---
 
