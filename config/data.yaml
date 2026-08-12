@@ -206,6 +206,12 @@ labels:
     timeout_record_return: true         # terminal return ya timeout -> E[R|timeout] (EV madarasa 3)
     max_timeout_frac:  0.35
     min_labels_per_cell: 200
+  # Ukaguzi wa M1-dhidi-ya-tick (T2): decision points hizi hizi zinatatuliwa
+  # MARA YA PILI kwa high/low za M1 ili gharama ya kutotumia ticks ipimwe kwa
+  # namba. Ni sampuli kwa sababu jibu halitofautiani kwa point moja moja —
+  # 5% ya cells 1.3M bado ni cells 65,000, zaidi ya inavyohitajika.
+  m1_check_frac:       0.05
+  m1_check_seed:       20260812
   fill:
     order_types:       [market, stop, limit]
     cap_source:        "config/risk.yaml:slippage_cap_pips"   # chanzo KIMOJA

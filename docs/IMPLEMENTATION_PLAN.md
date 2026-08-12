@@ -720,6 +720,42 @@ holdout imetengwa **7,366** · `config_hash` `sha256:4ce1768`.
 
 ---
 
+### 3.7 T2 — L4 imejengwa; na kile build ya kwanza haikuweza kupima (2026-08-12)
+
+**Build ya kwanza (toleo 1):** points **52,321** · cells **1,308,025** (= 52,321 × 25, sawasawa) ·
+timeout **2.8%** · tie-break **0.00%** · **2,215s (dakika 37)**. `bila ticks` = 0 kwa symbol zote.
+EURCHF/GBPJPY/XAUUSD zina points **0** kwa 2023 — hukumu ya R0 imeshikilia mwanzo hadi mwisho.
+
+**Timeout 2.8%, si 35%.** Hii ni namba muhimu zaidi kuliko inavyoonekana: §5.5 inaweka kikomo 0.35,
+na mapitio ya mpango yalikuwa yameonya kwamba **RS-04 yenyewe inakufa** timeout ikikaribia 35% —
+`p_tp/(p_tp+p_sl)` ingekuwa ikilinganisha sehemu ndogo mno ya sampuli. Kwa 2.8%, ukaguzi wa jiometri
+unabaki na maana.
+
+**Tie-break 0.00% — na sababu si "haijatokea", ni "HAIWEZI kutokea".** Nilikuwa nimetangaza kwamba
+ninaangalia namba mbili: timeout na tie-break. Ya pili ilipokuja sifuri, nilipima kwa nini:
+kwa BUY, SL **na** TP zote zinapimwa kwa **bid** (`sl_idx = bid ≤ entry − sl·ATR`,
+`tp_idx = bid ≥ entry + tp·ATR`). Tick moja haiwezi kuwa `≤ X` na `≥ Y` wakati `X < Y`. Jaribio la
+gap 400 × cells 25 × pande 2 lilitoa **0 kati ya 20,000**. §5.2 yenyewe ina hoja hii ndani yake
+("Tick moja haiwezi kugusa zote mbili"). Kwa hiyo: sheria iliyosainiwa **haijawahi kuguswa na
+data**, na haitaguswa kwa muundo huu wa grid. Inabaki kwa grid zijazo zinazopima pande mbili
+tofauti. R1 inaandika hili kama `note`, si kama PASS kimya — sheria isiyoweza kuwaka ikiripotiwa
+"0.00% ✓" ingesomeka kama ushahidi wa usalama, si kama ukimya.
+
+**Kilichokosekana: vipimo vitatu vya R1 havikuwa vimerekodiwa.** T2 inadai (safu ya 108 + DF-21 +
+K1-07) mid-dhidi-ya-trade quantile, fill/slippage bootstrap, na M1-dhidi-ya-tick disagreement.
+Toleo 1 la L4 halikuwa na malighafi ya hata moja — na malighafi hiyo **haipatikani baada ya
+build**: ingehitaji kupita kwenye ticks za miaka 8 mara ya pili. Kwa hiyo toleo **2** (§5.6 ya
+standard) linarekodi `touch_past_pips`, `terminal_trade`/`quantile_y_trade`, na ukaguzi wa M1
+kwa sampuli ya hash — vyote pale ticks zilipo tayari kwenye kumbukumbu. Gharama: **build moja
+zaidi ya dakika ~40**. Mbadala ulikuwa kupitisha T2 na "haijapimwa" mara tatu.
+
+**R1 (`r1-summary`)** ni ripoti ya vigezo vyote kwenye jedwali moja, kama `r0-summary` ya T1:
+jiometri kwa cell (`p_tp` BILA timeout dhidi ya `sl/(sl+tp)`, na `z` yake), utulivu kwa miaka,
+setup-dhidi-ya-control (`z` ya tofauti), quantile mid-vs-trade kwa symbol, fill/slippage dhidi ya
+`slippage_cap_pips` ya RCE, buckets za L-D kwa mkunjo wa gharama, na M1-vs-tick. Inafeli — si
+kuonya — pale `min_labels_per_cell < 200`, timeout > 0.35, tie-break > 1%, au point yoyote ya
+holdout ikigusa takwimu (G2 inasimamisha ripoti **kabla** ya kuhesabu chochote).
+
 **MAPITIO YA USHAURI WA NJE (PD 2026-08-07 — "nimekubali, fanya maamuzi").** Ushauri wa nje
 ulileta mapengo matano; uchambuzi huru uliyathibitisha manne, ukapima moja upya, na kuongeza
 mawili ambayo hayakuonwa. Maamuzi (yote yameandikwa kwenye spec + config, vipengele DF-20,

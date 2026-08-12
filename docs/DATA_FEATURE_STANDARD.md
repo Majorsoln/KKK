@@ -431,11 +431,33 @@ R_net = (matokeo ya barrier kwa R) − (cost_pips ÷ sl_pips)
 bucket:  A+ / A / B / reject   (mipaka kwenye config)
 ```
 
+**Gharama hapa ni commission + swap PEKEE.** Spread ishaingia kwenye path (§5.2 — barrier
+inatatuliwa kwa bei ya trade). Kuiongeza tena kwenye `cost_pips` ni kuihesabu mara mbili
+kwenye namba ile ile. Mamlaka ya `cost_pips` ni RCE (§6.2 F6); R1 inatoa mkunjo wa unyeti
+kwa gharama zilizotajwa wazi, si jibu.
+
 ### 5.5 Sheria za labels
 - **Horizon moja iliyotangazwa** kwa kila familia; kubadilisha horizon = dataset mpya, si tweak.
 - **Class balance inaripotiwa**, haisawazishwi kwa kubuni (resampling inapotosha calibration).
 - **Timeout haitupwi kimya** — ni taarifa (setup haikwenda popote).
 - Label yoyote inayohitaji data baada ya `t + H` haipo.
+
+### 5.6 Kile L4 inarekodi ili R1 iweze kupima (toleo 2, 2026-08-12)
+
+Vipimo vitatu vya R1 vinahitaji malighafi ambayo **haipatikani baada ya build**: kuipata
+baadaye kungehitaji kupita kwenye ticks za miaka 8 mara ya pili. Kwa hiyo inarekodiwa pale
+ticks zilipo tayari kwenye kumbukumbu:
+
+| Safu | Iko wapi | Inajibu swali gani |
+|---|---|---|
+| `touch_past_pips` | kila cell | bei ilipita barrier kwa kiasi gani kabla ya tick ya kwanza kuionekana? Kwa **SL** ni slippage ya stop (§5.3, inapimwa dhidi ya `slippage_cap_pips`); kwa **TP** ni limit — bei kuruka zaidi haikupi bei bora |
+| `terminal_trade`, `quantile_y_trade` | kila point | L-A ikipimwa kwa bei ya trade badala ya MID — §5.1 iliamua MID **kwa hoja**; hii inairuhusu ipimwe kwa namba |
+| `m1_disagree` | sampuli ya points (`labels.m1_check_frac`) | grid ile ile ikitatuliwa kwa **high/low za M1** badala ya ticks — je majibu yanatofautiana, na mara ngapi M1 moja iligusa SL na TP kwa pamoja? |
+
+Ukaguzi wa M1 unatumia **ticks zile zile** kama chanzo cha bars, si faili la L2: kulinganisha
+lazima kuwe juu ya data moja, la sivyo tofauti za chanzo zingeingia ndani ya kipimo cha
+tofauti za resolution. Sampuli inachaguliwa kwa **hash** ya `(seed, symbol, muda)` — point ile
+ile inaangaliwa kila run, kwenye kila mashine (sababu ile ile ya control sample, §4.3).
 
 ---
 

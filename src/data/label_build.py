@@ -32,13 +32,18 @@ from typing import Any, Callable, Iterable, Sequence
 import numpy as np
 import pandas as pd
 
-from .labels import epoch_us, resolve_arrays
+from .labels import epoch_us, resolve_arrays, resolve_m1_arrays
 
 ProgressFn = Callable[[int, int, str], None]
 
 # Muundo wa matokeo ya L4. Ukibadilika, kazi ya masaa haiwezi kuendelea
 # ilipoishia — hali ya zamani inatupwa badala ya kuchanganywa kimya.
-LABEL_BUILD_VERSION = 1
+#
+# 2 (2026-08-12): `touch_price` kwa kila cell (L-C slippage), `terminal_trade` +
+#     `quantile_y_trade` (§5.1 mid-dhidi-ya-trade), na ukaguzi wa M1-dhidi-ya-tick
+#     kwa sampuli. Vipimo vitatu vya R1 ambavyo toleo 1 halikurekodi; kuvipima
+#     baadaye kungehitaji kupita kwenye ticks mara ya pili.
+LABEL_BUILD_VERSION = 2
 
 
 class TickWindow:
@@ -194,6 +199,7 @@ class SymbolLabels:
             f"{self.symbol}: points {s['points']} (setup {s['setups']} · control "
             f"{s['controls']}) · cells {s['cells']} · timeout {s['timeout_frac']:.1%} · "
             f"tie-break {s['tie_breaks']} ({s['tie_break_frac']:.2%}) · "
+            f"M1≠tick {s['m1_disagree_frac']:.2%} (cells {s['m1_cells']:,}) · "
             f"bila ticks {s['no_ticks']}"
         )
 
@@ -225,6 +231,8 @@ def build_labels_for_symbol(
     sl_grid = [float(x) for x in cfg.get("labels.barrier.sl_atr")]
     tp_grid = [float(x) for x in cfg.get("labels.barrier.tp_atr")]
     pip = _pip(symbol)
+    m1_frac = float(cfg.get("labels.m1_check_frac"))
+    m1_seed = int(cfg.get("labels.m1_check_seed"))
 
     frame = setups.sort_index(kind="stable").copy()
     frame["horizon_end"] = horizon_ends(frame["decision_time"], horizon_bars)
@@ -237,6 +245,7 @@ def build_labels_for_symbol(
     cell_rows: list[dict[str, Any]] = []
     no_ticks = 0
     total = len(wanted)
+    m1_checked = m1_agree = m1_ambiguous = 0
 
     for index, (stamp, row) in enumerate(wanted.iterrows(), start=1):
         decision_time = pd.Timestamp(row["decision_time"])
@@ -256,7 +265,26 @@ def build_labels_for_symbol(
             no_ticks += 1
             continue
 
+        # M1-dhidi-ya-tick kwa sampuli (§5 hoja ya "bar haisemi ipi ilianza").
+        # Sampuli, si zote: gharama ni ya kuhesabu tu, lakini points 52,000 x
+        # dakika 1,440 ni kazi ya bure pale 5% inapotoa jibu lile lile.
+        m1_disagree_here = None
+        if _m1_pick(m1_seed, symbol, decision_time, m1_frac):
+            m1 = resolve_m1_arrays(
+                stamps, bid, ask, decision_time, horizon_end,
+                int(row["direction"]), float(row["atr"]), sl_grid, tp_grid,
+            )
+            if m1 is not None and len(m1.outcomes) == len(result.cells):
+                same = sum(
+                    1 for cell, out in zip(result.cells, m1.outcomes) if cell.outcome == out
+                )
+                m1_checked += len(m1.outcomes)
+                m1_agree += same
+                m1_ambiguous += int(sum(m1.ambiguous))
+                m1_disagree_here = len(m1.outcomes) - same
+
         spread_entry = (result.entry_trade - result.entry_mid) * 2.0 / pip
+        spread_exit = (result.terminal_mid - result.terminal_trade) * 2.0 / pip
         point_rows.append(
             {
                 "symbol": symbol,
@@ -270,14 +298,24 @@ def build_labels_for_symbol(
                 "entry_mid": result.entry_mid,
                 "atr_price": result.atr_price,
                 "atr_pips": result.atr_price / pip,
+                "terminal_mid": result.terminal_mid,
+                "terminal_trade": result.terminal_trade,
                 # Malighafi ya L-D (§5.4): R_net inahesabiwa na RCE, si hapa.
                 "spread_entry_pips": abs(spread_entry),
+                "spread_exit_pips": abs(spread_exit),
                 "quantile_y": result.quantile_y,
+                "quantile_y_trade": result.quantile_y_trade,
                 "terminal_atr": result.terminal_atr,
                 "ticks_seen": result.ticks_seen,
+                "m1_disagree": m1_disagree_here,
             }
         )
         for cell in result.cells:
+            barrier_price = (
+                result.entry_trade - cell.sl_atr * result.atr_price * result.direction
+                if cell.outcome == 0
+                else result.entry_trade + cell.tp_atr * result.atr_price * result.direction
+            )
             cell_rows.append(
                 {
                     "symbol": symbol,
@@ -289,6 +327,16 @@ def build_labels_for_symbol(
                     "timeout_return_r": cell.timeout_return_r,
                     # sl kwa pips — RCE inahitaji hii kugeuza cost_pips kuwa R.
                     "sl_pips": cell.sl_atr * result.atr_price / pip,
+                    # L-C (§5.3): umbali bei ilivyopita barrier kabla ya tick
+                    # ya kwanza kuionekana — daima ≥ 0 kwa muundo. Ishara
+                    # haihifadhiwi hapa kwa makusudi: kwa SL (stop) umbali huu
+                    # ni HASARA, kwa TP (limit) ni sifuri kwako (limit inajaza
+                    # kwa bei yake). `outcome` iko safu ile ile; R1 inatenganisha.
+                    "touch_past_pips": (
+                        None
+                        if cell.touch_price is None
+                        else abs(cell.touch_price - barrier_price) / pip
+                    ),
                 }
             )
 
@@ -312,8 +360,31 @@ def build_labels_for_symbol(
         "tie_break_frac": ties / len(barriers) if len(barriers) else 0.0,
         "partitions_read": window.partitions_read,
         "partitions_skipped": window.partitions_skipped,
+        # M1-dhidi-ya-tick: cells zilizoangaliwa mara mbili, si points.
+        "m1_cells": m1_checked,
+        "m1_disagree": m1_checked - m1_agree,
+        "m1_disagree_frac": (m1_checked - m1_agree) / m1_checked if m1_checked else 0.0,
+        "m1_ambiguous": m1_ambiguous,
+        "m1_ambiguous_frac": m1_ambiguous / m1_checked if m1_checked else 0.0,
     }
     return SymbolLabels(symbol=symbol, points=points, barriers=barriers, stats=stats)
+
+
+def _m1_pick(seed: int, symbol: str, stamp: pd.Timestamp, frac: float) -> bool:
+    """Sampuli ya ukaguzi wa M1 — hash, si `random`.
+
+    Sababu ile ile ya control sample (§4.3): point ile ile inaangaliwa kila
+    run, kwenye kila mashine. Ukaguzi unaobadilika kila run hauwezi
+    kulinganishwa na wa jana.
+    """
+    import hashlib
+
+    if frac <= 0:
+        return False
+    if frac >= 1:
+        return True
+    digest = hashlib.sha256(f"m1|{seed}|{symbol}|{stamp.isoformat()}".encode()).digest()
+    return int.from_bytes(digest[:8], "big") / 2**64 < frac
 
 
 def _pip(symbol: str) -> float:

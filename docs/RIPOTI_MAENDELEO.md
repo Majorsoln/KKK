@@ -15,7 +15,7 @@ tests: **287** zinapita · `config_hash` `sha256:4ce1768`
 |---|---|---|
 | **T0 — Msingi** | ✅ IMEFUNGWA (2026-08-06) | L0 immutable + SHA256; recorder wa broker; normalization A/B; malango ya repo |
 | **T1 — R0 ukaguzi wa data** | ✅ IMEFUNGWA (2026-08-10) | Siku **33,440/34,781 (96.1%)** zinafaa kutumika; sahihi 6 za VERIFIED |
-| **T2 — R1 labels** | 🔄 INAENDELEA | SETUP-v1 imesainiwa (pre-registration); ujenzi wa labels unafuata |
+| **T2 — R1 labels** | 🔄 INAENDELEA | SETUP-v1 imesainiwa; L4 imejengwa (cells **1,308,025**, timeout 2.8%); inasubiri build ya toleo 2 + R1 |
 | T3–T7 | ⏳ zinasubiri mfuatano | features, baselines, EV, holdout, live |
 
 **Data:** ticks **bilioni 3.4** · symbols **12** · 2016-01-04 → 2026-08-07 · partitions **25,510**.
@@ -163,10 +163,53 @@ $$259 \text{ siku} \times 24 = 6{,}216 \approx 6{,}088$$
 
 **Rate ya pooled inabaki 4.46%** — kichujio hakikubadilika, ni denominator iliyosafishwa.
 
-### 4.4 Hali ya mwisho ya T2
+### 4.4 Hali ya mwisho ya SETUP-v1
 
 setups **25,374** · control **27,089** · **jumla ya decision points 52,463** ·
 holdout imetengwa **7,366**.
+
+### 4.5 Labels (L4) zimejengwa
+
+| | |
+|---|---|
+| decision points zilizopata labels | **52,321** |
+| cells (points × grid 5×5) | **1,308,025** — sawasawa `52,321 × 25` |
+| timeout | **2.8%** (kikomo cha §5.5 ni 35%) |
+| tie-break | **0.00%** |
+| points bila ticks | **0**, kwa symbol zote |
+| muda | **2,215s (dakika 37)** |
+| 2023 ya EURCHF/GBPJPY/XAUUSD | points **0** — hukumu ya R0 imeshikilia hadi mwisho |
+
+**Timeout 2.8% ndiyo namba muhimu.** Ukaguzi mkuu wa R1 ni jiometri: bila drift,
+`p_tp/(p_tp+p_sl)` inapaswa kukaribia `sl/(sl+tp)`. Timeout ikikaribia 35%, ukaguzi huo
+ungekuwa unalinganisha sehemu ndogo mno ya sampuli na ungepoteza maana. Kwa 2.8%, unabaki
+na meno.
+
+**Tie-break 0.00% — si "haijatokea", ni "haiwezi kutokea".** Nilipima badala ya kufurahia:
+kwa BUY, SL **na** TP zote zinapimwa kwa **bid**. Tick moja ingelazimika kuwa `≤ X` na `≥ Y`
+kwa wakati mmoja ikiwa `X < Y` — haiwezekani. Jaribio la gap 400 × cells 25 × pande 2:
+**0 kati ya 20,000**. §5.2 yenyewe ina hoja hii ndani yake. Kwa hiyo sheria uliyosaini
+**haijawahi kuguswa na data hata mara moja**, na haitaguswa kwa grid hii. Inabaki kwa grid
+zijazo zinazopima pande mbili tofauti. R1 inaandika hili kwa maneno — "0.00% ✓" peke yake
+ingesomeka kama ushahidi wa usalama badala ya ukimya.
+
+### 4.6 Kilichokosekana — na build ya pili
+
+T2 inadai vipimo vitatu ambavyo build ya kwanza **haikuwa imerekodi malighafi yake**:
+
+| Kipimo | Kinatoka wapi | Kwa nini haikuweza kupimwa baadaye |
+|---|---|---|
+| quantile MID dhidi ya bei ya trade (§5.1) | `terminal_trade` kwa kila point | bei ya kufungia ya mwisho haipo kwenye kilichoandikwa |
+| fill/slippage (§5.3, K1-07) | `touch_past_pips` kwa kila cell | bei ya tick iliyogusa barrier haipo — ni bei ya barrier pekee iliyokuwepo |
+| M1 dhidi ya tick | ukaguzi wa sampuli wakati wa build | ungehitaji kupita kwenye ticks za miaka 8 mara ya pili |
+
+Vyote vinahitaji **ticks zikiwa tayari kwenye kumbukumbu**. Kuvipata baadaye siyo "kuhesabu
+tena" — ni kusoma L0 nzima upya. Kwa hiyo L4 imepanda toleo **2** na build inarudiwa mara moja:
+**dakika ~40**. Mbadala ulikuwa kufunga T2 na "haijapimwa" mara tatu, kwenye vipengele
+vitatu ambavyo mpango unavitaja kwa jina.
+
+Amri sasa ni moja: `scripts\labels.bat` (setups → labels → R1), yenye onyo lile lile la
+`audit.bat` ikiwa branch iko nyuma.
 
 ---
 
@@ -213,17 +256,21 @@ kilichozisoma. Sheria haifanyi kazi hadi kitu kiitumie.
 
 ## 7. Kinachofuata
 
-**Ujenzi wa labels (L4).** Decision points **52,463**, kila moja ikitatuliwa kwa path ya ticks kwa
-grid ya SL×TP **5×5**:
+**Hatua moja: `scripts\labels.bat`** (dakika ~40). Inajenga L4 upya kwa toleo 2, kisha inatoa
+**R1** — vigezo vyote kwenye jedwali moja, kama `r0-summary` ya T1:
 
-- **L-B barrier:** TP kwanza / SL kwanza / timeout — bei ya kufungia (BUY: bid), gap-honest,
-  tie-break SL kwanza
-- **L-A quantile:** MID, bila mwelekeo — kipimo cha mwendo wa soko
-- **L-C fill:** stop/limit kwa path ya ticks; market kwa prior 0.98
-- **L-D quality:** R_net → A+ / A / B / reject
+| # | Kigezo | Inafeli lini |
+|---|---|---|
+| 1 | jiometri: `p_tp` BILA timeout dhidi ya `sl/(sl+tp)`, na `z` yake | — (inasomwa na PD) |
+| 2 | utulivu kwa miaka — base rate inayotembea si base rate | — |
+| 3 | setup dhidi ya control: je kichujio kinatoa trades **bora**, au chache tu? | — |
+| 4 | quantile MID dhidi ya trade kwa symbol (XAUUSD, GBPJPY ndizo za kupinga) | — |
+| 5 | fill/slippage dhidi ya `slippage_cap_pips` ya RCE | — |
+| 6 | buckets za L-D kwa mkunjo wa gharama (commission+swap; spread imo kwenye path) | — |
+| 7 | M1 dhidi ya tick | — |
+| — | `min_labels_per_cell` | chini ya **200** |
+| — | timeout | zaidi ya **35%** |
+| — | tie-break | zaidi ya **1%** |
+| — | G2 | point yoyote ya holdout ikigusa takwimu — **ripoti inasimama kabla ya kuhesabu** |
 
-Kazi ya masaa kadhaa kwenye PC ya PD, inayoendelea ilipoishia kama `audit.bat`.
-
-Kisha **ripoti ya R1**: base rates dhidi ya jiometri, utulivu kwa miaka, sehemu ya timeout,
-mzunguko wa tie-break (>1% → PD), na **setup dhidi ya control** — je kichujio kinatupa trades bora
-kuliko kinazochukua?
+Baada ya hapo: **sahihi ya exit ya T2 — R1 PASS au LESSON.**

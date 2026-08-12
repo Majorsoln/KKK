@@ -9,6 +9,7 @@ ikibadilika).
 
 from __future__ import annotations
 
+import json
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -594,6 +595,27 @@ def test_mjenzi_unatoa_points_na_barriers(cfg, tmp_path, monkeypatch):
     assert {"spread_entry_pips", "atr_pips"} <= set(points.columns)
     assert "sl_pips" in barriers.columns
     assert not any("cost" in c or "r_net" in c for c in barriers.columns)
+    # Toleo la 2: malighafi ya vipimo vitatu vya R1 (§5.1, §5.3, M1-vs-tick).
+    assert {"terminal_trade", "quantile_y_trade", "spread_exit_pips"} <= set(points.columns)
+    assert "touch_past_pips" in barriers.columns
+    resolved = barriers[barriers["outcome"] != TIMEOUT]
+    assert resolved["touch_past_pips"].notna().all()
+    assert (resolved["touch_past_pips"] >= 0).all(), "umbali wa kupita barrier hasi hauwezekani"
+
+    # R1 juu ya kile kile kilichoandikwa — bila kugusa ticks tena.
+    rc = main(["r1-summary", "--symbols", "EURUSD"])
+    summary = json.loads(
+        (cfg.path_of("storage.reports_root") / "r1" / "r1_summary.json").read_text("utf-8")
+    )
+    assert summary["totals"]["cells"] == len(barriers)
+    assert summary["base_rates"], "R1 bila base rates si R1"
+    assert len(summary["base_rates"]) == 25, "cell moja moja ya grid, si wastani mmoja"
+    assert summary["setup_vs_control"]["setup"]["cells"] > 0
+    assert summary["setup_vs_control"]["control"]["cells"] > 0
+    # Jiometri: kila cell iko chini ya sl/(sl+tp) — spread iko ndani ya path.
+    assert all(row["diff"] <= 0 for row in summary["base_rates"])
+    assert rc in (0, 1)
+    assert (rc == 0) == (not summary["problems"])
 
 
 def test_mjenzi_hauna_ruhusa_bila_sahihi_ya_df20(cfg, tmp_path, monkeypatch):

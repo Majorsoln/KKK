@@ -35,7 +35,7 @@ SL_FIRST = 0
 TIMEOUT = 2
 
 # Muundo wa matokeo ya labels — unaingia dataset_id (§8).
-LABEL_SCHEMA_VERSION = 1
+LABEL_SCHEMA_VERSION = 2   # 2: touch_price (L-C), terminal_trade (mid-vs-trade)
 
 
 @dataclass
@@ -48,6 +48,11 @@ class BarrierCell:
     tie_break: bool = False           # gap ilifunika zote mbili → SL kwanza
     touch_index: int | None = None    # tick iliyotatua (None kwa timeout)
     timeout_return_r: float | None = None  # E[R|timeout] — R units (÷ sl_atr)
+    # Bei HALISI ya tick iliyogusa barrier — si bei ya barrier yenyewe. Gap
+    # ikiruka barrier, hizi mbili zinatofautiana, na tofauti hiyo NDIYO
+    # slippage ya L-C (§5.3). Bila kuirekodi, `fill_probe` ingelazimika kupita
+    # kwenye ticks mara ya pili kwa points 52,000.
+    touch_price: float | None = None
 
     def to_json(self) -> dict[str, Any]:
         return {
@@ -56,6 +61,7 @@ class BarrierCell:
             "outcome": self.outcome,
             "tie_break": self.tie_break,
             "timeout_return_r": self.timeout_return_r,
+            "touch_price": self.touch_price,
         }
 
 
@@ -70,7 +76,9 @@ class PointLabels:
     atr_price: float                  # ATR14 units za bei (mid)
     horizon_end: pd.Timestamp
     terminal_mid: float | None        # mid ya mwisho ndani ya horizon
+    terminal_trade: float | None      # bei ya KUFUNGIA ya mwisho (BUY: bid)
     quantile_y: float | None          # L-A: log(midH/mid0) ÷ (ATR/mid0) — MID
+    quantile_y_trade: float | None    # ILE ILE kwa bei ya trade — §5.1 inaitaka
     terminal_atr: float | None        # mwendo wa horizon kwa ATR, ISHARA ya trade
     cells: list[BarrierCell] = field(default_factory=list)
     ticks_seen: int = 0
@@ -84,6 +92,7 @@ class PointLabels:
             "atr_price": self.atr_price,
             "horizon_end": self.horizon_end.isoformat(),
             "quantile_y": self.quantile_y,
+            "quantile_y_trade": self.quantile_y_trade,
             "terminal_atr": self.terminal_atr,
             "ticks_seen": self.ticks_seen,
             "cells": [c.to_json() for c in self.cells],
@@ -180,12 +189,14 @@ def resolve_arrays(
 
     # Path ya kufungia: BUY unafunga kwa BID (SL na TP zote); SELL kwa ASK.
     path = bid if direction == 1 else ask
+    terminal_trade = float(path[-1])
     prefix_min = np.minimum.accumulate(path)
     prefix_max = np.maximum.accumulate(path)
 
     cells: list[BarrierCell] = []
     # Mwendo wa mwisho kwa ATR, ukiwa na ISHARA ya trade: +1 = trade ilishinda.
     terminal_atr = direction * (terminal_mid - entry_mid) / atr_price
+    n = len(path)
     for sl_atr in sl_grid:
         if direction == 1:
             sl_idx = _first_leq(prefix_min, entry_trade - sl_atr * atr_price)
@@ -197,7 +208,6 @@ def resolve_arrays(
             else:
                 tp_idx = _first_leq(prefix_min, entry_trade - tp_atr * atr_price)
 
-            n = len(path)
             if sl_idx >= n and tp_idx >= n:
                 cells.append(
                     BarrierCell(
@@ -206,19 +216,37 @@ def resolve_arrays(
                     )
                 )
             elif tp_idx < sl_idx:
-                cells.append(BarrierCell(sl_atr, tp_atr, TP_FIRST, touch_index=tp_idx))
+                cells.append(
+                    BarrierCell(
+                        sl_atr, tp_atr, TP_FIRST,
+                        touch_index=tp_idx, touch_price=float(path[tp_idx]),
+                    )
+                )
             elif sl_idx < tp_idx:
-                cells.append(BarrierCell(sl_atr, tp_atr, SL_FIRST, touch_index=sl_idx))
+                cells.append(
+                    BarrierCell(
+                        sl_atr, tp_atr, SL_FIRST,
+                        touch_index=sl_idx, touch_price=float(path[sl_idx]),
+                    )
+                )
             else:
                 # Tick ILE ILE inafunika zote mbili — gap ya wikendi/habari.
                 # SL kwanza (DF-21): live, stop inatekelezwa upande mbaya kwanza.
                 cells.append(
-                    BarrierCell(sl_atr, tp_atr, SL_FIRST, tie_break=True, touch_index=sl_idx)
+                    BarrierCell(
+                        sl_atr, tp_atr, SL_FIRST, tie_break=True,
+                        touch_index=sl_idx, touch_price=float(path[sl_idx]),
+                    )
                 )
 
     # L-A (§5.1): MID pekee, bila mwelekeo — kipimo cha MWENDO WA SOKO.
     # ATR inagawanywa kwa bei ili yote yawe scale-free (log-return ÷ ATR-return).
     quantile_y = float(np.log(terminal_mid / entry_mid) / (atr_price / entry_mid))
+    # Toleo la bei ya TRADE la kipimo kile kile. Halitumiki kufundisha —
+    # §5.1 iliamua MID. Lipo ili uamuzi huo upimwe kwa namba (R1), si kwa hoja.
+    quantile_y_trade = float(
+        np.log(terminal_trade / entry_trade) / (atr_price / entry_trade)
+    )
 
     return PointLabels(
         decision_time=pd.Timestamp(decision_time),
@@ -228,11 +256,105 @@ def resolve_arrays(
         atr_price=float(atr_price),
         horizon_end=pd.Timestamp(horizon_end),
         terminal_mid=terminal_mid,
+        terminal_trade=terminal_trade,
         quantile_y=quantile_y,
+        quantile_y_trade=quantile_y_trade,
         terminal_atr=float(terminal_atr),
         cells=cells,
         ticks_seen=hi - lo,
     )
+
+
+# --------------------------------------------------------------------------
+# M1-dhidi-ya-TICK — kupima gharama ya kutotumia ticks (T2, safu ya 108)
+# --------------------------------------------------------------------------
+
+
+@dataclass
+class M1Resolution:
+    """Grid ile ile, ikitatuliwa kwa OHLC ya M1 badala ya ticks."""
+
+    outcomes: list[int] = field(default_factory=list)
+    ambiguous: list[bool] = field(default_factory=list)   # M1 moja iligusa zote mbili
+    minutes: int = 0
+
+
+def resolve_m1_arrays(
+    stamps: np.ndarray,
+    bid_all: np.ndarray,
+    ask_all: np.ndarray,
+    decision_time: pd.Timestamp,
+    horizon_end: pd.Timestamp,
+    direction: int,
+    atr_price: float,
+    sl_grid: list[float],
+    tp_grid: list[float],
+) -> M1Resolution | None:
+    """Grid ile ile lakini kwa **high/low za M1**, si tick kwa tick.
+
+    Hii si njia mbadala ya kujenga labels — ni **kipimo cha kosa**. §5 inasema
+    bar inaonyesha kwamba high na low ziligusa lakini haisemi ipi ilianza; hoja
+    hiyo ilikuwa maneno hadi ilipopimwa. M1 moja ikigusa SL na TP kwa pamoja,
+    hapa inahesabiwa `ambiguous` NA inapewa jibu la kawaida (SL kwanza,
+    tahadhari) ili ilinganishwe na ukweli wa ticks.
+
+    Ticks ndizo chanzo cha M1 hapa — si faili la L2. Kulinganisha lazima kuwe
+    juu ya **data ile ile**; L2 ingeleta tofauti za chanzo ndani ya kipimo cha
+    tofauti za resolution.
+    """
+    if direction not in (1, -1):
+        raise ValueError(f"direction lazima iwe +1/-1, si {direction!r}")
+    if not atr_price or atr_price <= 0 or np.isnan(atr_price):
+        return None
+
+    lo = int(np.searchsorted(stamps, pd.Timestamp(decision_time).value // 1_000, side="left"))
+    hi = int(np.searchsorted(stamps, pd.Timestamp(horizon_end).value // 1_000, side="right"))
+    if lo >= hi:
+        return None
+
+    window = stamps[lo:hi]
+    path = (bid_all if direction == 1 else ask_all)[lo:hi]
+    entry_trade = float(ask_all[lo] if direction == 1 else bid_all[lo])
+
+    # Dakika za epoch — grouping bila pandas (points 52,000 x groupby = saa).
+    minute = window // 60_000_000
+    starts = np.flatnonzero(np.r_[True, minute[1:] != minute[:-1]])
+    highs = np.maximum.reduceat(path, starts)
+    lows = np.minimum.reduceat(path, starts)
+
+    prefix_min = np.minimum.accumulate(lows)
+    prefix_max = np.maximum.accumulate(highs)
+    n = len(starts)
+
+    outcomes: list[int] = []
+    ambiguous: list[bool] = []
+    for sl_atr in sl_grid:
+        if direction == 1:
+            sl_idx = _first_leq(prefix_min, entry_trade - sl_atr * atr_price)
+        else:
+            sl_idx = _first_geq(prefix_max, entry_trade + sl_atr * atr_price)
+        for tp_atr in tp_grid:
+            if direction == 1:
+                tp_idx = _first_geq(prefix_max, entry_trade + tp_atr * atr_price)
+            else:
+                tp_idx = _first_leq(prefix_min, entry_trade - tp_atr * atr_price)
+
+            if sl_idx >= n and tp_idx >= n:
+                outcomes.append(TIMEOUT)
+                ambiguous.append(False)
+            elif tp_idx < sl_idx:
+                outcomes.append(TP_FIRST)
+                ambiguous.append(False)
+            elif sl_idx < tp_idx:
+                outcomes.append(SL_FIRST)
+                ambiguous.append(False)
+            else:
+                # Bar MOJA iligusa zote mbili. Hii ndiyo kesi ambayo ticks
+                # zinajibu na bars haziwezi — si kesi adimu ya gap.
+                outcomes.append(SL_FIRST)
+                ambiguous.append(True)
+
+    return M1Resolution(outcomes=outcomes, ambiguous=ambiguous, minutes=n)
 
 
 # --------------------------------------------------------------------------

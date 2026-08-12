@@ -1280,7 +1280,10 @@ def cmd_build_labels(args: argparse.Namespace) -> int:
     done: set[str] = set() if args.no_resume else set(state.get("done", []))
 
     on_progress, started = _progress_printer(args.progress_every)
-    totals = {"points": 0, "cells": 0, "setups": 0, "controls": 0, "ties": 0, "timeouts": 0}
+    totals = {
+        "points": 0, "cells": 0, "setups": 0, "controls": 0, "ties": 0, "timeouts": 0,
+        "m1_cells": 0, "m1_disagree": 0, "m1_ambiguous": 0,
+    }
     per_symbol: dict[str, Any] = {}
 
     for symbol in symbols:
@@ -1314,17 +1317,26 @@ def cmd_build_labels(args: argparse.Namespace) -> int:
             totals["controls"] += s["controls"]
             totals["ties"] += s["tie_breaks"]
             totals["timeouts"] += s["timeouts"]
+            totals["m1_cells"] += s["m1_cells"]
+            totals["m1_disagree"] += s["m1_disagree"]
+            totals["m1_ambiguous"] += s["m1_ambiguous"]
             per_symbol.setdefault(symbol, {"years": {}})["years"][str(year)] = s
 
     tie_frac = totals["ties"] / totals["cells"] if totals["cells"] else 0.0
     timeout_frac = totals["timeouts"] / totals["cells"] if totals["cells"] else 0.0
+    m1_frac = totals["m1_disagree"] / totals["m1_cells"] if totals["m1_cells"] else 0.0
     summary = {
         "version": LABEL_BUILD_VERSION,
         "built_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "config_hash": cfg.config_hash,
         "code_rev": code_rev(),
         "holdout_start": holdout_start.isoformat(),
-        "totals": {**totals, "tie_break_frac": tie_frac, "timeout_frac": timeout_frac},
+        "totals": {
+            **totals,
+            "tie_break_frac": tie_frac,
+            "timeout_frac": timeout_frac,
+            "m1_disagree_frac": m1_frac,
+        },
         "per_symbol": per_symbol,
     }
     report_path = cfg.path_of("storage.reports_root") / "r1" / "label_build.json"
@@ -1335,6 +1347,7 @@ def cmd_build_labels(args: argparse.Namespace) -> int:
         f"\njumla: points {totals['points']:,} (setup {totals['setups']:,} · control "
         f"{totals['controls']:,}) · cells {totals['cells']:,} · "
         f"timeout {timeout_frac:.1%} · tie-break {tie_frac:.2%} · "
+        f"M1≠tick {m1_frac:.2%} (cells {totals['m1_cells']:,}) · "
         f"{time.monotonic() - started:.0f}s"
     )
     print(f"ushahidi: {report_path}")
@@ -1358,6 +1371,152 @@ def cmd_build_labels(args: argparse.Namespace) -> int:
         )
         rc = 1
     return rc
+
+
+def cmd_r1_summary(args: argparse.Namespace) -> int:
+    """R1 — ukaguzi wa labels dhidi ya vigezo vyake (T2, RS-04/DF-21/K1-07).
+
+    Kama `r0-summary`: haisomi ticks, inasoma kile kilichoandikwa. Ushahidi wa
+    sahihi ya exit ya T2.
+    """
+    cfg = _load(args)
+    import pandas as pd
+
+    from .r1 import build_report, load_build_stats, load_labels
+    from .splits import SplitPlan
+
+    labels_root = cfg.research_root / "data" / "L4_labels" / "labels"
+    points, barriers = load_labels(labels_root, _symbol_list(args))
+    if barriers.empty:
+        print(f"hakuna labels chini ya {labels_root} — `build-labels` kwanza", file=sys.stderr)
+        return 2
+
+    reports_root = cfg.path_of("storage.reports_root") / "r1"
+    stats = load_build_stats(reports_root / "label_build.json")
+    cost_grid = (
+        [float(x) for x in args.cost_pips.split(",")] if args.cost_pips else [0.0, 0.5, 1.0]
+    )
+    report = build_report(
+        cfg,
+        points,
+        barriers,
+        SplitPlan.from_config(cfg).holdout_start,
+        build_stats=stats,
+        cost_grid=cost_grid,
+    )
+    p = report.payload
+    if not p:
+        for problem in report.problems:
+            print(f"HITILAFU: {problem}", file=sys.stderr)
+        return 2
+
+    t = p["totals"]
+    print("R1 — UKAGUZI WA LABELS (TRAIN+VAL pekee, G2)\n")
+    print(
+        f"points {t['points']:,} (setup {t['setups']:,} · control {t['controls']:,}) · "
+        f"cells {t['cells']:,} · timeout {t['timeout_frac']:.2%} · "
+        f"tie-break {t['tie_breaks']} ({t['tie_break_frac']:.2%})"
+    )
+    print(f"E[R] gross: setups {t['ev_r_gross_setups']:+.4f} R · zote {t['ev_r_gross']:+.4f} R\n")
+
+    print("1. JIOMETRI (RS-04) — p_tp BILA timeout dhidi ya sl/(sl+tp)")
+    rates = pd.DataFrame(p["base_rates"])
+    print(f"   {'sl':>5} {'tp':>5} {'n':>8} {'timeout':>8} {'p_tp':>7} {'jiometri':>9} {'diff':>7} {'z':>7}")
+    for _, r in rates.iterrows():
+        print(
+            f"   {r['sl_atr']:>5.2f} {r['tp_atr']:>5.2f} {int(r['n']):>8,} "
+            f"{r['timeout_frac']:>7.1%} {r['p_tp']:>7.3f} {r['geometry']:>9.3f} "
+            f"{r['diff']:>+7.3f} {r['z']:>+7.1f}"
+        )
+    print(f"   cells ndogo kuliko zote: {t['min_labels_per_cell']:,} "
+          f"(kikomo {int(cfg.get('labels.barrier.min_labels_per_cell'))})\n")
+
+    print("2. UTULIVU KWA MIAKA")
+    for row in p["year_stability"]:
+        print(
+            f"   {row['year']}  cells {row['cells']:>8,}  p_tp {row['p_tp']:.3f}  "
+            f"timeout {row['timeout_frac']:.1%}  E[R] {row['ev_r']:+.4f}"
+        )
+    ys = [r["p_tp"] for r in p["year_stability"]]
+    if ys:
+        print(f"   mwanya: {min(ys):.3f} → {max(ys):.3f}  (upana {max(ys) - min(ys):.3f})\n")
+
+    svc = p["setup_vs_control"]
+    if svc:
+        print("3. SETUP DHIDI YA CONTROL (DF-20)")
+        for name in ("setup", "control"):
+            s = svc[name]
+            print(
+                f"   {name:<8} cells {s['cells']:>9,}  p_tp {s['p_tp']:.4f}  "
+                f"timeout {s['timeout_frac']:.1%}  E[R] {s['ev_r']:+.4f}  "
+                f"ATR p50 {s['atr_pips_median']:.1f} pips"
+            )
+        print(
+            f"   tofauti p_tp {svc['delta_p_tp']:+.4f} (z {svc['delta_z']:+.1f}) · "
+            f"E[R] {svc['delta_ev_r']:+.4f} R\n"
+        )
+
+    q = p["quantile_mid_vs_trade"]
+    if q:
+        print("4. QUANTILE: MID DHIDI YA BEI YA TRADE (§5.1)")
+        for row in q:
+            keys = sorted(k for k in row if k.startswith("diff_q"))
+            diffs = "  ".join(f"{k[5:]}: {row[k]:+.4f}" for k in keys)
+            print(
+                f"   {row['symbol']:<8} spread p50 {row['spread_entry_p50']:>5.2f} pips  "
+                f"wastani {row['mean_diff']:+.4f}   {diffs}"
+            )
+        print()
+
+    f = p["fill_bootstrap"]
+    if f:
+        print(f"5. L-C — FILL (§5.3; cap ya stop {f['cap_stop_pips']} pips kutoka risk.yaml)")
+        if "stop_sl" in f:
+            s = f["stop_sl"]
+            print(
+                f"   SL (stop): n {s['n']:>9,}  p50 {s['p50']:.2f}  p90 {s['p90']:.2f}  "
+                f"p99 {s['p99']:.2f}  max {s['max']:.1f} pips"
+            )
+            print(
+                f"              ndani ya cap: {s['within_cap']:.2%}  "
+                f"(nje ya cap: {s['over_cap']:,})"
+            )
+        if "limit_tp" in f:
+            s = f["limit_tp"]
+            print(f"   TP (limit): n {s['n']:>8,}  p50 {s['p50']:.2f}  p99 {s['p99']:.2f} pips")
+        print(f"   market: prior {f['market_prior']} — §5.3 haikisii kwa historia\n")
+
+    b = p["quality_buckets"]
+    if b:
+        print("6. L-D — BUCKETS kwa gharama (commission+swap PEKEE; spread imo kwenye path)")
+        for cost, row in b.items():
+            print(
+                f"   cost {cost:>4} pips  E[R] {row['ev_r_net']:+.4f}  "
+                f"A+ {row['A+']:.1%}  A {row['A']:.1%}  B {row['B']:.1%}  "
+                f"reject {row['reject']:.1%}"
+            )
+        print("   namba halisi ya gharama ni ya RCE (T7) — hii ni unyeti\n")
+
+    m1 = p["m1_vs_tick"]
+    if m1 and m1.get("cells"):
+        print("7. M1 DHIDI YA TICK")
+        print(
+            f"   cells {m1['cells']:,} zilizoangaliwa mara mbili · "
+            f"hazikubaliani {m1['disagree']:,} ({m1['disagree_frac']:.2%}) · "
+            f"M1 moja iligusa zote mbili {m1['ambiguous']:,}\n"
+        )
+
+    for note in p["notes"]:
+        print(f"kumbuka: {note}")
+    for problem in p["problems"]:
+        print(f"HITILAFU: {problem}", file=sys.stderr)
+
+    out_path = reports_root / "r1_summary.json"
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_path.write_text(json.dumps(p, indent=2, default=str), encoding="utf-8")
+    print(f"\nushahidi: {out_path}")
+    print(f"HUKUMU: {'PASS' if report.ok else 'FAIL'}")
+    return 0 if report.ok else 1
 
 
 def cmd_splits(args: argparse.Namespace) -> int:
@@ -1685,6 +1844,18 @@ def build_parser() -> argparse.ArgumentParser:
         help="kwa tests pekee — DF-20 ni pre-registration ya lazima (§4.3 sheria 5)",
     )
     p_labels.set_defaults(func=cmd_build_labels)
+
+    p_r1 = subparsers.add_parser(
+        "r1-summary",
+        help="R1 — labels dhidi ya vigezo vyao (RS-04, DF-21, K1-07) — ushahidi wa T2",
+        parents=[common],
+    )
+    p_r1.add_argument("--symbols", help="orodha ya symbols, comma separated")
+    p_r1.add_argument(
+        "--cost-pips",
+        help="mkunjo wa unyeti wa L-D, mf. 0,0.5,1 (commission+swap; spread imo kwenye path)",
+    )
+    p_r1.set_defaults(func=cmd_r1_summary)
 
     p_split = subparsers.add_parser(
         "splits", help="DF-14 / G2 — mpango wa splits + holdout guard (§7)", parents=[common]
