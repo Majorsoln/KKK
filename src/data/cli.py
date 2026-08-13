@@ -1793,6 +1793,85 @@ def cmd_effective_n(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_setup_effect(args: argparse.Namespace) -> int:
+    """Je makali ya SETUP-v1 ni utabiri, au uteuzi wa volatility? (T3 hatua 2)
+
+    Inagharimu bajeti: inatathmini dhidi ya labels na matokeo yake yataamua
+    kama tunaendelea. Hilo ni uteuzi, hata kama ni uchambuzi.
+    """
+    cfg = _load(args)
+    import numpy as np
+
+    from src.governance import budget as bud
+
+    from .costs import realized_r
+    from .matching import DEFAULT_STRATA, build_strata, matched_effect
+    from .r1 import load_labels
+
+    bud.guard()
+    want_sl, want_tp = (float(x) for x in args.cell.split("/"))
+
+    labels_root = cfg.research_root / "data" / "L4_labels" / "labels"
+    points, barriers = load_labels(labels_root, _symbol_list(args))
+    if barriers.empty:
+        print(f"hakuna labels chini ya {labels_root}", file=sys.stderr)
+        return 2
+
+    cells = barriers[
+        np.isclose(barriers["sl_atr"], want_sl) & np.isclose(barriers["tp_atr"], want_tp)
+    ].copy()
+    if cells.empty:
+        print(f"cell {args.cell} haipo kwenye grid", file=sys.stderr)
+        return 2
+    cells["r_net"] = realized_r(cells, commission_pips=args.commission_pips)
+
+    frame = points.merge(
+        cells[["symbol", "decision_time", "r_net"]], on=["symbol", "decision_time"], how="inner"
+    )
+    frame = build_strata(frame)
+    result = matched_effect(
+        frame, outcome="r_net", strata=DEFAULT_STRATA, cell=(want_sl, want_tp),
+        n_boot=args.bootstrap,
+    )
+
+    print(f"SETUP DHIDI YA CONTROL, NDANI YA STRATA — cell {want_sl}/{want_tp}")
+    print(f"strata: {' · '.join(DEFAULT_STRATA)}\n")
+    print(f"   setups {result.n_setup:,}  ·  controls {result.n_control:,}")
+    print(f"   strata {result.strata_total:,} · zenye zote mbili {result.strata_both:,}"
+          f" · common support {result.support_frac:.1%}\n")
+    print(f"   tofauti GHAFI       {result.raw_diff:+.4f} R")
+    print(f"   tofauti NDANI YA STRATA {result.matched_diff:+.4f} R", end="")
+    if np.isfinite(result.ci_low):
+        print(f"   [90% CI {result.ci_low:+.4f}, {result.ci_high:+.4f}]")
+    else:
+        print()
+    if np.isfinite(result.raw_diff) and result.raw_diff != 0:
+        print(f"   imepungua kwa {1 - result.matched_diff / result.raw_diff:.0%}")
+
+    verdict = "—"
+    if np.isfinite(result.matched_diff):
+        if np.isfinite(result.ci_low) and result.ci_low > 0:
+            verdict = "HALISI — CI haiguzi sifuri"
+        elif result.matched_diff <= 0.2 * result.raw_diff:
+            verdict = "ARTEFACT — karibu yote ilikuwa uteuzi wa mazingira"
+        else:
+            verdict = "DHAIFU — imebaki lakini CI inaguza sifuri"
+    print(f"\n   HUKUMU: {verdict}")
+    for note in result.notes:
+        print(f"\nkumbuka: {note}")
+
+    out_path = cfg.path_of("storage.reports_root") / "r2" / "setup_effect.json"
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_path.write_text(json.dumps(result.to_json(), indent=2, default=str), encoding="utf-8")
+    print(f"\nushahidi: {out_path}")
+    print(
+        "\nbajeti: matumizi hayajaandikwa. Yaandike ukikubali matokeo:\n"
+        f'  python -m src.governance.cli budget-spend setup-effect-{args.cell.replace("/", "-")}'
+        ' --reason "..."'
+    )
+    return 0
+
+
 def cmd_splits(args: argparse.Namespace) -> int:
     """DF-14 / lango G2 — mpango wa splits kutoka config PEKEE (spec §7)."""
     cfg = _load(args)
@@ -2198,6 +2277,17 @@ def build_parser() -> argparse.ArgumentParser:
     p_neff.add_argument("--delta", type=float, help="δ_MER — inaonyesha kama N inatosha")
     p_neff.add_argument("--include-control", action="store_true")
     p_neff.set_defaults(func=cmd_effective_n)
+
+    p_eff = subparsers.add_parser(
+        "setup-effect",
+        help="T3 hatua 2 — je makali ya SETUP-v1 ni utabiri au uteuzi wa volatility?",
+        parents=[common],
+    )
+    p_eff.add_argument("--symbols")
+    p_eff.add_argument("--cell", default="2.0/3.0", help="cell iliyosainiwa")
+    p_eff.add_argument("--commission-pips", type=float, default=0.7)
+    p_eff.add_argument("--bootstrap", type=int, default=500)
+    p_eff.set_defaults(func=cmd_setup_effect)
 
     p_split = subparsers.add_parser(
         "splits", help="DF-14 / G2 — mpango wa splits + holdout guard (§7)", parents=[common]
