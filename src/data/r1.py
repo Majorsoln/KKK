@@ -561,6 +561,10 @@ def build_report(
     report.payload = {
         "version": R1_REPORT_VERSION,
         "config_hash": cfg.config_hash,
+        # Sahihi za T2 zinahusu sehemu hizi, si faili nzima ya config (§3.8).
+        "section_hashes": {
+            k: cfg.section_hash(k) for k in ("labels", "setups", "quality", "splits")
+        },
         "holdout_start": holdout_start.isoformat(),
         "totals": {
             "points": int(len(points)),

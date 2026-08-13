@@ -859,6 +859,32 @@ folds hizo hauna msingi — bila kufelisha kitu ambacho mafunzo hayakiitaji.
 EURCHF, GBPJPY na XAUUSD ndizo Toleo B, na 2023 yao iliondolewa kwa sahihi ya PD (#3). Miezi 19
 inakuwa **7**. Njaa haikutokea — **iliamuliwa**, na ni bei iliyojulikana ya uamuzi ule.
 
+**G14 ilikamata kitu halisi: `config_hash` ni ya faili NZIMA (2026-08-13).** Baada ya sahihi
+#12–#17, `verify` ilifelisha **sahihi #11** (DF-20): "ushahidi umebadilika baada ya kusainiwa"
+(`setup_rates.json`). Sababu: `labels.bat` inaendesha `detect-setups` upya, na faili linabeba
+`built_at`, `code_rev` na `config_hash` — zote tatu zilihama.
+
+Lakini `config_hash` ilihama kwa sababu **`m1_check_frac` iliongezwa chini ya `labels`** — kigezo
+kisichohusiana hata kidogo na sheria ya setups. Ulinganisho wa sehemu kwa sehemu kati ya commit
+ya sahihi (`f62f3e1`) na HEAD unaonyesha: sehemu **moja** imebadilika (`labels`); `setups`,
+`quality`, `splits` — zote **sawa**.
+
+Hii ndiyo kasoro: **sahihi kuhusu setups ilifungwa na fingerprint ya faili nzima.** Kila kigezo
+chochote kikiguswa mahali popote, kila sahihi ya zamani inaonekana imevunjika — na baada ya mara
+chache, ONYO linaanza kupuuzwa. Lango linalolia bila sababu linakufa polepole.
+
+Kimewekwa `DataConfig.section_hash()` (JSON iliyopangwa, kwa hiyo maoni na mpangilio wa YAML
+haviihusu), `config-hash --sections --since <commit>`, na `section_hashes` ndani ya ushahidi
+wenyewe (`setup_rates.json`, `label_build.json`, `r1_summary.json`) — ili swali "je SEHEMU
+inayohusika imebadilika?" lijibiwe kwa faili, si kwa uchimbaji wa git.
+
+**Kilichobaki kwa PD:** mstari MPYA wa DF-20 unaoelekeza faili la sasa. Rejista ni ya kuongezwa
+tu; #11 inabaki ikiwa FAIL, na hiyo ni sehemu ya ushahidi. Muhimu: mstari mpya **si
+pre-registration** — pre-registration inathibitishwa na #11 kuwepo kwenye commit `f62f3e1` ya
+2026-08-11, **kabla** `build-labels` haijawahi kuendeshwa. Hilo liko kwenye git na haliwezi
+kubadilishwa. Mstari mpya ni **kufunga upya kwenye ushahidi wa sasa**, na sababu yake lazima
+iseme hivyo.
+
 **Kasoro kwenye kipimo changu (imerekebishwa, 2026-08-13).** Quantile mid-dhidi-ya-trade
 ilikuwa ikipimwa **bila ishara ya trade**. `quantile_y_trade` haina mwelekeo: BUY (nunua kwa ask,
 funga kwa bid) iko chini ya mid; SELL iko juu kwa kiasi kile kile. Wastani wa pamoja unafuta

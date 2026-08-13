@@ -91,6 +91,33 @@ class DataConfig:
             )
         return Path(text).expanduser()
 
+    # ---------- fingerprint ya SEHEMU ----------
+
+    def section_hash(self, section: str) -> str:
+        """Fingerprint ya sehemu MOJA ya config (`setups`, `labels`, …).
+
+        `config_hash` ni ya faili nzima, na hiyo ndiyo tatizo lake: kigezo cha
+        `labels` kikiongezwa, sahihi ya **DF-20** (sheria ya setups) inaonekana
+        imevunjika ingawa sheria yenyewe haijaguswa hata herufi moja. Ilitokea
+        2026-08-13: `m1_check_frac` iliongezwa, na sahihi #11 ikafeli.
+
+        Hash ya sehemu inagawanya swali: "je config imebadilika?" (faili nzima)
+        dhidi ya "je **hii** imebadilika?" (sehemu). Sahihi inayohusu setups
+        inapaswa kufungwa na sehemu ya setups.
+
+        Inahesabiwa kwa JSON iliyopangwa (`sort_keys`), si kwa bytes za YAML:
+        maoni na mpangilio wa mistari si sehemu ya maana.
+        """
+        import hashlib
+        import json as _json
+
+        payload = _json.dumps(self.raw.get(section), sort_keys=True, default=str)
+        return "sha256:" + hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+    def section_hashes(self) -> dict[str, str]:
+        """Fingerprint ya kila sehemu ya juu ya config."""
+        return {name: self.section_hash(name) for name in sorted(self.raw)}
+
     # ---------- vigezo vinavyotumika mara kwa mara ----------
 
     @property

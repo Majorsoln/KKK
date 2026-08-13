@@ -6,6 +6,8 @@ Exit codes ndizo mkataba: 0 = sawa/skipped · 1 = ONYO au ukiukaji · 2 = hitila
 from __future__ import annotations
 
 import json
+from dataclasses import replace
+from pathlib import Path
 
 import pytest
 
@@ -93,6 +95,38 @@ def test_config_hash_inatoka_kwenye_faili_la_config(capsys):
     assert main(["--config", CONFIG, "config-hash"]) == 0
     payload = json.loads(capsys.readouterr().out)
     assert payload["config_hash"].startswith("sha256:")
+
+
+def test_hash_ya_sehemu_haiathiriwi_na_sehemu_nyingine(capsys):
+    """Kigezo cha `labels` kikibadilika, hash ya `setups` ISIBADILIKE.
+
+    Hii ndiyo kasoro iliyofelisha sahihi #11 (DF-20) tarehe 2026-08-13:
+    `m1_check_frac` iliongezwa chini ya `labels`, `config_hash` ya faili
+    nzima ikabadilika, na sahihi kuhusu SHERIA YA SETUPS ikaonekana
+    imevunjika ingawa sheria haikuguswa hata herufi moja.
+    """
+    from src.data.config import load_config
+
+    cfg = load_config(Path(CONFIG), env={"ELITEFX_RESEARCH_ROOT": "/tmp/x", "ELITEFX_HOLDOUT_ROOT": "/tmp/y"})
+    kabla = cfg.section_hash("setups")
+
+    badiliko = {**cfg.raw, "labels": {**cfg.raw["labels"], "m1_check_frac": 0.99}}
+    mpya = replace(cfg, raw=badiliko)
+
+    assert mpya.section_hash("labels") != cfg.section_hash("labels"), "iliyobadilika ionekane"
+    assert mpya.section_hash("setups") == kabla, "isiyobadilika isiguswe"
+
+
+def test_hash_ya_sehemu_haijali_maoni_wala_mpangilio(capsys):
+    """Maoni na mpangilio wa mistari si maana — hash isiyaone.
+
+    Sahihi ingevunjika kwa kuhariri maoni ya YAML, ambayo si uamuzi.
+    """
+    from src.data.config import load_config
+
+    cfg = load_config(Path(CONFIG), env={"ELITEFX_RESEARCH_ROOT": "/tmp/x", "ELITEFX_HOLDOUT_ROOT": "/tmp/y"})
+    upya = replace(cfg, raw={**cfg.raw, "setups": dict(reversed(list(cfg.raw["setups"].items())))})
+    assert upya.section_hash("setups") == cfg.section_hash("setups")
 
 
 def test_hitilafu_ya_config_inarudisha_exit_2(capsys):

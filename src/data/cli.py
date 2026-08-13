@@ -1180,6 +1180,10 @@ def cmd_detect_setups(args: argparse.Namespace) -> int:
         "schema": SETUP_SCHEMA_VERSION,
         "built_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "config_hash": cfg.config_hash,
+        # Sahihi ya DF-20 inahusu SHERIA ya setups, si faili nzima ya config.
+        # Bila hii, kigezo cha `labels` kikiongezwa sahihi inaonekana imevunjika
+        # ingawa sheria haijaguswa (ilitokea 2026-08-13).
+        "section_hashes": {k: cfg.section_hash(k) for k in ("setups", "quality", "splits")},
         "code_rev": code_rev(),
         "holdout_start": holdout_start.isoformat(),
         "quality_report": str(report_path),
@@ -1329,6 +1333,7 @@ def cmd_build_labels(args: argparse.Namespace) -> int:
         "version": LABEL_BUILD_VERSION,
         "built_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "config_hash": cfg.config_hash,
+        "section_hashes": {k: cfg.section_hash(k) for k in ("labels", "setups", "splits")},
         "code_rev": code_rev(),
         "holdout_start": holdout_start.isoformat(),
         "totals": {
@@ -1597,8 +1602,40 @@ def cmd_splits(args: argparse.Namespace) -> int:
 
 def cmd_config_hash(args: argparse.Namespace) -> int:
     cfg = _load(args)
-    print(json.dumps({"config": str(cfg.path), "config_hash": cfg.config_hash}, indent=2))
+    payload: dict[str, Any] = {"config": str(cfg.path), "config_hash": cfg.config_hash}
+    if args.sections:
+        payload["sections"] = cfg.section_hashes()
+    if args.since:
+        # Sahihi inaelekeza `code_rev`. Swali si "config imebadilika?" bali
+        # "je SEHEMU inayohusika na sahihi hii imebadilika?" — hilo ndilo
+        # linaloweza kujibiwa, na ni tofauti kabisa (2026-08-13, sahihi #11).
+        payload["since"] = args.since
+        payload["changed"] = _sections_changed(cfg, args.since)
+    print(json.dumps(payload, indent=2))
     return 0
+
+
+def _sections_changed(cfg, revision: str) -> dict[str, str]:
+    """Sehemu zilizobadilika kati ya commit `revision` na config ya sasa."""
+    import subprocess
+
+    import yaml
+
+    try:
+        blob = subprocess.run(
+            ["git", "show", f"{revision}:config/data.yaml"],
+            capture_output=True, text=True, check=True,
+        ).stdout
+    except (subprocess.CalledProcessError, FileNotFoundError) as exc:
+        return {"—": f"commit `{revision}` haipatikani ({exc})"}
+
+    old = yaml.safe_load(blob) or {}
+    out: dict[str, str] = {}
+    for name in sorted(set(old) | set(cfg.raw)):
+        before = json.dumps(old.get(name), sort_keys=True, default=str)
+        after = json.dumps(cfg.raw.get(name), sort_keys=True, default=str)
+        out[name] = "IMEBADILIKA" if before != after else "sawa"
+    return out
 
 
 # --------------------------------------------------------------------------
@@ -1899,6 +1936,14 @@ def build_parser() -> argparse.ArgumentParser:
     p_split.set_defaults(func=cmd_splits)
 
     p_cfg = subparsers.add_parser("config-hash", help="fingerprint ya config/data.yaml", parents=[common])
+    p_cfg.add_argument(
+        "--sections", action="store_true", help="fingerprint ya KILA sehemu, si faili nzima"
+    )
+    p_cfg.add_argument(
+        "--since",
+        metavar="COMMIT",
+        help="sehemu zipi zimebadilika tangu commit hii (mf. `code_rev` ya sahihi)",
+    )
     p_cfg.set_defaults(func=cmd_config_hash)
 
     return parser
