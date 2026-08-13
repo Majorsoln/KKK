@@ -196,8 +196,13 @@ def n_max_from_cost(cost_r: float, sr_target: float, kappa: float) -> float:
 def delta_mer(sr_target: float, n_per_year: float, dev_dp: float = 2.0) -> float:
     """Edge ndogo kabisa yenye maana ya KIUCHUMI, kwa units za p_tp.
 
-    `SR* = e·√n` ambapo `e` ni EV kwa trade (R), sd ya trade ≈ 1 R. Kwenye cell
-    yenye `tp/sl = 1`, `dEV/dp_tp = 2`, kwa hiyo `e = 2δ`.
+    `SR* = e·√n` ambapo `e` ni EV kwa trade (R), sd ya trade ≈ 1 R.
+
+    **`dev_dp = 1 + tp/sl`, si 2.0 daima.** TP inalipa `tp/sl` R na SL
+    inagharimu 1 R, kwa hiyo kuhamisha uzito kutoka SL kwenda TP kunabadilisha
+    EV kwa `1 + tp/sl` kwa kila unit ya `p_tp`. Ni 2.0 kwa cell yenye
+    `tp/sl = 1` pekee; kwa 2.0/3.0 ni **2.5**, na kutumia 2.0 kunavimbisha
+    `δ_MER` kwa 25% (kosa la 2026-08-13).
 
     Hii ndiyo iliyochukua nafasi ya "je inazidi breakeven": kupima kwa usahihi
     wa breakeven ni kujenga jaribio ambalo, likifaulu, linarudisha Sharpe ~0.24

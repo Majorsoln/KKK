@@ -127,6 +127,26 @@ def test_delta_mer_inashuka_kwa_mzizi_wa_n():
     assert delta_mer(0.7, 1012) == pytest.approx(delta_mer(0.7, 253) / 2.0, rel=0.01)
 
 
+def test_delta_mer_inategemea_uwiano_wa_tp_kwa_sl():
+    """`dEV/dp_tp = 1 + tp/sl` — si 2.0 daima.
+
+    Kwa cell 2.0/3.0 ni 2.5. Kutumia 2.0 kunavimbisha δ_MER (0.0294 badala ya
+    0.0235) — na kwa sababu `N_req ∝ 1/δ²`, kunafanya data inayohitajika
+    **ionekane ndogo** kuliko ilivyo: 2,269 badala ya 3,549.
+
+    Ndio mwelekeo hatari: kosa lilifanya jaribio lionekane rahisi zaidi.
+    Kosa lililotokea kwenye run ya kwanza ya `cost-audit` (2026-08-13).
+    """
+    n = 142.0
+    sawa = delta_mer(0.7, n, dev_dp=1.0 + 3.0 / 2.0)      # cell 2.0/3.0
+    kosa = delta_mer(0.7, n, dev_dp=2.0)                  # dhana ya tp/sl = 1
+    assert sawa == pytest.approx(0.0235, abs=0.0005)
+    assert kosa == pytest.approx(0.0294, abs=0.0005)
+    assert n_required(sawa) == pytest.approx(3_549, rel=0.02)
+    assert n_required(kosa) == pytest.approx(2_269, rel=0.02)
+    assert n_required(kosa) < n_required(sawa), "kosa lilipunguza data inayoonekana kuhitajika"
+
+
 def test_n_required_ni_one_sample_si_two():
     """Swali ni "je inazidi breakeven ILIYOFAHAMIKA" — one-sample.
 

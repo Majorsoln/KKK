@@ -1634,6 +1634,8 @@ def cmd_cost_audit(args: argparse.Namespace) -> int:
     inatumika kwa mara ya kwanza tangu ilipoanza kurekodiwa.
     """
     cfg = _load(args)
+    import numpy as np
+
     from .costs import audit, config_budget, delta_mer, n_max_from_cost, n_required
     from .r1 import load_labels
 
@@ -1667,23 +1669,55 @@ def cmd_cost_audit(args: argparse.Namespace) -> int:
             f"{r['ev_r_naive']:>+9.4f} {r['ev_r_realized']:>+10.4f} {r['ev_r_net']:>+9.4f}"
         )
 
-    # Identities za T3 kwa cell iliyotajwa (default: pana zaidi).
-    row = frame.loc[frame["ev_r_net"].idxmax()]
-    cost_r = float(row["cost_r_total"])
-    naive_cost = float(row["commission_r"])
-    n_max = n_max_from_cost(cost_r, args.sr_target, args.kappa)
-    n_max_naive = n_max_from_cost(naive_cost, args.sr_target, args.kappa)
-    delta = delta_mer(args.sr_target, n_max)
-    need = n_required(delta)
+    # Identities za T3. Cell LAZIMA itajwe: kuichagua kwa `idxmax` ya EV ni
+    # UTEUZI JUU YA LABEL (§4.3 darasa la tatu) — kosa lile lile ambalo
+    # `r1-ev` inaonya dhidi yake, likirudiwa hapa (2026-08-13).
+    if not args.cell:
+        print(
+            "\nIDENTITIES hazijahesabiwa: `--cell SL/TP` haijatajwa.\n"
+            "  Kuchagua cell kwa kuangalia jedwali hili ni uteuzi juu ya label.\n"
+            "  Tangaza cell, kisha isaini kama registered rule pamoja na ukiri huo:\n"
+            "      python -m src.data.cli cost-audit --cell 2.0/3.0",
+            file=sys.stderr,
+        )
+        rc_cell = 1
+    else:
+        rc_cell = 0
+        want_sl, want_tp = (float(x) for x in args.cell.split("/"))
+        match = frame[
+            np.isclose(frame["sl_atr"], want_sl) & np.isclose(frame["tp_atr"], want_tp)
+        ]
+        if match.empty:
+            print(f"cell {args.cell} haipo kwenye grid", file=sys.stderr)
+            return 2
+        row = match.iloc[0]
+        cost_r = float(row["cost_r_total"])
+        naive_cost = float(row["commission_r"])
+        # `dEV/dp_tp = 1 + tp/sl` — SI 2.0 daima. Kwa cell 2.0/3.0 ni 2.5, na
+        # kuitumia 2.0 kunavimbisha δ_MER kwa 25%.
+        dev_dp = 1.0 + want_tp / want_sl
+        n_max = n_max_from_cost(cost_r, args.sr_target, args.kappa)
+        n_max_naive = n_max_from_cost(naive_cost, args.sr_target, args.kappa)
+        delta = delta_mer(args.sr_target, n_max, dev_dp=dev_dp)
+        need = n_required(delta)
+        # Bar HALISI: umbali hadi breakeven, JUMLISHA edge inayolipa.
+        gap_to_breakeven = -float(row["ev_r_net"]) / dev_dp
+        total_lift = gap_to_breakeven + delta
 
-    print(f"\nIDENTITIES (cell {row['sl_atr']:.2f}/{row['tp_atr']:.2f} · SR* {args.sr_target} · κ {args.kappa})")
-    print(f"   commission pekee    : cost_R {naive_cost:.4f}  →  n_max {n_max_naive:>8,.0f}/mwaka")
-    print(f"   PAMOJA na overshoot : cost_R {cost_r:.4f}  →  n_max {n_max:>8,.0f}/mwaka")
-    if naive_cost > 0:
-        print(f"   overshoot inaongeza gharama kwa {cost_r / naive_cost - 1:.0%}"
-              f" na inashusha n_max kwa {1 - n_max / n_max_naive:.0%}")
-    print(f"   δ_MER {delta:.4f}  ·  N_req {need:>8,.0f}  ·  "
-          f"config budget {config_budget(args.sr_target, args.years):.1f}")
+        print(f"\nIDENTITIES (cell {want_sl:.2f}/{want_tp:.2f} · SR* {args.sr_target} · κ {args.kappa})")
+        print(f"   dEV/dp_tp = 1 + tp/sl = {dev_dp:.2f}")
+        print(f"   commission pekee    : cost_R {naive_cost:.4f}  →  n_max {n_max_naive:>7,.0f}/mwaka")
+        print(f"   PAMOJA na overshoot : cost_R {cost_r:.4f}  →  n_max {n_max:>7,.0f}/mwaka")
+        if naive_cost > 0:
+            print(f"   overshoot inaongeza gharama kwa {cost_r / naive_cost - 1:.0%}"
+                  f" na inashusha n_max kwa {1 - n_max / n_max_naive:.0%}")
+        print(f"\n   hadi breakeven        {gap_to_breakeven:>8.4f} p_tp")
+        print(f"   δ_MER (SR* {args.sr_target})        {delta:>8.4f} p_tp")
+        print(f"   ---------------------------------------")
+        print(f"   LIFT INAYOHITAJIKA    {total_lift:>8.4f} p_tp     (SETUP-v1 ililetea +0.0251)")
+        print(f"\n   N_req {need:>8,.0f}  ·  config budget "
+              f"{config_budget(args.sr_target, args.years):.1f}")
+        print(f"\n   endelea: python -m src.data.cli effective-n --delta {delta:.4f}")
 
     out_path = cfg.path_of("storage.reports_root") / "r1" / "cost_audit.json"
     out_path.parent.mkdir(parents=True, exist_ok=True)
@@ -1695,15 +1729,19 @@ def cmd_cost_audit(args: argparse.Namespace) -> int:
                 "kappa": args.kappa,
                 "years": args.years,
                 "cells": frame.to_dict(orient="records"),
-                "identities": {
-                    "cell": [float(row["sl_atr"]), float(row["tp_atr"])],
+                "identities": None if rc_cell else {
+                    "cell": [want_sl, want_tp],
+                    "dev_dp": dev_dp,
                     "cost_r_commission_only": naive_cost,
                     "cost_r_total": cost_r,
                     "n_max": n_max,
                     "n_max_commission_only": n_max_naive,
+                    "gap_to_breakeven": gap_to_breakeven,
                     "delta_mer": delta,
+                    "total_lift_required": total_lift,
                     "n_required": need,
                     "config_budget": config_budget(args.sr_target, args.years),
+                    "two_sided": True,
                 },
             },
             indent=2,
@@ -1712,7 +1750,7 @@ def cmd_cost_audit(args: argparse.Namespace) -> int:
         encoding="utf-8",
     )
     print(f"\nushahidi: {out_path}")
-    return 0
+    return rc_cell
 
 
 def cmd_effective_n(args: argparse.Namespace) -> int:
@@ -2144,6 +2182,11 @@ def build_parser() -> argparse.ArgumentParser:
     p_cost.add_argument("--sr-target", type=float, default=0.7, help="SR* iliyosainiwa")
     p_cost.add_argument("--kappa", type=float, default=0.50, help="cost drag / net target")
     p_cost.add_argument("--years", type=float, default=8.25, help="TRAIN+VAL kwa MinBTL")
+    p_cost.add_argument(
+        "--cell",
+        help="cell ya identities, mf. 2.0/3.0. LAZIMA itangazwe — kuichagua kwa "
+        "kuangalia jedwali ni uteuzi juu ya label (§4.3)",
+    )
     p_cost.set_defaults(func=cmd_cost_audit)
 
     p_neff = subparsers.add_parser(
