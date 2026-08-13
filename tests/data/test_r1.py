@@ -429,6 +429,38 @@ def test_kigezo_cha_fold_ni_pooled_si_cha_kila_symbol(cfg):
     assert not any("cell x fold (pooled)" in p for p in report.problems)
 
 
+def test_r1_ev_inasoma_ripoti_bila_kuiandika(cfg, monkeypatch, capsys):
+    """`r1-ev` haigusi ushahidi — ni sahihi sita zinazoelekeza faili hilo.
+
+    Kuandika `r1_summary.json` upya kungehamisha hash yake na kuvunja #12–#17
+    mara moja. Ripoti iliyosainiwa inasomwa, haiguswi.
+    """
+    import json as _json
+
+    from src.data.cli import main
+
+    path = cfg.path_of("storage.reports_root") / "r1" / "r1_summary.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "base_rates": [
+            {"sl_atr": 0.5, "tp_atr": 0.5, "p_tp": 0.438, "timeout_frac": 0.0, "ev_r": -0.124},
+            {"sl_atr": 2.0, "tp_atr": 2.0, "p_tp": 0.505, "timeout_frac": 0.107, "ev_r": 0.0089},
+        ]
+    }
+    path.write_text(_json.dumps(payload), encoding="utf-8")
+    kabla = path.read_bytes()
+
+    monkeypatch.setattr("src.data.cli._load", lambda args: cfg)
+    assert main(["r1-ev", "--cost-pips", "0.7", "--atr-pips", "16.1"]) == 0
+    assert path.read_bytes() == kabla, "ushahidi haujaguswa hata byte moja"
+
+    out = capsys.readouterr().out
+    # SL pana inagharimu nusu ya R kwa commission — ndilo hoja nzima.
+    assert "2.00" in out and "0.50" in out
+    assert "sl 2.00 / tp 2.00" in out, "cell yenye pengo dogo inatajwa"
+    assert "UTEUZI" in out, "tahadhari ya §4.3 haijaachwa nje"
+
+
 def test_holdout_violations_inahesabu_si_kudhani():
     points = pd.DataFrame(
         {"decision_time": pd.to_datetime(["2024-03-31", "2024-04-01", "2025-01-01"], utc=True)}

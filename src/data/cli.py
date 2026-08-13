@@ -1559,6 +1559,73 @@ def cmd_r1_summary(args: argparse.Namespace) -> int:
     return 0 if report.ok else 1
 
 
+def cmd_r1_ev(args: argparse.Namespace) -> int:
+    """EV kwa kila cell ya grid — **inasoma tu** `r1_summary.json` iliyopo.
+
+    Haiandiki chochote na haihesabu upya. Sababu si uvivu: `r1_summary.json`
+    ndilo ushahidi wa sahihi #12–#17, na kuliandika upya kungehamisha hash yake
+    na kuvunja sahihi sita mara moja (somo la #11/#18). Ripoti iliyosainiwa
+    inasomwa, haiguswi.
+
+    `ev_r` ilikuwepo ndani ya JSON tangu mwanzo; jedwali la R1 halikuionyesha.
+    Ni namba ya uamuzi kuliko zote: `p_tp` dhidi ya jiometri inaeleza kama
+    ulimwengu ni wa haki, `ev_r` inaeleza kama BIASHARA inalipa.
+    """
+    cfg = _load(args)
+    path = cfg.path_of("storage.reports_root") / "r1" / "r1_summary.json"
+    if not path.is_file():
+        print(f"{path} haipo — `r1-summary` kwanza", file=sys.stderr)
+        return 2
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    rows = payload.get("base_rates") or []
+    if not rows:
+        print("ripoti haina base_rates", file=sys.stderr)
+        return 2
+
+    atr_p50 = args.atr_pips
+    cost = args.cost_pips
+    print(f"EV KWA KILA CELL — gharama {cost} pips (commission+swap), ATR p50 {atr_p50} pips")
+    print("spread IMO ndani ya path (§5.2); hii ni commission pekee juu yake.\n")
+    print(f"   {'sl':>5} {'tp':>5} {'p_tp':>7} {'timeout':>8} {'EV gross':>9} "
+          f"{'cost R':>8} {'EV net':>8} {'p_tp inayohitajika':>19} {'pengo':>7}")
+
+    ranked = []
+    for r in rows:
+        sl, tp = float(r["sl_atr"]), float(r["tp_atr"])
+        ev_gross = float(r["ev_r"])
+        sl_pips = sl * atr_p50
+        cost_r = cost / sl_pips if sl_pips else float("nan")
+        ev_net = ev_gross - cost_r
+        # p_tp inayohitajika ili EV_net = 0, ikishikilia timeout na E[R|timeout]
+        # kama zilivyo. Hii ndiyo "umbali" halisi ambao model inapaswa kuufunika.
+        f_to = float(r["timeout_frac"])
+        resolved = 1.0 - f_to
+        ev_timeout = ev_gross - resolved * (
+            float(r["p_tp"]) * (tp / sl) - (1.0 - float(r["p_tp"]))
+        )
+        needed = (
+            (cost_r - ev_timeout) / resolved + 1.0
+        ) / (tp / sl + 1.0) if resolved else float("nan")
+        ranked.append((ev_net, sl, tp, r, cost_r, ev_gross, needed))
+        print(
+            f"   {sl:>5.2f} {tp:>5.2f} {float(r['p_tp']):>7.3f} {f_to:>7.1%} "
+            f"{ev_gross:>+9.4f} {cost_r:>8.4f} {ev_net:>+8.4f} "
+            f"{needed:>19.3f} {needed - float(r['p_tp']):>+7.3f}"
+        )
+
+    best = max(ranked, key=lambda t: t[0])
+    print(
+        f"\ncell yenye pengo dogo kuliko zote: sl {best[1]:.2f} / tp {best[2]:.2f} — "
+        f"EV net {best[0]:+.4f} R, model inahitaji p_tp +{best[6] - float(best[3]['p_tp']):.3f}"
+    )
+    print(
+        "TAHADHARI: kuchagua cell kwa kuangalia jedwali hili ni UTEUZI juu ya label\n"
+        "(§4.3 darasa la tatu). Grid inabaki INPUT ya model (anti-S1); jedwali hili ni\n"
+        "kupima UMBALI, si kuchagua biashara."
+    )
+    return 0
+
+
 def cmd_splits(args: argparse.Namespace) -> int:
     """DF-14 / lango G2 — mpango wa splits kutoka config PEKEE (spec §7)."""
     cfg = _load(args)
@@ -1928,6 +1995,15 @@ def build_parser() -> argparse.ArgumentParser:
         help="mkunjo wa unyeti wa L-D, mf. 0,0.5,1 (commission+swap; spread imo kwenye path)",
     )
     p_r1.set_defaults(func=cmd_r1_summary)
+
+    p_ev = subparsers.add_parser(
+        "r1-ev",
+        help="EV kwa kila cell kutoka r1_summary.json (INASOMA tu — haiguswi ushahidi)",
+        parents=[common],
+    )
+    p_ev.add_argument("--cost-pips", type=float, default=0.7, help="commission+swap (default 0.7)")
+    p_ev.add_argument("--atr-pips", type=float, default=16.1, help="ATR p50 ya setups")
+    p_ev.set_defaults(func=cmd_r1_ev)
 
     p_split = subparsers.add_parser(
         "splits", help="DF-14 / G2 — mpango wa splits + holdout guard (§7)", parents=[common]
