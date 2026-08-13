@@ -353,7 +353,36 @@ threshold by ~2.3×.
 
 ## 9. Questions
 
-Please disagree freely. Numbered so you can answer selectively.
+**You are one of three independent reviewers.** All three receive this identical brief and
+none of you sees another's answer before writing. That is deliberate: where three
+practitioners independently converge, we will treat it as strong evidence; where you
+diverge, that is where the real uncertainty lives and we will dig there. Please do not
+hedge toward a consensus you cannot see.
+
+### 9.0 If you answer nothing else, answer these three
+
+These are deliberately forced-choice. "It depends" is a valid answer only if you then pick
+one anyway and state the condition.
+
+**A. One change.** If you could change exactly **one** thing about this programme — the
+target, the horizon, the instrument set, the architecture, the validation, anything — what
+would it be, and what do you expect it to be worth? Please also state: *what evidence would
+change your mind about this?*
+
+**B. First thirty days.** Concretely, what would you do in the next month if this were your
+project? A sequence of specific work items, not principles. Assume one operator plus an AI
+implementer, and that the data and measurement pipeline described above already exist.
+
+**C. What to stop.** What in this programme should be **abandoned outright** — not
+deferred, not deprioritised, but stopped? Practitioners rarely volunteer this and it is
+usually the most valuable thing they know.
+
+Please also rate your overall confidence in A (low / medium / high) and say what you would
+need to see to raise it.
+
+### 9.1 Detailed questions
+
+Numbered so you can answer selectively. Please disagree freely.
 
 **On the premise**
 
