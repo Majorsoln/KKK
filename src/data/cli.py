@@ -1626,6 +1626,135 @@ def cmd_r1_ev(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_cost_audit(args: argparse.Namespace) -> int:
+    """Gharama HALISI kwa R — ikiwemo kile stop zilizoruka zilichogharimu.
+
+    Namba inayoamua kila kitu kingine cha T3: `cost_R` → `n_max` → `δ_MER` →
+    `N_req`. R1 ilitoza −1.0 R sawasawa kila SL; hapa `touch_past_pips`
+    inatumika kwa mara ya kwanza tangu ilipoanza kurekodiwa.
+    """
+    cfg = _load(args)
+    from .costs import audit, config_budget, delta_mer, n_max_from_cost, n_required
+    from .r1 import load_labels
+
+    labels_root = cfg.research_root / "data" / "L4_labels" / "labels"
+    points, barriers = load_labels(labels_root, _symbol_list(args))
+    if barriers.empty:
+        print(f"hakuna labels chini ya {labels_root}", file=sys.stderr)
+        return 2
+    if "is_setup" in points.columns:
+        keys = points.loc[points["is_setup"].fillna(False), ["symbol", "decision_time"]]
+        barriers = barriers.merge(keys, on=["symbol", "decision_time"], how="inner")
+
+    report = audit(barriers, commission_pips=args.commission_pips)
+    if not report.cells:
+        for note in report.notes:
+            print(f"HITILAFU: {note}", file=sys.stderr)
+        return 2
+
+    frame = report.frame()
+    print(f"GHARAMA HALISI KWA R — commission {args.commission_pips} pips/round-turn")
+    print("spread haiingii: ishaingia kwenye path (§5.2). Setups pekee.\n")
+    print(
+        f"   {'sl':>5} {'tp':>5} {'SL%':>6} {'comm R':>8} {'over R':>8} {'over p99':>9} "
+        f"{'cost R':>8} {'EV naive':>9} {'EV halisi':>10} {'EV net':>9}"
+    )
+    for _, r in frame.iterrows():
+        print(
+            f"   {r['sl_atr']:>5.2f} {r['tp_atr']:>5.2f} {r['p_stopped']:>5.1%} "
+            f"{r['commission_r']:>8.4f} {r['overshoot_r_mean_given_stop']:>8.4f} "
+            f"{r['overshoot_r_p99_given_stop']:>9.4f} {r['cost_r_total']:>8.4f} "
+            f"{r['ev_r_naive']:>+9.4f} {r['ev_r_realized']:>+10.4f} {r['ev_r_net']:>+9.4f}"
+        )
+
+    # Identities za T3 kwa cell iliyotajwa (default: pana zaidi).
+    row = frame.loc[frame["ev_r_net"].idxmax()]
+    cost_r = float(row["cost_r_total"])
+    naive_cost = float(row["commission_r"])
+    n_max = n_max_from_cost(cost_r, args.sr_target, args.kappa)
+    n_max_naive = n_max_from_cost(naive_cost, args.sr_target, args.kappa)
+    delta = delta_mer(args.sr_target, n_max)
+    need = n_required(delta)
+
+    print(f"\nIDENTITIES (cell {row['sl_atr']:.2f}/{row['tp_atr']:.2f} · SR* {args.sr_target} · κ {args.kappa})")
+    print(f"   commission pekee    : cost_R {naive_cost:.4f}  →  n_max {n_max_naive:>8,.0f}/mwaka")
+    print(f"   PAMOJA na overshoot : cost_R {cost_r:.4f}  →  n_max {n_max:>8,.0f}/mwaka")
+    if naive_cost > 0:
+        print(f"   overshoot inaongeza gharama kwa {cost_r / naive_cost - 1:.0%}"
+              f" na inashusha n_max kwa {1 - n_max / n_max_naive:.0%}")
+    print(f"   δ_MER {delta:.4f}  ·  N_req {need:>8,.0f}  ·  "
+          f"config budget {config_budget(args.sr_target, args.years):.1f}")
+
+    out_path = cfg.path_of("storage.reports_root") / "r1" / "cost_audit.json"
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_path.write_text(
+        json.dumps(
+            {
+                "commission_pips": args.commission_pips,
+                "sr_target": args.sr_target,
+                "kappa": args.kappa,
+                "years": args.years,
+                "cells": frame.to_dict(orient="records"),
+                "identities": {
+                    "cell": [float(row["sl_atr"]), float(row["tp_atr"])],
+                    "cost_r_commission_only": naive_cost,
+                    "cost_r_total": cost_r,
+                    "n_max": n_max,
+                    "n_max_commission_only": n_max_naive,
+                    "delta_mer": delta,
+                    "n_required": need,
+                    "config_budget": config_budget(args.sr_target, args.years),
+                },
+            },
+            indent=2,
+            default=str,
+        ),
+        encoding="utf-8",
+    )
+    print(f"\nushahidi: {out_path}")
+    return 0
+
+
+def cmd_effective_n(args: argparse.Namespace) -> int:
+    """Observations HURU ngapi tunazo — envelope ya makadirio manne."""
+    cfg = _load(args)
+    from .costs import n_required
+    from .effective_n import estimate
+    from .r1 import load_labels
+
+    labels_root = cfg.research_root / "data" / "L4_labels" / "labels"
+    points, _ = load_labels(labels_root, _symbol_list(args))
+    if points.empty:
+        print(f"hakuna points chini ya {labels_root}", file=sys.stderr)
+        return 2
+    if "is_setup" in points.columns and not args.include_control:
+        points = points[points["is_setup"].fillna(False)]
+
+    result = estimate(points, horizon_bars=int(cfg.get("labels.horizon_bars")))
+    print("EFFECTIVE N — ndogo kuliko zote, si wastani\n")
+    print(f"   n_raw    {result.n_raw:>10,}   points (setups pekee)" )
+    print(f"   n_uniq   {result.n_uniq:>10,.0f}   concurrency ya labels zinazopishana")
+    print(f"   n_time   {result.n_time:>10,.0f}   τ = {result.tau:.2f}")
+    print(f"   n_cross  {result.n_cross:>10,.0f}   factors huru {result.participation_ratio:.2f}"
+          f" kati ya symbols {result.symbols}")
+    print(f"   n_block  {result.n_block:>10,.0f}   blocks × breadth")
+    print(f"\n   N_eff    {result.n_eff:>10,.0f}")
+
+    if args.delta:
+        need = n_required(args.delta)
+        verdict = "INATOSHA" if result.n_eff >= need else "HAITOSHI"
+        print(f"\n   δ = {args.delta}  →  N_req {need:,.0f}  →  **{verdict}**"
+              f"  ({result.n_eff / need:.2f}×)")
+    for note in result.notes:
+        print(f"\nkumbuka: {note}")
+
+    out_path = cfg.path_of("storage.reports_root") / "r1" / "effective_n.json"
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_path.write_text(json.dumps(result.to_json(), indent=2), encoding="utf-8")
+    print(f"\nushahidi: {out_path}")
+    return 0
+
+
 def cmd_splits(args: argparse.Namespace) -> int:
     """DF-14 / lango G2 — mpango wa splits kutoka config PEKEE (spec §7)."""
     cfg = _load(args)
@@ -2004,6 +2133,28 @@ def build_parser() -> argparse.ArgumentParser:
     p_ev.add_argument("--cost-pips", type=float, default=0.7, help="commission+swap (default 0.7)")
     p_ev.add_argument("--atr-pips", type=float, default=16.1, help="ATR p50 ya setups")
     p_ev.set_defaults(func=cmd_r1_ev)
+
+    p_cost = subparsers.add_parser(
+        "cost-audit",
+        help="gharama HALISI kwa R (stop zilizoruka) + identities za T3",
+        parents=[common],
+    )
+    p_cost.add_argument("--symbols")
+    p_cost.add_argument("--commission-pips", type=float, default=0.7)
+    p_cost.add_argument("--sr-target", type=float, default=0.7, help="SR* iliyosainiwa")
+    p_cost.add_argument("--kappa", type=float, default=0.50, help="cost drag / net target")
+    p_cost.add_argument("--years", type=float, default=8.25, help="TRAIN+VAL kwa MinBTL")
+    p_cost.set_defaults(func=cmd_cost_audit)
+
+    p_neff = subparsers.add_parser(
+        "effective-n",
+        help="observations HURU — envelope ya makadirio manne",
+        parents=[common],
+    )
+    p_neff.add_argument("--symbols")
+    p_neff.add_argument("--delta", type=float, help="δ_MER — inaonyesha kama N inatosha")
+    p_neff.add_argument("--include-control", action="store_true")
+    p_neff.set_defaults(func=cmd_effective_n)
 
     p_split = subparsers.add_parser(
         "splits", help="DF-14 / G2 — mpango wa splits + holdout guard (§7)", parents=[common]

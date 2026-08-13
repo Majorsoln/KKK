@@ -239,18 +239,21 @@ TRAIN+VAL PEKEE — takwimu za holdout MARUFUKU (G2).
 
 ---
 
-### T3 — R2+R3 (FEATURES) ▶ `IMEFUNGULIWA` 2026-08-13 · **UAMUZI WA MWELEKEO UNASUBIRIWA (§3.9)**
+### T3 — R2+R3 (FEATURES) ▶ `IMEFUNGULIWA` 2026-08-13 · **MPANGO: `docs/T3_PLAN.md`**
 
-> **Soma §3.9 kabla ya kuanza T3.** Mapitio ya 2026-08-13 yanapendekeza kwamba T3 ijengwe
-> juu ya msingi tofauti: historia hadi 2003, symbols ~28 badala ya 12, labels dense badala
-> ya kuchujwa kwa mkono, na lengo la **kupanga chini ya uwezo** badala ya usahihi kwa zote.
-> Ikikubaliwa, PROMPT hapa chini inabaki kama ilivyo **kimaudhui** (cards, screening, FDR,
-> redundancy) lakini bajeti ya features na hesabu ya effective N zinabadilika kwa kiasi
-> kikubwa. Ikikataliwa, PROMPT inatekelezwa kama ilivyoandikwa.
+> **`docs/T3_PLAN.md` ndio mpango unaotumika**, baada ya mapitio ya nje ya wataalamu wawili
+> huru. PROMPT hapa chini inabaki kwa kumbukumbu, lakini **haitekelezwi kama ilivyo**:
 >
-> Kilichoharibika kwenye pendekezo la kwanza la T3 (na kwa nini): §3.9.2.
+> * Feature cards za F1–F7 zinasubiri — hatua ya kwanza si features, ni **vipimo viwili**
+>   (`cost-audit`, `effective-n`) kisha **meta-labelling kwenye L4 iliyopo**
+> * Bajeti ya features inahesabiwa kwa **N_eff iliyopimwa**, si kwa idadi ya rows
+> * Bajeti mpya, ngumu zaidi, imeongezwa: **configs 7 kwa maisha yote ya mradi**
+>   (MinBTL), ikitekelezwa na `src/governance/budget.py`
+>
+> Sababu: kupima kwa usahihi wa breakeven ni kujenga jaribio lisilo na thamani likifaulu.
+> Ona `T3_PLAN.md` §0.
 
-**PROMPT:**
+**PROMPT (ya awali — kwa kumbukumbu):**
 ```
 Tekeleza TERM T3 (rejista DF-12, DF-13, K1-09, RS-05, RS-06): KWANZA feature cards za
 F1-F7 zenye hypothesis (PD anazithibitisha KABLA ya code — G4); kisha L3 kwa sheria 8
@@ -937,10 +940,23 @@ point) badala ya kuandikwa kwa mkono — kazi ya T7 (integration).
 
 ## 3.9 MAPITIO YA MWELEKEO — "tuliboresha ndani ya kizuizi kibaya" (2026-08-13)
 
-> **HADHI: PENDEKEZO. HAKUNA KILICHOAMULIWA.** Sehemu hii inaandika hoja na namba
+> ## ⚠ SEHEMU HII IMEBATILIKA — ONA `docs/T3_PLAN.md`
+>
+> Mapitio ya nje ya wataalamu wawili huru (2026-08-13) yalibaini kwamba pendekezo hili
+> lilikuwa **linajibu swali baya**. Historia hadi 2003, symbols 28 na dense rebuild
+> vinanunua **usahihi kuhusu breakeven** — na kupima kwa usahihi wa breakeven ni kujenga
+> jaribio ambalo, likifaulu, linarudisha Sharpe **0.24**, yaani config **moja** kwa MinBTL.
+>
+> Swali sahihi ni **δ_MER**: je edge inatosha **kutradiwa**? Swali hilo linahitaji **chini ya
+> data tuliyonayo tayari** — kwa hiyo pendekezo lote hapa chini limeahirishwa, na masharti
+> ya kurudi kwake yameandikwa (`T3_PLAN.md` §6).
+>
+> Rekodi za mapitio: `REVIEW_EXPERT_1.md` · `REVIEW_EXPERT_2.md`.
+> **Sehemu hii inabaki bila kuhaririwa** — mfuatano wenyewe ni ushahidi.
+
+> **HADHI YA AWALI: PENDEKEZO. HAKUNA KILICHOAMULIWA.** Sehemu hii inaandika hoja na namba
 > zilizoipeleka; uamuzi ni wa PD. Hakuna code, config wala sahihi inayobadilika kwa
-> sehemu hii peke yake. Ikikubaliwa, kila hatua inapita kwenye milango yake ya kawaida
-> (pre-registration, R0 upya, purged CV, holdout imefungwa).
+> sehemu hii peke yake.
 
 ### 3.9.1 Namba iliyokuwa imefichwa: EV kwa kila cell
 

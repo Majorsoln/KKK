@@ -16,7 +16,7 @@ tests: **287** zinapita · `config_hash` `sha256:4ce1768`
 | **T0 — Msingi** | ✅ IMEFUNGWA (2026-08-06) | L0 immutable + SHA256; recorder wa broker; normalization A/B; malango ya repo |
 | **T1 — R0 ukaguzi wa data** | ✅ IMEFUNGWA (2026-08-10) | Siku **33,440/34,781 (96.1%)** zinafaa kutumika; sahihi 6 za VERIFIED |
 | **T2 — R1 labels** | ✅ IMEFUNGWA (2026-08-13) | L4 cells **1,308,025**; R1 **PASS**; setup dhidi ya control **+0.0251 p_tp / +0.0638 R**; sahihi 6 (#12–#17) |
-| **T3 — R2+R3 features** | 🔓 IMEFUNGULIWA · **uamuzi wa mwelekeo unasubiriwa** | pendekezo la kubadilisha msingi: §8 hapa chini |
+| **T3 — R2+R3 features** | 🔓 IMEFUNGULIWA · mpango umerekebishwa | mapitio ya nje yamebadilisha mwelekeo — `docs/T3_PLAN.md` |
 | T4–T7 | ⏳ zinasubiri mfuatano | baselines, EV, holdout, live |
 
 **Data:** ticks **bilioni 3.4** · symbols **12** · 2016-01-04 → 2026-08-07 · partitions **25,510**.
@@ -379,9 +379,22 @@ Sahihi #12–#17 zimewekwa 2026-08-13. **T3 (features) imefunguliwa.**
 
 ---
 
-## 8. Kinachofuata — na pendekezo la kubadilisha mwelekeo
+## 8. Kinachofuata — baada ya mapitio ya nje
 
-> **HADHI: PENDEKEZO. Uamuzi ni wa PD.** Maelezo kamili: §3.9 ya `IMPLEMENTATION_PLAN.md`.
+> **Mpango unaotumika: `docs/T3_PLAN.md`.** Sehemu hii inaandika **kwa nini** ulibadilika.
+> Rekodi za wataalamu: `REVIEW_EXPERT_1.md` · `REVIEW_EXPERT_2.md`.
+
+### 8.0 Kilichobadilika, kwa sentensi moja
+
+Tulikuwa tunauliza *"je tunaweza kupima kwamba edge inazidi breakeven?"* Tunapaswa kuuliza
+*"je edge inatosha **kutradiwa**?"*
+
+Swali la kwanza linahitaji data **mara nne** ya tuliyonayo — na likijibiwa "ndiyo" linarudisha
+Sharpe **0.24**, ambayo kwa MinBTL inaruhusu config **moja**. Hakuna mradi hapo.
+Swali la pili linahitaji **chini ya tuliyonayo tayari**.
+
+Kwa hiyo pendekezo langu la §8 la awali — historia hadi 2003, symbols 28, dense rebuild —
+**limeahirishwa kabisa**. Halikuwa baya; lilikuwa linajibu swali baya.
 
 ### 8.1 Namba iliyokuwa imefichwa
 
