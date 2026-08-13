@@ -166,7 +166,84 @@ def build_parser() -> argparse.ArgumentParser:
     p_show = subparsers.add_parser("show", help="sahihi zote zilizowekwa")
     p_show.add_argument("--json", action="store_true")
     p_show.set_defaults(func=cmd_show)
+
+    p_bud = subparsers.add_parser(
+        "budget", help="bajeti ya majaribio (MinBTL) — imebaki ngapi"
+    )
+    p_bud.add_argument("--ledger")
+    p_bud.set_defaults(func=cmd_budget)
+
+    p_bud_init = subparsers.add_parser(
+        "budget-init", help="tangaza bajeti — PD anasaini kwa commit"
+    )
+    p_bud_init.add_argument("--sr-target", type=float, required=True)
+    p_bud_init.add_argument("--years", type=float, required=True)
+    p_bud_init.add_argument("--ledger")
+    p_bud_init.set_defaults(func=cmd_budget_init)
+
+    p_spend = subparsers.add_parser(
+        "budget-spend", help="andika matumizi ya config dhidi ya labels"
+    )
+    p_spend.add_argument("config_id")
+    p_spend.add_argument("--weight", type=float, default=1.0)
+    p_spend.add_argument("--kind", default="EVALUATION", choices=["EVALUATION", "REPLICATION"])
+    p_spend.add_argument("--reason", required=True)
+    p_spend.add_argument("--ledger")
+    p_spend.set_defaults(func=cmd_budget_spend)
     return parser
+
+
+def cmd_budget(args: argparse.Namespace) -> int:
+    from . import budget as bud
+
+    path = Path(args.ledger) if args.ledger else None
+    loaded = bud.load(path)
+    if loaded.total <= 0:
+        print(
+            "bajeti haijatangazwa. Itangaze KABLA ya evaluation ya kwanza:\n"
+            "  python -m src.governance.cli budget-init --sr-target 0.7 --years 8.25",
+            file=sys.stderr,
+        )
+        return 2
+    print(f"BAJETI YA MAJARIBIO — SR* {loaded.sr_target} · miaka {loaded.years}")
+    print(f"  jumla     {loaded.total:>7.1f} configs   (MinBTL)")
+    print(f"  imetumika {loaded.spent:>7.1f}")
+    print(f"  imebaki   {loaded.remaining:>7.1f}")
+    for entry in loaded.entries:
+        print(f"  #{entry.number} {entry.kind:<11} {entry.weight:>5.1f}  {entry.config_id}")
+    if loaded.exhausted:
+        print("\nIMEKWISHA — hakuna evaluation nyingine dhidi ya labels inayoruhusiwa.",
+              file=sys.stderr)
+        return 1
+    return 0
+
+
+def cmd_budget_init(args: argparse.Namespace) -> int:
+    from . import budget as bud
+
+    path = Path(args.ledger) if args.ledger else bud.LEDGER
+    if path.is_file():
+        print(f"{path} tayari ipo — bajeti haitangazwi mara mbili", file=sys.stderr)
+        return 2
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(bud.render_header(args.sr_target, args.years), encoding="utf-8")
+    total = bud.total_for(args.sr_target, args.years)
+    print(f"{path} imeandikwa: SR* {args.sr_target} · miaka {args.years} → configs {total:.1f}")
+    print("\nHAIJAKAMILIKA HADI UCOMMIT — commit ndiyo sahihi yenyewe:")
+    print(f'  git add {path} && git commit -m "bajeti ya majaribio: SR* {args.sr_target}"')
+    return 0
+
+
+def cmd_budget_spend(args: argparse.Namespace) -> int:
+    from . import budget as bud
+
+    path = Path(args.ledger) if args.ledger else None
+    entry = bud.spend(
+        args.config_id, args.weight, args.reason, kind=args.kind, path=path
+    )
+    print(f"#{entry.number} {entry.kind} `{entry.config_id}` uzito {entry.weight:.1f}")
+    print(f"  imebaki: {entry.remaining:.1f}")
+    return 0
 
 
 def _force_utf8() -> None:

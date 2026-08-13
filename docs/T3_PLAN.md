@@ -119,27 +119,65 @@ linaloruhusu pesa halisi kupita liwe gumu kuliko lazima, si rahisi kuliko lazima
 
 ## 5. Hatua — kwa mfuatano, na kila moja ikiwa na lango
 
-### Hatua 0 — VIPIMO VIWILI (haigharimu bajeti; hakuna model)
+### Hatua 0 — VIPIMO VIWILI ✅ **IMEKAMILIKA 2026-08-13**
 
 ```cmd
-python -m src.data.cli cost-audit
-python -m src.data.cli effective-n --delta <δ_MER kutoka cost-audit>
+python -m src.data.cli cost-audit --cell 2.0/3.0
+python -m src.data.cli effective-n --delta 0.0235
 ```
 
-Hakuna kinachoendelea kabla ya hizi mbili. **Hii ndiyo tofauti kati ya mpango na matumaini.**
+**Matokeo — sasa ni vipimo, si makadirio:**
 
-| Matokeo | Maana |
+| | Ilikadiriwa | **Ilipimwa** |
+|---|---|---|
+| `cost_R` (2.0/3.0) | 0.022 (commission pekee) | **0.0294** — overshoot inaongeza **34%** |
+| `n_max` | 253/mwaka | **142/mwaka** (−44%) |
+| `δ_MER` | 0.022 | **0.0235** (`dEV/dp_tp = 2.5`, si 2.0) |
+| `N_req` | ~4,050 | **3,553** |
+| `N_eff` | "~5×" / ~10,300 | **10,168** |
+| **Hukumu** | — | **INATOSHA — mara 2.86** |
+
+**Bar halisi: `+0.0300 p_tp`** (0.0065 hadi breakeven + 0.0235 δ_MER), ikilinganishwa na
+**+0.0251** ambayo SETUP-v1 ililetea kwa wastani wa setups zote.
+
+Envelope kamili ya `N_eff`:
+
+| | | |
+|---|---|---|
+| `n_uniq` | 11,355 | concurrency ya labels zinazopishana |
+| **`n_time`** | **10,168** | **kizuizi halisi** · τ = 2.49 |
+| `n_cross` | 15,903 | factors huru **7.54** kati ya symbols 12 |
+| `n_block` | 15,903 | blocks × breadth |
+
+> **Factors 7.54, si 5.** Nilikadiria ~5 kwenye §3.9 na kwenye marekebisho yangu kwa
+> mtaalamu wa 2. Kipimo kinasema **7.54** — symbols zetu ni huru zaidi kuliko nilivyodhani,
+> na hiyo ndiyo sababu kubwa kwa nini mradi unabaki hai.
+
+**Overshoot kwa R inathibitisha hoja iliyobishaniwa:**
+
+| SL | over R |
 |---|---|
-| `cost_R` ikikaribia commission pekee | `n_max ≈ 253`, mpango unaendelea kama ulivyoandikwa |
-| `cost_R` ikiwa mara mbili ya commission | `n_max ≈ 61` — **strategy inatrade mara 61 kwa mwaka**; hilo ni jaribio, si biashara. Rudi kwenye δ_MER na κ |
-| `N_eff < N_req` | jaribio lolote la baadaye ni **inconclusive kimuundo**. Ndipo — na ndipo pekee — pivot ya §3.9 inarudi mezani |
+| 0.50 ATR | **0.0285** |
+| 2.00 ATR | **0.0153** |
 
-### Hatua 1 — TANGAZA BAJETI (kabla ya evaluation ya kwanza)
+Stop nyembamba inaumia **mara mbili** kwa gap ile ile — `R = overshoot/sl_pips`, kama
+hesabu ilivyotabiri dhidi ya dai la mtaalamu wa 2, sasa ikithibitishwa na data.
 
-`docs/TRIAL_BUDGET.md` yenye `SR*` na miaka, imesainiwa na PD. `budget.guard()` inakataa
-evaluation yoyote dhidi ya labels bajeti ikiisha.
+### Hatua 1 — TANGAZA BAJETI (kabla ya evaluation ya kwanza) — **INASUBIRI SAHIHI**
+
+`docs/TRIAL_BUDGET.md` imeandaliwa: **SR\* 0.7 · miaka 8.25 → configs 7.5**.
+`budget.guard()` inakataa evaluation yoyote dhidi ya labels bajeti ikiisha.
 
 Mgao uliotangazwa: **3** meta-labelling na variants · **2** cross-sectional · **2** akiba.
+
+**Inakuwa halali PD anapocommit** — kama sahihi. Pamoja nayo, vitu vitatu vinahitaji
+kusainiwa kwenye `SIGNATURES.md` kabla ya hatua 2:
+
+| Kipengele | Uamuzi | Kwa nini ni uamuzi wa PD |
+|---|---|---|
+| `SR*` = **0.7** | bajeti = 7.5 configs | 1.0 ni ahadi kubwa inayoshawishi kutafuta; 0.5 inatoa configs 3 na mradi hauwezi kutekelezwa |
+| `κ` = **0.50** | `n_max` = 142/mwaka | sehemu ya return unayokubali kuipoteza kwa gharama |
+| cell = **2.0/3.0** | lengo la jaribio | **kuichagua baada ya kuona jedwali la EV ni uteuzi juu ya label** — lazima ikiriwe kwenye sababu, si kufichwa |
 
 ### Hatua 2 — UA ATHARI YA SETUP (config 1)
 
