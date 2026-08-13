@@ -238,25 +238,59 @@ def quantile_mid_vs_trade(points: pd.DataFrame, quantiles: list[float]) -> pd.Da
     §5.1 iliamua MID kwa hoja (spread inaingia path na RCE — si mara tatu).
     Symbols pana (XAUUSD, GBPJPY) ndizo zinazoweza kuipinga hoja hiyo kwa
     namba, kwa hiyo zinaonyeshwa peke yake pia.
+
+    **Tofauti LAZIMA ipewe ishara ya trade.** `quantile_y_trade` haina
+    mwelekeo: BUY inanunua kwa ask na kufunga kwa bid, kwa hiyo iko CHINI ya
+    ya mid; SELL ni kinyume kabisa, iko JUU. Ukichukua wastani wa pamoja,
+    upendeleo wa BUY unafuta wa SELL na jibu linakuwa ~0 kwa symbol yoyote —
+    ikiwemo XAUUSD yenye spread ya pips 35. Namba hiyo ya sifuri ingesomeka
+    kama "uamuzi hauna athari", wakati ukweli ni kwamba athari ipo pande zote
+    mbili kwa ukubwa ule ule, ikielekea pande tofauti (kosa langu, 2026-08-13).
+    Kipimo sahihi ni `direction × (mid − trade)`: gharama kwa units za ATR,
+    daima chanya.
     """
-    if points.empty or "quantile_y_trade" not in points:
+    if points.empty or not {"quantile_y_trade", "direction"} <= set(points.columns):
         return pd.DataFrame()
     rows = []
     for symbol, chunk in points.groupby("symbol", sort=True):
-        mid = chunk["quantile_y"].dropna()
-        trade = chunk["quantile_y_trade"].dropna()
+        chunk = chunk.dropna(subset=["quantile_y", "quantile_y_trade"])
+        if chunk.empty:
+            continue
+        mid = chunk["quantile_y"]
+        trade = chunk["quantile_y_trade"]
+        shift = chunk["direction"] * (mid - trade)
         row: dict[str, Any] = {
             "symbol": symbol,
             "n": len(chunk),
             "spread_entry_p50": float(chunk["spread_entry_pips"].median()),
-            "mid_mean": float(mid.mean()),
-            "trade_mean": float(trade.mean()),
-            "mean_diff": float(mid.mean() - trade.mean()),
+            "spread_exit_p50": (
+                float(chunk["spread_exit_pips"].median())
+                if "spread_exit_pips" in chunk
+                else None
+            ),
+            "atr_pips_p50": float(chunk["atr_pips"].median()) if "atr_pips" in chunk else None,
+            # Kipimo chenyewe: L-A ingehama kwa kiasi gani (ATR) ikigeuzwa trade.
+            "shift_mean": float(shift.mean()),
+            "shift_p50": float(shift.median()),
+            "shift_p90": float(shift.quantile(0.90)),
+            # Ulinganisho huru: (spread ya kuingia + ya kutoka) ÷ 2 ÷ ATR.
+            # Ikitofautiana sana na `shift_p50`, mmoja kati ya hivi viwili ni kosa.
+            "shift_expected_p50": (
+                float(
+                    (
+                        (chunk["spread_entry_pips"] + chunk["spread_exit_pips"])
+                        / 2.0
+                        / chunk["atr_pips"]
+                    ).median()
+                )
+                if {"spread_exit_pips", "atr_pips"} <= set(chunk.columns)
+                else None
+            ),
+            # Wastani wa pamoja — unabaki ili ionekane KWA NINI ni ~0.
+            "pooled_mean_diff": float(mid.mean() - trade.mean()),
         }
         for q in quantiles:
-            row[f"mid_q{q:g}"] = float(mid.quantile(q))
-            row[f"trade_q{q:g}"] = float(trade.quantile(q))
-            row[f"diff_q{q:g}"] = float(mid.quantile(q) - trade.quantile(q))
+            row[f"shift_q{q:g}"] = float(shift.quantile(q))
         rows.append(row)
     return pd.DataFrame(rows)
 

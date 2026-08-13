@@ -15,7 +15,7 @@ tests: **287** zinapita · `config_hash` `sha256:4ce1768`
 |---|---|---|
 | **T0 — Msingi** | ✅ IMEFUNGWA (2026-08-06) | L0 immutable + SHA256; recorder wa broker; normalization A/B; malango ya repo |
 | **T1 — R0 ukaguzi wa data** | ✅ IMEFUNGWA (2026-08-10) | Siku **33,440/34,781 (96.1%)** zinafaa kutumika; sahihi 6 za VERIFIED |
-| **T2 — R1 labels** | 🔄 INAENDELEA | SETUP-v1 imesainiwa; L4 imejengwa (cells **1,308,025**, timeout 2.8%); inasubiri build ya toleo 2 + R1 |
+| **T2 — R1 labels** | 🔄 R1 **PASS** | L4 cells **1,308,025**; jiometri inashikilia; setup dhidi ya control **+0.0251 p_tp / +0.0638 R**; inasubiri sahihi ya exit |
 | T3–T7 | ⏳ zinasubiri mfuatano | features, baselines, EV, holdout, live |
 
 **Data:** ticks **bilioni 3.4** · symbols **12** · 2016-01-04 → 2026-08-07 · partitions **25,510**.
@@ -254,23 +254,50 @@ kilichozisoma. Sheria haifanyi kazi hadi kitu kiitumie.
 
 ---
 
-## 7. Kinachofuata
+## 7. R1 — matokeo (2026-08-13, HUKUMU **PASS**)
 
-**Hatua moja: `scripts\labels.bat`** (dakika ~40). Inajenga L4 upya kwa toleo 2, kisha inatoa
-**R1** — vigezo vyote kwenye jedwali moja, kama `r0-summary` ya T1:
+**Vigezo vigumu vyote vimepita:** cell ndogo kuliko zote 25,314 (kikomo 200) · timeout 2.79%
+(kikomo 35%) · tie-break 0 (kikomo 1%) · G2 safi.
 
-| # | Kigezo | Inafeli lini |
-|---|---|---|
-| 1 | jiometri: `p_tp` BILA timeout dhidi ya `sl/(sl+tp)`, na `z` yake | — (inasomwa na PD) |
-| 2 | utulivu kwa miaka — base rate inayotembea si base rate | — |
-| 3 | setup dhidi ya control: je kichujio kinatoa trades **bora**, au chache tu? | — |
-| 4 | quantile MID dhidi ya trade kwa symbol (XAUUSD, GBPJPY ndizo za kupinga) | — |
-| 5 | fill/slippage dhidi ya `slippage_cap_pips` ya RCE | — |
-| 6 | buckets za L-D kwa mkunjo wa gharama (commission+swap; spread imo kwenye path) | — |
-| 7 | M1 dhidi ya tick | — |
-| — | `min_labels_per_cell` | chini ya **200** |
-| — | timeout | zaidi ya **35%** |
-| — | tie-break | zaidi ya **1%** |
-| — | G2 | point yoyote ya holdout ikigusa takwimu — **ripoti inasimama kabla ya kuhesabu** |
+### 7.1 Kichujio kinafanya kazi
 
-Baada ya hapo: **sahihi ya exit ya T2 — R1 PASS au LESSON.**
+| | setup | control | tofauti |
+|---|---|---|---|
+| p_tp | 0.4173 | 0.3923 | **+0.0251** |
+| E[R] gross | −0.0505 R | −0.1142 R | **+0.0638 R** |
+| ATR p50 | 16.1 pips | 14.3 pips | +1.8 |
+
+Hii ndiyo namba ambayo control sample ilikuwepo kwa ajili yake. SETUP-v1 haichagui trades chache
+tu — inachagua **bora**. Tahadhari mbili za kweli: (1) `z = +28.8` isisomwe kama ilivyo, kwa
+sababu cells 25 za point moja si huru; (2) ATR 16.1 dhidi ya 14.3 inaonyesha kichujio kinachagua
+volatility ya juu — sehemu ya makali inaweza kuwa **uteuzi**, si utabiri, na features za T3 ndizo
+zitakazovitenganisha.
+
+**E[R] hasi ni sahihi.** Entry bila model inalipa spread. −0.0505 R ni **mstari wa kuanzia**
+ambao model lazima iuzidi — si tokeo baya.
+
+### 7.2 Jiometri inashikilia kwa muundo unaoeleweka
+
+Tofauti kati ya `p_tp` na `sl/(sl+tp)` **inashuka SL inapopanuka**: −0.042 kwa `sl=0.5` hadi
+−0.001 kwa `sl=2.0` (`tp=1.0`). Hiyo ni saini ya **spread** — umbali usiobadilika wa bei ni
+sehemu kubwa ya SL nyembamba. Ingekuwa tofauti ya kudumu bila kujali SL, ingekuwa kasoro.
+
+Safu ya `tp=3.0` inatoka nje ya mtiririko kwa sababu halali: timeout yake inafika 22.7%, na
+zilizokatwa na horizon ni zile zilizokuwa zikielekea TP ya mbali.
+
+### 7.3 Mambo mawili ya kuchukua mbele
+
+**Cap ya stop ya RCE inagongana na data.** `slippage_cap_pips.stop = 0.3`, lakini kati ya touch
+757,424 za SL, **76.06% pekee** ziko ndani ya cap (p50 0.12 · p90 1.06 · max 2,503.7 pips). Ni
+kazi ya T7 — **RCE haiguswi sasa** — lakini backtest inayodhani cap inashikilia kila mara inadhani
+kitu ambacho feed inakipinga robo ya muda.
+
+**Ticks dhidi ya M1: 0.01%.** Kati ya cells 66,650 zilizoangaliwa mara mbili, M1 ilitofautiana na
+ticks mara **9**. Sheria ya §5 ni kweli lakini karibu haina athari kwa grid hii — SL ya 0.5 ATR ni
+pana kuliko range ya dakika moja. Ingekuwa na maana kwa barriers nyembamba. Sasa tunajua kwa namba
+badala ya kwa hoja.
+
+### 7.4 Kinachofuata
+
+`r1-summary` peke yake (sekunde chache — hakuna ujenzi upya), kisha **sahihi ya exit ya T2:
+R1 PASS.**

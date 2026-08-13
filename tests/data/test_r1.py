@@ -232,6 +232,7 @@ def test_g2_inasimamisha_ripoti_badala_ya_kuonya(cfg):
         {
             "symbol": ["EURUSD"],
             "decision_time": [pd.Timestamp("2025-01-01", tz="UTC")],
+            "direction": [1],
             "is_setup": [True],
             "is_control": [False],
             "atr_pips": [10.0],
@@ -253,6 +254,7 @@ def test_cells_chache_kuliko_kikomo_zinafelisha_r1(cfg):
         {
             "symbol": ["EURUSD"] * 2,
             "decision_time": pd.to_datetime(["2020-01-01", "2020-01-02"], utc=True),
+            "direction": [1, -1],
             "is_setup": [True, True],
             "is_control": [False, False],
             "atr_pips": [10.0, 10.0],
@@ -278,6 +280,7 @@ def test_tie_break_sifuri_inaelezwa_si_kupuuzwa(cfg):
         {
             "symbol": ["EURUSD"] * n,
             "decision_time": pd.date_range("2020-01-01", periods=n, freq="1D", tz="UTC"),
+            "direction": np.where(np.arange(n) % 2 == 0, 1, -1),
             "is_setup": [True] * n,
             "is_control": [False] * n,
             "atr_pips": [10.0] * n,
@@ -319,19 +322,38 @@ def test_attach_flags_inaunganisha_kwa_symbol_na_muda():
     assert not bool(joined.loc[joined["symbol"] == "GBPUSD", "is_setup"].iloc[0])
 
 
-def test_quantile_mid_vs_trade_kwa_symbol():
+def test_quantile_mid_vs_trade_inapewa_ishara_ya_trade():
+    """BUY iko chini ya mid, SELL iko juu — bila ishara zinafutana hadi ~0.
+
+    Hii ndiyo kasoro iliyopatikana kwenye R1 ya kwanza (2026-08-13): XAUUSD
+    yenye spread ya pips 35 ilionyesha tofauti ya 0.0029 ATR, ikisomeka kama
+    "uamuzi wa §5.1 hauna athari".
+    """
+    n = 100
+    direction = np.where(np.arange(n) % 2 == 0, 1, -1)
+    mid = np.linspace(-1, 1, n)
+    # Gharama ya kweli: 0.05 ATR kwa KILA point, ikielekea upande wa trade.
+    trade = mid - direction * 0.05
     points = pd.DataFrame(
         {
-            "symbol": ["XAUUSD"] * 100,
-            "quantile_y": np.linspace(-1, 1, 100),
-            "quantile_y_trade": np.linspace(-1, 1, 100) - 0.05,
-            "spread_entry_pips": [3.0] * 100,
+            "symbol": ["XAUUSD"] * n,
+            "direction": direction,
+            "quantile_y": mid,
+            "quantile_y_trade": trade,
+            "spread_entry_pips": [30.0] * n,
+            "spread_exit_pips": [30.0] * n,
+            "atr_pips": [300.0] * n,
         }
     )
     out = quantile_mid_vs_trade(points, [0.10, 0.50, 0.90])
     assert out.loc[0, "symbol"] == "XAUUSD"
-    assert out.loc[0, "mean_diff"] == pytest.approx(0.05)
-    assert out.loc[0, "diff_q0.5"] == pytest.approx(0.05)
+    assert out.loc[0, "shift_p50"] == pytest.approx(0.05)
+    assert out.loc[0, "shift_mean"] == pytest.approx(0.05)
+    # Wastani wa pamoja unafuta gharama nzima — ndiyo sababu ya kipimo kipya.
+    assert out.loc[0, "pooled_mean_diff"] == pytest.approx(0.0, abs=1e-9)
+    # Ulinganisho huru: (30+30)/2/300 = 0.10 ... kwa hiyo shift_p50 ikitofautiana
+    # sana na hii, mmoja kati ya viwili ni kosa. Hapa fixture imeweka 0.05.
+    assert out.loc[0, "shift_expected_p50"] == pytest.approx(0.10)
 
 
 def test_holdout_violations_inahesabu_si_kudhani():

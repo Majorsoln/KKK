@@ -749,6 +749,82 @@ standard) linarekodi `touch_past_pips`, `terminal_trade`/`quantile_y_trade`, na 
 kwa sampuli ya hash — vyote pale ticks zilipo tayari kwenye kumbukumbu. Gharama: **build moja
 zaidi ya dakika ~40**. Mbadala ulikuwa kupitisha T2 na "haijapimwa" mara tatu.
 
+### 3.8 T2 — R1 imekimbia: HUKUMU PASS (2026-08-13)
+
+Build ya toleo 2: points **52,321** · cells **1,308,025** · timeout **2.79%** · tie-break **0** ·
+M1≠tick **0.01%** · **48,562s (saa 13.5)**.
+
+> **Makadirio yangu ya muda yalikuwa mabaya mara 22** (nilisema "dakika ~40" kwa sababu build ya
+> toleo 1 ilikuwa 2,215s). Ukaguzi wa M1 ni 5% ya points na unagharimu kama `resolve_arrays`
+> yenyewe — hauwezi kuelezea 22×. Sababu haijathibitishwa; `partitions_read` ndani ya
+> `label_build.json` ndiyo inayoweza kuisuluhisha. Haiathiri matokeo, inaathiri makadirio yangu.
+
+**Vigezo vigumu vyote vimepita:** cell ndogo kuliko zote **25,314** (kikomo 200) · timeout 2.79%
+(< 0.35) · tie-break 0 (< 1%) · G2 safi.
+
+**Jiometri (RS-04) inashikilia, na inashindwa kwa MUUNDO unaoeleweka.** Cells 23/25 ziko chini ya
+`sl/(sl+tp)`, na ukubwa wa tofauti **unashuka SL inapopanuka**:
+
+| `sl_atr` | 0.50 | 0.75 | 1.00 | 1.50 | 2.00 |
+|---|---|---|---|---|---|
+| `diff` kwa `tp=1.0` | −0.042 | −0.033 | −0.025 | −0.009 | −0.001 |
+
+Hii ndiyo saini ya **spread**: spread ni umbali usiobadilika wa bei, kwa hiyo ni sehemu kubwa ya
+SL nyembamba na ndogo ya SL pana. Kwa `sl=2.0`, `tp∈{1.5, 2.0}` zinatoa `+0.003`/`+0.005` (z ≈ 1)
+— hazitofautiani na jiometri kabisa. Kama tofauti ingekuwa ya kudumu bila kujali SL, ingekuwa
+drift au kasoro; hii si hivyo.
+
+**Isipokuwa moja iliyo halali:** safu ya `tp=3.0` ina tofauti KUBWA kuliko majirani zake kwa kila
+SL (mfano `sl=2.0`: `tp=2.0` → +0.005, lakini `tp=3.0` → −0.023). Sababu ni **timeout**: kwa
+`tp=3.0` timeout inafika 22.7%, na zilizokatwa na horizon si sampuli ya nasibu — ni zile
+zilizokuwa zikielekea TP ya mbali. Ukaguzi wa jiometri ni safi zaidi pale timeout ni ndogo.
+
+**`z` isisomwe kama uwezekano.** `z = −19.9` kwa cell moja haina maana ya "hakika mara 19";
+`n = 25,314` inafanya upendeleo mdogo kabisa uonekane sigma nyingi. Ukubwa wa `diff` ndio
+unaosomwa, si `z`.
+
+**Utulivu:** p_tp 0.409–0.428 kwa 2016–2023 (upana 0.019 — imara). **2024 ni 0.379** lakini ni
+miezi mitatu tu (cells 19,125 dhidi ya ~80,000 kwa mwaka mzima), kwa hiyo si ushahidi wa
+kubadilika kwa soko bado.
+
+**SETUP-v1 INAFANYA KAZI — na hii ndiyo namba iliyokuwa ikisubiriwa:**
+
+| | setup | control | tofauti |
+|---|---|---|---|
+| p_tp | 0.4173 | 0.3923 | **+0.0251** |
+| E[R] gross | −0.0505 R | −0.1142 R | **+0.0638 R** |
+| ATR p50 | 16.1 pips | 14.3 pips | +1.8 |
+
+Kichujio hakichagui trades chache tu — kinachagua **bora**. Lakini `z = +28.8` **isisomwe kama
+ilivyo**: cells 25 za point moja si huru, na points zinapishana kwa wakati; effective N ni ndogo
+kuliko 632,850 kwa mbali (hoja ile ile ya §3.6 kipengele 5). Mwelekeo na ukubwa ndio ushahidi.
+Kumbuka pia ATR p50 16.1 dhidi ya 14.3: sehemu ya makali inaweza kuwa **uteuzi wa volatility**,
+si utabiri — features za T3 ndizo zitakazoweza kuvitenganisha.
+
+**E[R] gross ni hasi kila mahali** (setups −0.0505 R). Hii ni sahihi na inatarajiwa: entry bila
+model inalipa spread. Ndiyo **kiwango ambacho model lazima ikizidi** — si tokeo baya, ni mstari
+wa kuanzia ulioandikwa kwa namba.
+
+**L-C: cap ya stop ya RCE inagongana na data.** `slippage_cap_pips.stop = 0.3`, lakini kati ya
+touch 757,424 za SL, **76.06% pekee** ziko ndani ya cap (p50 0.12 · p90 1.06 · p99 14.59 ·
+max 2,503.7 pips). Ni matokeo ya T7, si ya sasa: **RCE haiguswi**. Lakini inaandikwa hapa kwa
+sababu backtest inayodhani cap ya 0.3 inashikilia kila mara inadhani kitu ambacho feed ya
+kihistoria inakipinga robo ya muda.
+
+**M1 dhidi ya tick: 9 kati ya 66,650 (0.01%).** Sheria ya §5 ("bar haisemi ipi iligusa kwanza")
+ni **kweli lakini karibu haina athari kwa grid hii** — SL ya 0.5 ATR ni pana ikilinganishwa na
+range ya dakika moja. Ingekuwa na maana kwa barriers nyembamba. Faida ya kujua hili: ticks
+zikija kuwa kizuizi, M1 ni mbadala unaotetereka kwa 0.01%, si dhana.
+
+**Kasoro kwenye kipimo changu (imerekebishwa, 2026-08-13).** Quantile mid-dhidi-ya-trade
+ilikuwa ikipimwa **bila ishara ya trade**. `quantile_y_trade` haina mwelekeo: BUY (nunua kwa ask,
+funga kwa bid) iko chini ya mid; SELL iko juu kwa kiasi kile kile. Wastani wa pamoja unafuta
+gharama nzima — ndiyo maana XAUUSD yenye spread ya pips 35 ilionyesha 0.0029 pekee. Namba hiyo
+ingesomeka kama "uamuzi wa §5.1 hauna athari", wakati ukweli ni athari sawa pande zote mbili
+zikielekeana. Kipimo sasa ni `direction × (mid − trade)`, na kinalinganishwa na
+`(spread_in + spread_out) ÷ 2 ÷ ATR` iliyopimwa kwa kujitegemea — zikitofautiana, mmoja ni kosa.
+Hakuna ujenzi upya: `r1-summary` peke yake inatosha.
+
 **R1 (`r1-summary`)** ni ripoti ya vigezo vyote kwenye jedwali moja, kama `r0-summary` ya T1:
 jiometri kwa cell (`p_tp` BILA timeout dhidi ya `sl/(sl+tp)`, na `z` yake), utulivu kwa miaka,
 setup-dhidi-ya-control (`z` ya tofauti), quantile mid-vs-trade kwa symbol, fill/slippage dhidi ya

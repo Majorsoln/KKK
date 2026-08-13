@@ -1458,15 +1458,22 @@ def cmd_r1_summary(args: argparse.Namespace) -> int:
 
     q = p["quantile_mid_vs_trade"]
     if q:
-        print("4. QUANTILE: MID DHIDI YA BEI YA TRADE (§5.1)")
+        print("4. QUANTILE: MID DHIDI YA BEI YA TRADE (§5.1) — kwa ISHARA ya trade")
+        print(
+            f"   {'symbol':<8} {'spread':>7} {'ATR':>8} {'shift p50':>10} {'p90':>8} "
+            f"{'inayotarajiwa':>14} {'pooled':>9}"
+        )
         for row in q:
-            keys = sorted(k for k in row if k.startswith("diff_q"))
-            diffs = "  ".join(f"{k[5:]}: {row[k]:+.4f}" for k in keys)
             print(
-                f"   {row['symbol']:<8} spread p50 {row['spread_entry_p50']:>5.2f} pips  "
-                f"wastani {row['mean_diff']:+.4f}   {diffs}"
+                f"   {row['symbol']:<8} {row['spread_entry_p50']:>6.2f}p "
+                f"{row['atr_pips_p50']:>7.1f}p {row['shift_p50']:>10.4f} "
+                f"{row['shift_p90']:>8.4f} {row['shift_expected_p50']:>14.4f} "
+                f"{row['pooled_mean_diff']:>+9.4f}"
             )
-        print()
+        print(
+            "   `shift` = direction x (mid - trade), units za ATR. `pooled` ni wastani BILA\n"
+            "   ishara — uko hapo ili ionekane kwa nini ni ~0: BUY na SELL zinafutana.\n"
+        )
 
     f = p["fill_bootstrap"]
     if f:
