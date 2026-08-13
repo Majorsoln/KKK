@@ -15,8 +15,9 @@ tests: **287** zinapita · `config_hash` `sha256:4ce1768`
 |---|---|---|
 | **T0 — Msingi** | ✅ IMEFUNGWA (2026-08-06) | L0 immutable + SHA256; recorder wa broker; normalization A/B; malango ya repo |
 | **T1 — R0 ukaguzi wa data** | ✅ IMEFUNGWA (2026-08-10) | Siku **33,440/34,781 (96.1%)** zinafaa kutumika; sahihi 6 za VERIFIED |
-| **T2 — R1 labels** | 🔄 R1 **PASS** | L4 cells **1,308,025**; jiometri inashikilia; setup dhidi ya control **+0.0251 p_tp / +0.0638 R**; inasubiri sahihi ya exit |
-| T3–T7 | ⏳ zinasubiri mfuatano | features, baselines, EV, holdout, live |
+| **T2 — R1 labels** | ✅ IMEFUNGWA (2026-08-13) | L4 cells **1,308,025**; R1 **PASS**; setup dhidi ya control **+0.0251 p_tp / +0.0638 R**; sahihi 6 (#12–#17) |
+| **T3 — R2+R3 features** | 🔓 IMEFUNGULIWA | inafuata |
+| T4–T7 | ⏳ zinasubiri mfuatano | baselines, EV, holdout, live |
 
 **Data:** ticks **bilioni 3.4** · symbols **12** · 2016-01-04 → 2026-08-07 · partitions **25,510**.
 
@@ -213,7 +214,7 @@ Amri sasa ni moja: `scripts\labels.bat` (setups → labels → R1), yenye onyo l
 
 ---
 
-## 5. Sahihi zilizowekwa (11)
+## 5. Sahihi zilizowekwa (17)
 
 | # | Kipengele | Uamuzi | Kinachosemwa |
 |---|---|---|---|
@@ -225,8 +226,20 @@ Amri sasa ni moja: `scripts\labels.bat` (setups → labels → R1), yenye onyo l
 | 9 | DF-08 | **VERIFIED** | sentinel ya uvujaji: leaked=0 |
 | 10 | DF-14 | **VERIFIED** | G2: folds 5 ndani ya TRAIN+VAL; holdout haijaguswa |
 | 11 | DF-20 | APPROVED | SETUP-v1 **pre-registration** |
+| 12 | RS-04 | **VERIFIED** | jiometri inashikilia; tofauti inashuka SL ikipanuka — saini ya spread |
+| 13 | DF-09 | **VERIFIED** | labels 52,321 kwa path ya ticks; bila ticks 0; gap-honest imepimwa |
+| 14 | DF-10 | **VERIFIED** | grid 5×5 kamili: 52,321 × 25 = 1,308,025 sawasawa |
+| 15 | DF-11 | **VERIFIED** | horizon moja; class balance imeripotiwa, haijasawazishwa |
+| 16 | DF-21 | **LESSON** | mid-vs-trade ni 0.02–0.10 ATR (uamuzi unashikilia); **tie-break haiwezi kuwaka kwa grid hii** |
+| 17 | K1-07 | **VERIFIED** | fill bootstrap: stop ndani ya cap 76.06%; market prior 0.98 haikisiwi |
 
-Lango G14: **PASS** · vipengele `VERIFIED`: **6/64**.
+Lango G14: **PASS** · vipengele `VERIFIED`: **11/64** · `LESSON`: **1**.
+
+> **#16 ni LESSON kwa makusudi.** Sehemu ya kwanza ya DF-21 (mid dhidi ya trade) imepimwa na
+> inashikilia. Sehemu ya pili (tie-break SL-kwanza) ni sheria iliyosainiwa ambayo **haiwezi kuwaka
+> kwa grid hii**. `VERIFIED` ingeandika kwenye kumbukumbu kwamba tuliithibitisha, wakati
+> tulichothibitisha ni kwamba haipimiki. `LESSON` inaandika ukweli: kipimo kimekamilika, na
+> kilichojifunza ni kwamba sheria inasubiri grid inayopima pande mbili tofauti.
 
 > Sahihi #1–#2 na #3–#4 ni maamuzi mawili yale yale mara mbili — #1–#2 zilisainiwa kabla ya
 > `git pull`, kwa hiyo `code_rev` yake inaelekeza mahali ambapo config haikuwa nayo. **#3–#4 ndizo
@@ -336,7 +349,36 @@ hizo haina msingi) bila kufelisha kitu ambacho mafunzo hayakiitaji.
 XAUUSD ndizo Toleo B — na **2023 yao uliiondoa mwenyewe** (sahihi #3). Miezi 19 inakuwa **7**.
 Njaa haikutokea kwa bahati; ni **bei iliyojulikana ya uamuzi ule**, sasa ikionekana kwa namba.
 
-### 7.6 Kinachofuata
+### 7.6 T2 imefungwa
 
-`r1-summary` mara moja zaidi (sekunde chache — hakuna ujenzi upya). Angalia sehemu **1b**
-(kigezo) na **1c** (uchunguzi). Ikitoa PASS, T2 iko tayari kwa **sahihi ya exit: R1 PASS**.
+Kigezo cha fold kinapita kwa nafasi kubwa: cell ndogo kuliko zote **4,417** dhidi ya kikomo
+**200** — mara 22. Folds zote tano ziko kati ya 4,417 na 5,561.
+
+| Kigezo | Matokeo | Kikomo |
+|---|---|---|
+| labels kwa cell × fold | **4,417** | ≥ 200 |
+| timeout | **2.79%** | ≤ 35% |
+| tie-break | **0** | ≤ 1% |
+| G2 (holdout) | safi | — |
+| jiometri (RS-04) | inashikilia | — |
+| setup dhidi ya control | **+0.0251 p_tp · +0.0638 R** | — |
+| M1 dhidi ya tick | 0.01% | — |
+
+Sahihi #12–#17 zimewekwa 2026-08-13. **T3 (features) imefunguliwa.**
+
+---
+
+## 8. Kinachofuata — T3 (R2 + R3: FEATURES)
+
+Kilichopo tayari: decision points **52,321** zenye labels nne, dataset iliyogawanywa kwa folds 5,
+na **base rate** ya kila cell. Kinachofuata ni **features** — na hapo ndipo maswali mawili ya T2
+yanapopata majibu:
+
+1. **Je makali ya +0.0638 R ni utabiri au uteuzi wa volatility?** Setup ina ATR p50 16.1 dhidi ya
+   control 14.3. Feature za volatility zikiingia, sehemu ya makali itakayobaki ndiyo ya kweli.
+2. **Je base rate inaweza kupandishwa kwa masharti?** E[R] gross ni −0.0505 R. Model haina budi
+   kuzidi hapo, si sifuri.
+
+Sheria nane za §6.1 zinatawala: scale-free, point-in-time, as-of, feature card kwa kila feature,
+chanzo kimoja kwa kila kiasi. Na somo la T2 linaingia hapa moja kwa moja — **kigezo
+kisichoweza kufeli si kigezo**.

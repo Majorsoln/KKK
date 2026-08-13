@@ -180,7 +180,7 @@ Mwisho: tests zote RCE-* kijani kwenye CI + rejista imesasishwa.
 
 ---
 
-### T1 — R0 (DATA AUDIT) ▶ `CODE IMEKAMILIKA · KIPIMO CHA DATA HALISI KINAENDELEA` (ledger §3.5)
+### T1 — R0 (DATA AUDIT) ▶ `IMEFUNGWA` 2026-08-10 (ledger §3.5 · sahihi #5–#10)
 **PROMPT:**
 ```
 Tekeleza TERM T1 (rejista DF-05..DF-08, DF-14, RS-03): L1 checks 8 + quality_report.json
@@ -212,7 +212,7 @@ vya data.yaml + ulinganisho A<->B.
 
 ---
 
-### T2 — R1 (LABEL AUDIT) ▶ `INASUBIRI T1`
+### T2 — R1 (LABEL AUDIT) ▶ `IMEFUNGWA` 2026-08-13 (ledger §3.6–§3.8 · sahihi #11–#17)
 **PROMPT:**
 ```
 Tekeleza TERM T2 (rejista DF-09..DF-11, DF-20, DF-21, K1-07, RS-04):
@@ -239,7 +239,7 @@ TRAIN+VAL PEKEE — takwimu za holdout MARUFUKU (G2).
 
 ---
 
-### T3 — R2+R3 (FEATURES) ▶ `INASUBIRI T2`
+### T3 — R2+R3 (FEATURES) ▶ `IMEFUNGULIWA` 2026-08-13
 **PROMPT:**
 ```
 Tekeleza TERM T3 (rejista DF-12, DF-13, K1-09, RS-05, RS-06): KWANZA feature cards za
