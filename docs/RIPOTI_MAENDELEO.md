@@ -323,11 +323,20 @@ kila decision point inapata cells zote 25, kwa hiyo cells zote zina idadi ile il
 data ikiwa yoyote. Ni ukaguzi wa aina ile ile ya `clock_drift` iliyotoa 0/34,089 kwenye T1 —
 inapita kwa muundo, si kwa ushahidi.
 
-Kigezo chenye meno ni cha **cell × symbol × fold** — mahali mafunzo yanapofanyika. Symbol yenye
-labels 25,314 kwa jumla lakini 40 ndani ya fold moja haiwezi kufundishwa humo, na pooled
-haitasema neno. R1 sasa inapima hapo na inaweza kufeli.
+Kigezo chenye meno ni cha **mahali mafunzo yanapofanyika**. Hapo nilikosea mara ya kwanza:
+nilipima kila **symbol** peke yake, ikafeli — EURCHF fold 5 = 136, XAUUSD 160, GBPJPY 164. Lakini
+mafunzo si ya kila symbol peke yake: KAIROS-1 ni model **MMOJA** kwa symbols 12, na folds ni za
+wakati zikishirikiwa. Kigezo changu kilikuwa **kikali kuliko utaratibu wenyewe**.
+
+Sasa kigezo ni **cell × fold, symbols zote kwa pamoja**, na mgawanyo wa kila symbol unaripotiwa
+kama **uchunguzi** — kwa sababu unaeleza kitu cha kweli (calibration ya symbol moja ndani ya folds
+hizo haina msingi) bila kufelisha kitu ambacho mafunzo hayakiitaji.
+
+**Na kwa nini symbols hizo tatu?** Fold 5 ni 2022-09 → 2024-03, miezi 19. EURCHF, GBPJPY na
+XAUUSD ndizo Toleo B — na **2023 yao uliiondoa mwenyewe** (sahihi #3). Miezi 19 inakuwa **7**.
+Njaa haikutokea kwa bahati; ni **bei iliyojulikana ya uamuzi ule**, sasa ikionekana kwa namba.
 
 ### 7.6 Kinachofuata
 
-`r1-summary` mara moja zaidi (sekunde chache — hakuna ujenzi upya). Ikitoa PASS baada ya kigezo
-cha fold kuongezwa, T2 iko tayari kwa **sahihi ya exit: R1 PASS**.
+`r1-summary` mara moja zaidi (sekunde chache — hakuna ujenzi upya). Angalia sehemu **1b**
+(kigezo) na **1c** (uchunguzi). Ikitoa PASS, T2 iko tayari kwa **sahihi ya exit: R1 PASS**.

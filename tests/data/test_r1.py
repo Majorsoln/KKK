@@ -375,10 +375,58 @@ def test_kigezo_cha_fold_kinaweza_kufeli_pale_pooled_haiwezi(cfg):
     rows += [("2017-10-01", 1.0, 1.0, TP_FIRST, True)] * 5      # fold 2: chache mno
     coverage = cell_coverage(_barriers(rows), folds)
 
-    kwa_fold = dict(zip(coverage["fold"], coverage["n_min"]))
-    assert kwa_fold[1] == 300
-    assert kwa_fold[2] == 5, "fold yenye njaa lazima ionekane"
-    assert coverage["n_min"].min() < 200 <= 300
+    pooled = coverage[coverage["scope"] == "pooled"].set_index("fold")["n_min"].to_dict()
+    assert pooled[1] == 300
+    assert pooled[2] == 5, "fold yenye njaa lazima ionekane"
+    assert pooled[3] == 0, "fold tupu kabisa ni sifuri, si kukosekana kimya"
+    # Mizani zote mbili zipo: pooled ndiyo kigezo, ya symbol ni uchunguzi.
+    assert set(coverage["scope"]) == {"pooled", "symbol"}
+
+
+def test_kigezo_cha_fold_ni_pooled_si_cha_kila_symbol(cfg):
+    """Mafunzo ni pooled (DATA_SPLIT_PLAN §2) — kigezo kifuate utaratibu huo.
+
+    Symbols mbili, kila moja ikiwa na 120 ndani ya fold moja: kwa symbol ni
+    chini ya 200, lakini model inaona 240. Kigezo cha kila symbol peke yake
+    kingefelisha kitu ambacho mafunzo yenyewe hayakiitaji.
+    """
+    # Siku 120 ndani ya KILA fold — fold tupu ni sifuri, na hiyo ni FAIL
+    # halali inayoficha kile test hii inakipima.
+    days: list[str] = []
+    for anchor in ("2016-02-01", "2017-10-01", "2019-06-01", "2021-03-01", "2022-10-01"):
+        days += list(pd.date_range(anchor, periods=120, freq="1D").strftime("%Y-%m-%d"))
+    rows = [(day, 1.0, 1.0, TP_FIRST, True) for day in days]
+    barriers = pd.concat(
+        [_barriers(rows, symbol="EURUSD"), _barriers(rows, symbol="GBPUSD")],
+        ignore_index=True,
+    )
+    n = len(days)
+    points = pd.DataFrame(
+        {
+            "symbol": ["EURUSD"] * n + ["GBPUSD"] * n,
+            "decision_time": list(pd.to_datetime(days, utc=True)) * 2,
+            "direction": [1] * (2 * n),
+            "is_setup": [True] * (2 * n),
+            "is_control": [False] * (2 * n),
+            "atr_pips": [10.0] * (2 * n),
+            "quantile_y": [0.1] * (2 * n),
+            "quantile_y_trade": [0.05] * (2 * n),
+            "spread_entry_pips": [0.5] * (2 * n),
+            "spread_exit_pips": [0.5] * (2 * n),
+        }
+    )
+    from src.data.splits import SplitPlan
+
+    report = build_report(
+        cfg, points, barriers, date(2024, 4, 1), folds=SplitPlan.from_config(cfg).folds()
+    )
+    cov = pd.DataFrame(report.payload["cell_coverage"])
+    fold1 = cov[(cov["scope"] == "pooled") & (cov["fold"] == 1)]["n_min"].iloc[0]
+    assert fold1 == 240, "model inaona symbols zote mbili kwa pamoja"
+    assert report.payload["totals"]["min_labels_per_cell_symbol_fold"] == 120
+    # Njaa ya kila symbol INASEMWA, lakini haifelishi.
+    assert any("cell x SYMBOL x fold" in note for note in report.notes)
+    assert not any("cell x fold (pooled)" in p for p in report.problems)
 
 
 def test_holdout_violations_inahesabu_si_kudhani():

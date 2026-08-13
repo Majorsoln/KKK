@@ -840,12 +840,24 @@ bali **spread ÷ ATR ya symbol yenyewe**: EURCHF ina ATR ya 9.8p pekee. Somo lil
 sheria 1 na la sweep ya `min_atr_mult` — kigezo cha pips kinapima **bei**, cha ATR kinapima
 **fursa**.
 
-**Kigezo kilichokuwa hakiwezi kufeli (kimerekebishwa 2026-08-13).** `min_labels_per_cell` pooled
-ilionyesha 25,314 kwa **kila cell** — si bahati, ni muundo: kila decision point inapata cells zote
-25, kwa hiyo cells zote zina idadi ile ile daima. Kigezo kinachotoa jibu lile lile bila kujali
-data ni kilekile cha `clock_drift` 0/34,089 cha T1. Kigezo chenye meno ni cha **cell × symbol ×
-fold** — mahali mafunzo yanapofanyika. Symbol yenye labels 25,314 kwa jumla lakini 40 ndani ya
-fold moja haiwezi kufundishwa humo, na pooled haitasema neno. R1 sasa inapima na kufeli hapo.
+**Kigezo kilichokuwa hakiwezi kufeli (kimerekebishwa 2026-08-13).** `min_labels_per_cell` juu ya
+data yote ilionyesha 25,314 kwa **kila cell** — si bahati, ni muundo: kila decision point inapata
+cells zote 25, kwa hiyo cells zote zina idadi ile ile daima. Kigezo kinachotoa jibu lile lile bila
+kujali data ni kilekile cha `clock_drift` 0/34,089 cha T1.
+
+Kigezo chenye meno ni cha **mahali mafunzo yanapofanyika**. Hapo nilikosea mara ya kwanza:
+nilipima **cell × symbol × fold**, ikafeli (EURCHF fold 5 = 136 · XAUUSD 160 · GBPJPY 164).
+Lakini mafunzo si ya kila symbol peke yake — DATA_SPLIT_PLAN §2 inasema "symbols ZOTE ziko kwenye
+fold ile ile", na KAIROS-1 ni model **MMOJA** kwa symbols 12 (ndiyo sababu features ni scale-free
+tangu §6.1 sheria 1). Kigezo cha kila symbol kilikuwa **kikali kuliko utaratibu wenyewe**.
+
+Sasa: kigezo ni **cell × fold pooled**; mgawanyo wa kila symbol unaripotiwa kama **uchunguzi**
+(`note`), kwa sababu unaeleza jambo la kweli — uchambuzi au calibration ya symbol MOJA ndani ya
+folds hizo hauna msingi — bila kufelisha kitu ambacho mafunzo hayakiitaji.
+
+**Kwa nini symbols hizo tatu, na fold hiyo hiyo:** fold 5 ni 2022-09-01 → 2024-03-31, miezi 19.
+EURCHF, GBPJPY na XAUUSD ndizo Toleo B, na 2023 yao iliondolewa kwa sahihi ya PD (#3). Miezi 19
+inakuwa **7**. Njaa haikutokea — **iliamuliwa**, na ni bei iliyojulikana ya uamuzi ule.
 
 **Kasoro kwenye kipimo changu (imerekebishwa, 2026-08-13).** Quantile mid-dhidi-ya-trade
 ilikuwa ikipimwa **bila ishara ya trade**. `quantile_y_trade` haina mwelekeo: BUY (nunua kwa ask,

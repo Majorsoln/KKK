@@ -1435,18 +1435,28 @@ def cmd_r1_summary(args: argparse.Namespace) -> int:
 
     cov = p.get("cell_coverage") or []
     if cov:
-        print("\n1b. LABELS KWA CELL x SYMBOL x FOLD — hapa ndipo mafunzo yanafanyika")
-        worst = sorted(cov, key=lambda r: r["n_min"])[:6]
-        for row in worst:
+        pooled = [r for r in cov if r["scope"] == "pooled"]
+        symbol_rows = [r for r in cov if r["scope"] == "symbol"]
+        print("\n1b. LABELS KWA CELL x FOLD (pooled) — KIGEZO, mizani ya mafunzo")
+        for row in sorted(pooled, key=lambda r: r["fold"]):
             alama = "  <-- chini ya kikomo" if row["n_min"] < kikomo else ""
             print(
-                f"   fold {row['fold']}  {row['symbol']:<8} cell ndogo kuliko zote "
-                f"{row['n_min']:>6,}{alama}"
+                f"   fold {row['fold']}  cell ndogo kuliko zote {row['n_min']:>7,}"
+                f"  (cells {row['cells']:>9,}){alama}"
             )
-        print(
-            f"   ndogo kuliko zote katika michanganyiko {len(cov)}: "
-            f"{t['min_labels_per_cell_fold']:,} (kikomo {kikomo})"
-        )
+        print(f"   ndogo kuliko zote: {t['min_labels_per_cell_fold']:,} (kikomo {kikomo})")
+
+        if symbol_rows:
+            print("\n1c. ...na kwa SYMBOL ndani ya fold — uchunguzi, si kigezo")
+            for row in sorted(symbol_rows, key=lambda r: r["n_min"])[:5]:
+                alama = "  <--" if row["n_min"] < kikomo else ""
+                print(
+                    f"   fold {row['fold']}  {row['symbol']:<8} {row['n_min']:>6,}{alama}"
+                )
+            print(
+                f"   ndogo kuliko zote katika michanganyiko {len(symbol_rows)}: "
+                f"{t['min_labels_per_cell_symbol_fold']:,}"
+            )
     print()
 
     print("2. UTULIVU KWA MIAKA")

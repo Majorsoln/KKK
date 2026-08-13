@@ -156,17 +156,22 @@ def expected_r(cells: pd.DataFrame, cost_pips: float = 0.0) -> float:
 
 
 def cell_coverage(barriers: pd.DataFrame, folds: list) -> pd.DataFrame:
-    """Labels kwa **cell × symbol × fold** — si pooled.
+    """Labels kwa cell ndani ya kila fold — kwa **mizani miwili**.
 
-    `min_labels_per_cell` ikipimwa pooled haiwezi kufeli: kila decision point
-    inapata cells zote 25, kwa hiyo kila cell ina idadi ILE ILE (setups zote).
-    Ukaguzi unaotoa jibu lile lile kwa muundo, bila kujali data, ni ule ule
-    ulioficha `clock_drift` kwa 0/34,089 kwenye T1.
+    `min_labels_per_cell` ikipimwa pooled juu ya data YOTE haiwezi kufeli:
+    kila decision point inapata cells zote 25, kwa hiyo kila cell ina idadi ILE
+    ILE (setups zote). Ukaguzi unaotoa jibu lile lile kwa muundo, bila kujali
+    data, ni ule ule ulioficha `clock_drift` kwa 0/34,089 kwenye T1.
 
-    Kigezo chenye maana ni kile cha **mahali mafunzo yanapofanyika**: fold moja,
-    symbol moja, cell moja. XAUUSD ikiwa na labels 25,314 kwa jumla lakini 40
-    ndani ya fold 3, cell hiyo haiwezi kufundishwa humo — na pooled
-    haitasema neno.
+    Mizani inayohesabu ni ile ya **mahali mafunzo yanapofanyika**:
+
+    * `scope="pooled"` — cell × fold, symbols zote kwa pamoja. Huu ndio
+      utaratibu uliotangazwa (DATA_SPLIT_PLAN §2: "symbols ZOTE ziko kwenye
+      fold ile ile"; KAIROS-1 ni model MMOJA kwa symbols 12, ndiyo maana
+      features ni scale-free). **Hiki ndicho kigezo.**
+    * `scope="symbol"` — cell × symbol × fold. Si kigezo, ni **uchunguzi**:
+      kinaonyesha symbol ipi ina njaa wapi. Kigezo hapa kingekuwa kikali
+      kuliko utaratibu wenyewe wa mafunzo.
     """
     if barriers.empty or not folds:
         return pd.DataFrame()
@@ -176,13 +181,25 @@ def cell_coverage(barriers: pd.DataFrame, folds: list) -> pd.DataFrame:
         inside = (days >= fold.val_start) & (days <= fold.val_end)
         chunk = barriers[inside]
         if chunk.empty:
-            rows.append({"fold": fold.index, "symbol": "—", "n_min": 0, "cells": 0})
+            rows.append(
+                {"scope": "pooled", "fold": fold.index, "symbol": "*", "n_min": 0, "cells": 0}
+            )
             continue
+        pooled = chunk.groupby(["sl_atr", "tp_atr"], sort=False).size()
+        rows.append(
+            {
+                "scope": "pooled",
+                "fold": fold.index,
+                "symbol": "*",
+                "n_min": int(pooled.min()),
+                "cells": int(len(chunk)),
+            }
+        )
         counts = chunk.groupby(["symbol", "sl_atr", "tp_atr"], sort=False).size()
-        per_symbol = counts.groupby(level="symbol").min()
-        for symbol, n_min in per_symbol.items():
+        for symbol, n_min in counts.groupby(level="symbol").min().items():
             rows.append(
                 {
+                    "scope": "symbol",
                     "fold": fold.index,
                     "symbol": str(symbol),
                     "n_min": int(n_min),
@@ -450,14 +467,35 @@ def build_report(
         )
 
     coverage = cell_coverage(trainable, folds or [])
-    thin_folds = coverage[coverage["n_min"] < min_per_cell] if not coverage.empty else coverage
-    if not coverage.empty and not thin_folds.empty:
-        worst_fold = thin_folds.loc[thin_folds["n_min"].idxmin()]
-        report.fail(
-            f"cell x symbol x fold: michanganyiko {len(thin_folds)} iko chini ya "
-            f"{min_per_cell} (mbaya kuliko zote: {worst_fold['symbol']} fold "
-            f"{int(worst_fold['fold'])} = {int(worst_fold['n_min'])})"
-        )
+    if not coverage.empty:
+        # KIGEZO: mizani ya mafunzo — cell x fold, symbols zote kwa pamoja.
+        pooled = coverage[coverage["scope"] == "pooled"]
+        thin_pooled = pooled[pooled["n_min"] < min_per_cell]
+        if not thin_pooled.empty:
+            worst_fold = thin_pooled.loc[thin_pooled["n_min"].idxmin()]
+            report.fail(
+                f"cell x fold (pooled): folds {len(thin_pooled)} ziko chini ya {min_per_cell} "
+                f"(mbaya kuliko zote: fold {int(worst_fold['fold'])} = "
+                f"{int(worst_fold['n_min'])})"
+            )
+        # UCHUNGUZI: symbol ipi ina njaa wapi. Si kigezo — kigezo cha kila
+        # symbol peke yake kingekuwa kikali kuliko utaratibu wa mafunzo,
+        # ambao ni pooled (DATA_SPLIT_PLAN §2). Lakini kinyamaza si sahihi
+        # pia: hesabu ya kila symbol ndiyo inayoonyesha calibration ya symbol
+        # moja moja itakapokosa msingi.
+        per_symbol = coverage[coverage["scope"] == "symbol"]
+        thin_symbol = per_symbol[per_symbol["n_min"] < min_per_cell]
+        if not thin_symbol.empty:
+            worst = thin_symbol.sort_values("n_min").head(4)
+            orodha = " · ".join(
+                f"{r['symbol']} fold {int(r['fold'])} = {int(r['n_min'])}"
+                for _, r in worst.iterrows()
+            )
+            report.notes.append(
+                f"cell x SYMBOL x fold: michanganyiko {len(thin_symbol)}/{len(per_symbol)} iko "
+                f"chini ya {min_per_cell} ({orodha}). Si kigezo — mafunzo ni pooled — lakini "
+                "uchambuzi wowote wa symbol MOJA ndani ya folds hizo hauna msingi."
+            )
 
     max_timeout = float(cfg.get("labels.barrier.max_timeout_frac"))
     timeout_frac = float((barriers["outcome"] == TIMEOUT).mean())
@@ -534,7 +572,14 @@ def build_report(
             "tie_break_frac": tie_frac,
             "min_labels_per_cell": int(rates["n"].min()),
             "min_labels_per_cell_fold": (
-                int(coverage["n_min"].min()) if not coverage.empty else None
+                int(coverage.loc[coverage["scope"] == "pooled", "n_min"].min())
+                if not coverage.empty
+                else None
+            ),
+            "min_labels_per_cell_symbol_fold": (
+                int(coverage.loc[coverage["scope"] == "symbol", "n_min"].min())
+                if not coverage.empty
+                else None
             ),
             "ev_r_gross": expected_r(barriers),
             "ev_r_gross_setups": expected_r(trainable),
