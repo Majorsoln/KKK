@@ -13,6 +13,15 @@
 > hayaruhusiwi kutumika kwa uteuzi wa strategy. Bila sharti hilo, kila
 > config ingeitwa "validation".
 
+> **Mamlaka ya faili hili.** Faili lenyewe liliandikwa na zana
+> (`budget-init`) na kucommitiwa na mtekelezaji — kama `quality_report.json`
+> na ripoti nyingine. **Halina mamlaka lenyewe.** Kinachofunga `SR* = 0.7`,
+> `κ = 0.50` na cell `2.0/3.0` ni **sahihi ya PD kwenye `SIGNATURES.md`**
+> (DF-20, 2026-08-13, ushahidi `research\reports\r1\cost_audit.json`).
+>
+> Kama namba za kichwa hapa juu zikitofautiana na zilizosainiwa, **sahihi
+> ndiyo ya kweli na faili hili ni kosa.** Msomaji afuate ledger, si hili.
+
 ## Mgao uliotangazwa (si reset — ni mgawanyo wa 7.5 ile ile)
 
 | Eneo | Mgao | Kinachohusika |
