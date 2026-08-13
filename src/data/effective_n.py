@@ -84,16 +84,41 @@ def average_uniqueness(
 ) -> tuple[float, pd.Series]:
     """`Σ uᵢ` ambapo `uᵢ = (1/H)·Σ_t 1/C_t` juu ya span ya label.
 
-    `C_t` ni idadi ya labels **hai** wakati `t`, ikihesabiwa kwa symbols ZOTE
-    kwa pamoja — kwa sababu mafunzo ni pooled (DATA_SPLIT_PLAN §2). Label mbili
-    zinazopishana kwa muda kwenye symbols mbili zinazohusiana si observations
-    mbili kamili, na concurrency ya pooled ndiyo inayonasa hilo kwa sehemu.
+    `C_t` ni idadi ya labels **hai** wakati `t` **ndani ya symbol ile ile**.
+
+    **Kwa nini si pooled kwa symbols zote.** Toleo la kwanza lilihesabu
+    concurrency kwenye timeline moja ya symbols zote. Matokeo: kila label
+    ilionekana ikiwa ya kipekee kwa 8.6% — na 8.6% ≈ 1/12, yaani idadi ya
+    symbols zetu, si mali yoyote ya data. Symbols 12 zikiwa na labels hai kwa
+    wakati mmoja zinatoa `C_t = 12`, na uniqueness inashuka hadi `1/12` hata
+    kama symbols hizo hazina uhusiano wowote.
+
+    Hilo linachanganya vitu viwili tofauti:
+
+    * **kupishana kwa MUDA** ndani ya symbol — labels zinazoshiriki bars za
+      baadaye. Hii ndiyo redundancy ambayo `uniqueness` inapaswa kuipima.
+    * **kutokea kwa WAKATI MMOJA** kwenye symbols tofauti — redundancy ya
+      sehemu, inayopimwa kwa usahihi na `participation_ratio` (7.54 kati ya 12
+      kwenye data yetu), si kwa `1/12`.
+
+    Kuvichanganya kunahesabu dependence ya cross-sectional **mara mbili**, na
+    kunashusha `N_eff` kwa mara nne — kutosha kufunga mradi unaowezekana.
+    Kila estimator inapaswa kupima dependence YAKE; `n_eff` inachukua mbaya
+    kuliko zote (2026-08-13).
 
     Inarudisha jumla na uzito wa kila point (uzito huo ndio `max_samples` ya
     bagging — si idadi ghafi).
     """
     if points.empty:
         return 0.0, pd.Series(dtype=float)
+    if "symbol" in points.columns and points["symbol"].nunique() > 1:
+        totals = 0.0
+        pieces = []
+        for _, chunk in points.groupby("symbol", sort=False):
+            subtotal, weights = average_uniqueness(chunk, horizon_bars, bar_minutes)
+            totals += subtotal
+            pieces.append(weights)
+        return totals, pd.concat(pieces).reindex(points.index)
 
     start = pd.to_datetime(points["decision_time"], utc=True)
     step = pd.Timedelta(minutes=bar_minutes)

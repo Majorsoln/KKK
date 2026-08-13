@@ -208,6 +208,30 @@ def test_uniqueness_ni_moja_pale_labels_hazipishani():
     assert weights.round(6).eq(1.0).all()
 
 
+def test_uniqueness_haiadhibu_symbols_kwa_kuwepo_tu():
+    """Symbols HURU zisipunguzane uniqueness kwa kuwa tu ziko hai kwa wakati mmoja.
+
+    Toleo la kwanza lilihesabu concurrency kwenye timeline moja ya symbols zote.
+    Kila label ilionekana ya kipekee kwa 8.6% — na 8.6% ≈ 1/12, idadi ya symbols
+    zetu, si mali ya data. Hilo lilishusha N_eff mara nne na lilikaribia kufunga
+    mradi unaowezekana (2026-08-13).
+
+    Kupishana kwa MUDA ni kazi ya `n_uniq`; redundancy ya cross-sectional ni
+    kazi ya `participation_ratio`. Kuvichanganya ni kuhesabu mara mbili.
+    """
+    moja = _points(60, freq="48h", symbols=("EURUSD",))
+    kumi_mbili = _points(
+        60, freq="48h",
+        symbols=tuple(f"S{i}" for i in range(12)),
+    )
+    total_moja, _ = average_uniqueness(moja, horizon_bars=24)
+    total_12, _ = average_uniqueness(kumi_mbili, horizon_bars=24)
+
+    assert total_moja == pytest.approx(60.0)
+    # Symbols 12, kila moja na labels 60 zisizopishana → 720, si 60.
+    assert total_12 == pytest.approx(720.0), "symbols hazipaswi kupunguzana"
+
+
 def test_uniqueness_inaporomoka_labels_zikipishana():
     """Bars 23/24 zikishirikiwa, observations 100 si 100."""
     points = _points(100, freq="1h")      # nafasi bar 1, horizon 24
