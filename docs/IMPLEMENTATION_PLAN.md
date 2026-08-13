@@ -106,7 +106,7 @@ T0 MSINGI ─► T1 R0 ─► T2 R1 ─► T3 R2+R3 ─► T4 R4+R5 ─► T5 R6
 | **T0 — MSINGI** | recorder wa feed ya broker (huanza, hauishii); normalization A/B → schema moja; L0 hashes; muundo wa research repo | recorder unarekodi kila siku ya trading; symbols 12 zinasomeka kwa schema moja; SHA256 za partitions zote zimehifadhiwa |
 | **T1 — R0** | L1 (checks 8) + `quality_report.json`; kalenda ya sessions; L2 (TF 7 kutoka ticks + spread stats); sentinel ya uvujaji kwenye CI | R0 PASS kwa vizingiti vya `data.yaml`; sentinel inakimbia na kufelisha build ikigundua uvujaji; ulinganisho A↔B umeripotiwa |
 | **T2 — R1** | L4: grid labels kwa path ya ticks + terminal returns za timeout; fill bootstrap; quality buckets | R1 PASS (base rates + jiometri + utulivu); `min_labels_per_cell ≥ 200`; M1-vs-tick disagreement imeripotiwa |
-| **T3 — R2+R3** | feature cards F1–F7 (kabla ya code); L3 + screening (IC/MI + permutation + **FDR**); redundancy clustering | kila feature ina card; jedwali la screening na FDR limetoka; set ya mwisho ≤ bajeti (`labels ÷ 50`) |
+| **T3 — R2+R3** | feature cards F1–F7 (kabla ya code); L3 + screening (IC/MI + permutation + **FDR**); redundancy clustering — **ona §3.9: uamuzi wa mwelekeo unasubiriwa** | kila feature ina card; jedwali la screening na FDR limetoka; set ya mwisho ≤ bajeti (`labels ÷ 50`, ikihesabiwa kwa **effective N** — RS-15) |
 | **T4 — R4+R5** | baselines B0/B1/B2; **GO/NO-GO**; calibration (isotonic kwenye validation folds) | B1/B2 > B0 kwa CI isiyogusa sifuri — AU **SIMAMA na rudi T2/T3**; ECE ≤ 0.05, Brier skill > 0 |
 | **T5 — R6+R7** | EV ya madarasa 3, fill-aware, cost stress ×1.5; ablation ya familia + TF; wagombea wa Track P wanaingia hapa kupitia lango la R4 | EV_R net > baseline na inabaki chanya kwa cost ×1.5; jedwali la ablation limetoka |
 | **T6 — R8** | PD anafungua HOLDOUT **mara moja**; attestation | vigezo vya `data.yaml §holdout`; attestation yenye `dataset_id` + config_hash imesainiwa — AU mzunguko unaisha LESSON |
@@ -239,7 +239,17 @@ TRAIN+VAL PEKEE — takwimu za holdout MARUFUKU (G2).
 
 ---
 
-### T3 — R2+R3 (FEATURES) ▶ `IMEFUNGULIWA` 2026-08-13
+### T3 — R2+R3 (FEATURES) ▶ `IMEFUNGULIWA` 2026-08-13 · **UAMUZI WA MWELEKEO UNASUBIRIWA (§3.9)**
+
+> **Soma §3.9 kabla ya kuanza T3.** Mapitio ya 2026-08-13 yanapendekeza kwamba T3 ijengwe
+> juu ya msingi tofauti: historia hadi 2003, symbols ~28 badala ya 12, labels dense badala
+> ya kuchujwa kwa mkono, na lengo la **kupanga chini ya uwezo** badala ya usahihi kwa zote.
+> Ikikubaliwa, PROMPT hapa chini inabaki kama ilivyo **kimaudhui** (cards, screening, FDR,
+> redundancy) lakini bajeti ya features na hesabu ya effective N zinabadilika kwa kiasi
+> kikubwa. Ikikataliwa, PROMPT inatekelezwa kama ilivyoandikwa.
+>
+> Kilichoharibika kwenye pendekezo la kwanza la T3 (na kwa nini): §3.9.2.
+
 **PROMPT:**
 ```
 Tekeleza TERM T3 (rejista DF-12, DF-13, K1-09, RS-05, RS-06): KWANZA feature cards za
@@ -922,6 +932,152 @@ Yote ni ya **T2+**; T1 haiguswi na hata moja. RCE haijaguswa.
 namba halisi za Dukascopy kwenye `config/broker_costs.yaml` (commission round-turn), na
 `SymbolSpec` kusomwa moja kwa moja kutoka MT5 (volume_min/step/max, swap_*, contract_size,
 point) badala ya kuandikwa kwa mkono — kazi ya T7 (integration).
+
+---
+
+## 3.9 MAPITIO YA MWELEKEO — "tuliboresha ndani ya kizuizi kibaya" (2026-08-13)
+
+> **HADHI: PENDEKEZO. HAKUNA KILICHOAMULIWA.** Sehemu hii inaandika hoja na namba
+> zilizoipeleka; uamuzi ni wa PD. Hakuna code, config wala sahihi inayobadilika kwa
+> sehemu hii peke yake. Ikikubaliwa, kila hatua inapita kwenye milango yake ya kawaida
+> (pre-registration, R0 upya, purged CV, holdout imefungwa).
+
+### 3.9.1 Namba iliyokuwa imefichwa: EV kwa kila cell
+
+R1 ilihesabu `ev_r` kwa kila cell tangu mwanzo; jedwali halikuionyesha. `r1-ev`
+(inasoma tu — haiguswi ripoti iliyosainiwa) inaonyesha **umbali** ambao model inapaswa
+kuufunika, kwa gharama ya 0.7 pips na ATR p50 ya 16.1:
+
+| sl / tp | p_tp sasa | gharama (R) | EV net | p_tp inayohitajika | **pengo** |
+|---|---|---|---|---|---|
+| 2.0 / 2.0 | 0.505 | 0.022 | −0.013 | 0.512 | **+0.007** |
+| 2.0 / 1.5 | 0.575 | 0.022 | −0.016 | 0.585 | +0.010 |
+| 1.0 / 1.5 | 0.379 | 0.044 | −0.096 | 0.417 | +0.038 |
+| 0.5 / 0.5 | 0.438 | 0.087 | −0.211 | 0.543 | **+0.105** |
+
+**Pengo linatofautiana mara 15 ndani ya grid ile ile.** Sababu ni hesabu, si bahati:
+spread ni umbali usiobadilika wa bei, na commission kwa R ni `cost_pips ÷ sl_pips`. SL
+ikipanuka mara mbili, vyote viwili vinapungua nusu. Hoja hii inajulikana **kabla ya
+kuangalia label yoyote** — si kitu kilichochimbwa.
+
+Kwa kulinganisha: SETUP-v1 peke yake ilileta **+0.0251**. Kwenye SL pana, model inahitaji
+chini ya nusu ya hicho.
+
+> **Hii SI ruhusa ya kuchagua cell.** Kuchagua `sl=2.0` kwa sababu jedwali linaonyesha
+> namba nzuri ni **uteuzi juu ya label** (§4.3, darasa la tatu). Grid inabaki **input ya
+> model** (anti-S1). Jedwali linapima UMBALI, halichagui biashara.
+
+### 3.9.2 Kosa la kimuundo: N ndogo ilikuwa **uamuzi wetu**
+
+Pendekezo la kwanza la T3 lilisema "punguza features hadi ~30 kwa sababu N ni ndogo."
+Ilikuwa sahihi kimahesabu na **mbaya kimkakati**: iliboresha ndani ya kizuizi badala ya
+kukishambulia. Swali sahihi si "tufanyeje na N ndogo" bali **"kwa nini N ni ndogo?"**
+
+| Uamuzi | Athari |
+|---|---|
+| `min_atr_mult 2.5` → setups 4.46% | decision points **95.5% zimetupwa** |
+| symbols 12, zote FX, kutoka sarafu ~6 | factors huru **~5**, si 12 |
+| data inaanza 2016-01 | Dukascopy ina majors tangu **2003** |
+| horizon moja (bars 24) | supervision moja kwa kila point |
+
+Kisha N hiyo ndogo ilitumika kama sababu ya kubana features. **Mduara.**
+
+### 3.9.3 Mapendekezo saba
+
+**1 · Historia hadi 2003.** Muda ndio mwelekeo pekee ambao uhuru wa kitakwimu unaishi —
+symbols zinapishana, bars za jirani zinapishana, **miaka haipishani**. 2016→2024 ni blocks
+huru za bars-24 ≈ **2,060**; 2003→2024 ≈ **4,750**. Mara **2.3**.
+
+Na si wingi tu — ni **utofauti**. Dirisha la sasa halina **hata tukio moja la mkia**:
+hakuna 2008, hakuna Januari 2015 (CHF), hakuna 2011. Model isiyoona soko likivunjika,
+kisha ikapelekwa live kusimamia hatari, haijawahi kupimwa kwenye kile kinachoua akaunti.
+Tumeona `touch_past_pips` max ya **pips 2,503** kwenye dirisha **tulivu**; 2015 ingeonyesha
+kubwa zaidi. Zana zipo: `backfill`, `catchup.bat`, L0 immutable + SHA256.
+
+**2 · Symbols 12 → ~28, kwa UHURU si idadi.** Symbols za sasa zimejengwa kwa sarafu 6;
+EURUSD/EURGBP/EURCHF/EURJPY zote zinabeba EUR. Kuongeza pairs zaidi za FX hakuongezi
+chochote. Kinachoongeza ni vinavyotembea kwa **sababu tofauti**: metals, indices, energy,
+crosses za mbali. Factors huru ~5 → ~12. Mara **2.4**.
+
+Pamoja na (1): **effective N mara ~5.5** → kizingiti cha IC kinachogundulika kinashuka kwa
+√5.5 ≈ **mara 2.3**. Features zisizotofautiana na kelele leo zitaonekana.
+
+**3 · Acha kuchuja kwa mkono; mfundishe model kuchuja.** SETUP-v1 inagharimu (a) data mara
+20, (b) dhana MOJA iliyofungwa ambayo haijawahi kupimwa dhidi ya mbadala, (c) uchafuzi wa
+ATR 16.1 dhidi ya 14.3 unaoharibu screening ya F4. Badala yake: labels kwenye **kila H1 bar
+halali**; model inajifunza `p_tp(features, sl, tp)` juu ya mgawanyo mzima; uamuzi wa
+biashara unakuwa **kizingiti juu ya EV iliyotabiriwa**, inayohesabiwa na RCE.
+
+**Sahihi ya DF-20 haitupwi.** SETUP-v1 inakuwa (i) feature na (ii) **baseline ya kupigwa**.
+Ndio matumizi yake sahihi: tulipima +0.0251; sasa tunauliza kama model inaizidi.
+Decision points 25,314 → **~588,000**.
+
+**4 · Kinachofanya (3) iwezekane: barrier resolution ya NGAZI MBILI.** Hapa kipimo chetu
+chenyewe kinatulipa. **M1 dhidi ya tick = 9/66,650 (0.01%)** — bars zinatosha karibu daima
+kujua ni **bar gani** iligusa; ticks zinahitajika kwa kutatua **ndani ya bar hiyo moja**.
+
+```
+Ngazi 1: prefix min/max juu ya extremes za M1 (bars ~1,440)  -> bar iliyogusa
+Ngazi 2: ticks za bar HIYO PEKEE (~100)  -> mpangilio kamili + bei ya touch
+```
+
+Sasa: prefix juu ya ticks ~30,000 kwa kila point. Baadaye: bars 1,440 + ticks 100.
+**Nafuu ~mara 100.** Points mara 23 zikiwa nafuu mara 100 → kazi **inapungua**.
+
+Na ushahidi wa kuithibitisha upo: **cells 1,308,025** zilizotatuliwa kwa ticks kamili ni
+golden test yenye rows milioni 1.3. Resolver mpya lazima itoe jibu **lile lile** kwa zote.
+
+**5 · Lengo si usahihi kwa zote — ni KUPANGA chini ya uwezo.** "+0.007 kwa p_tp" inadhani
+tunafanya biashara zote 25,314. Lakini RCE ina bajeti na positions zinapishana (RS-16).
+Model **haihitaji kuinua wastani**; inahitaji **kupanga**. Decile ya juu ikiwa p_tp 0.55
+kwenye (2.0, 2.0): `EV = 2(0.55) − 1 − 0.022 = +0.078 R`, kwa biashara ~300/mwaka badala ya
+3,000. Swali la utafiti linakuwa **"kuna heterogeneity kiasi gani kwenye p_tp"**, si "IC ni
+ngapi" — na linapimwa kwa **EV ya top-k chini ya uwezo halisi**, kuanzia R2, si R6.
+
+**6 · Ongeza lengo la CROSS-SECTIONAL.** Timestamps zimepangana kwa symbols zote. Swali si
+"je EURUSD itapanda?" bali **"ni ipi kati ya hizi itazidi kikapu?"** — hilo **linafuta
+factor ya pamoja** (USD, risk-on/off), ambayo ndiyo kelele kubwa kuliko zote kwenye FX.
+`terminal_atr` ipo kwa kila point tayari: **jaribio hili linawezekana kwa data tuliyo nayo,
+bila kujenga chochote kipya.**
+
+**7 · Baada ya 1–6, features hazitakuwa kizuizi.** Effective N mara ~5.5 → dari halisi ya
+features inakuwa **500+**, si 120. Ushauri wa "features 30" unakuwa hauna maana — ndiyo
+sababu ulikuwa ushauri mbaya.
+
+### 3.9.4 Mfuatano unaopendekezwa
+
+| # | Kazi | Muda | Kwa nini hapa |
+|---|---|---|---|
+| 0 | Jaribio la **cross-sectional** kwa labels zilizopo | siku 3 | nafuu kabisa; linaweza kubadilisha yote yanayofuata |
+| 1 | **Resolver ya ngazi mbili** + golden dhidi ya cells 1,308,025 | wiki 1 | mlango wa 2–4 |
+| 2 | **Historia 2003–2016** (L0 → R0 upya) | wiki 3–4 | lever kubwa kuliko zote |
+| 3 | **Symbols +16** za tabia tofauti | wiki 2 (sambamba) | effective N |
+| 4 | **Labels dense** juu ya yote | siku 3 (baada ya 1) | N ×23 |
+| 5 | **T3 features** juu ya msingi mpya | — | sasa ina maana |
+
+Hatua 0 na 1 hazihitaji data mpya — zinaweza kuanza mara moja.
+
+### 3.9.5 Kisichobadilika
+
+**Ukubwa unaongezeka; nidhamu haipungui.** Holdout inabaki imefungwa hadi R8.
+Pre-registration inabaki kwa kila sheria mpya. Purged CV, embargo, sentinel, G1–G14 — zote
+zinabaki, zikitumika kwenye dataset kubwa zaidi.
+
+Hizi si urasimu unaoshikiliwa kwa woga. **Data kubwa inaongeza uwezo wa kujidanganya kwa
+kiwango kile kile inachoongeza uwezo wa kugundua.** Bila milango, kila namba kutoka kwenye
+data mara 5 itakuwa **hadithi nzuri zaidi**, si matokeo bora zaidi.
+
+### 3.9.6 Athari kwa vipengele vya rejista (ikikubaliwa)
+
+| Kipengele | Athari |
+|---|---|
+| DF-20 | **haitupwi** — SETUP-v1 inakuwa feature + baseline; sahihi #11/#18 zinabaki halali kama kumbukumbu ya kile kilichopimwa |
+| DF-09/10 | resolver ya ngazi mbili lazima ilingane na labels zilizosainiwa kwa **cells 1,308,025 zote** kabla ya kutumika |
+| DF-05, RS-03 | R0 inaendeshwa **upya** kwa dirisha jipya la historia + symbols mpya; sahihi mpya zinahitajika |
+| DF-14 | `fold_boundaries` na `data_start` zinabadilika → mpango mpya wa splits, sahihi mpya |
+| RS-15 | effective N inapimwa **kwa data mpya**, si kukisiwa |
+| K1-07, DF-21 | hazibadiliki |
+| RCE-01..13 | **haziguswi** |
 
 ---
 

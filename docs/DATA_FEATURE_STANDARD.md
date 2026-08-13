@@ -459,6 +459,20 @@ lazima kuwe juu ya data moja, la sivyo tofauti za chanzo zingeingia ndani ya kip
 tofauti za resolution. Sampuli inachaguliwa kwa **hash** ya `(seed, symbol, muda)` — point ile
 ile inaangaliwa kila run, kwenye kila mashine (sababu ile ile ya control sample, §4.3).
 
+**Kilichopimwa (R1, 2026-08-13): M1 ilitofautiana na ticks mara 9 kati ya 66,650 — 0.01%.**
+Kati ya hizo, mara 16 M1 moja iligusa SL na TP kwa pamoja (`ambiguous`).
+
+Hoja ya §5 ("bar haisemi ipi iligusa kwanza") ni **kweli**, lakini kwa grid hii — SL ya chini
+kabisa ni 0.5 ATR, pana kuliko range ya dakika moja — athari yake ni **karibu sifuri**.
+Ingekuwa kubwa kwa barriers nyembamba zaidi.
+
+Matokeo yanayofuata kutoka hapo ni ya kiuhandisi, si ya kisheria: **bars zinatosha karibu daima
+kujua ni bar GANI iligusa; ticks zinahitajika kwa kutatua NDANI ya bar hiyo moja.** Sheria ya
+§5 haibadiliki hata kidogo — label bado inatatuliwa kwa ticks — lakini njia ya kuifikia inaweza
+kuwa ya ngazi mbili (bars → ticks za bar moja) badala ya kupita kwenye ticks zote. Pendekezo na
+hesabu zake: `IMPLEMENTATION_PLAN.md` §3.9.3 kipengele 4. **Hakijaamuliwa**, na kikiamuliwa
+lazima kilingane na cells **1,308,025** zilizosainiwa kabla ya kutumika.
+
 ---
 
 ## 6. L3 — FEATURES

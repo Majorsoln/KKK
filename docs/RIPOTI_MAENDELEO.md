@@ -16,7 +16,7 @@ tests: **287** zinapita · `config_hash` `sha256:4ce1768`
 | **T0 — Msingi** | ✅ IMEFUNGWA (2026-08-06) | L0 immutable + SHA256; recorder wa broker; normalization A/B; malango ya repo |
 | **T1 — R0 ukaguzi wa data** | ✅ IMEFUNGWA (2026-08-10) | Siku **33,440/34,781 (96.1%)** zinafaa kutumika; sahihi 6 za VERIFIED |
 | **T2 — R1 labels** | ✅ IMEFUNGWA (2026-08-13) | L4 cells **1,308,025**; R1 **PASS**; setup dhidi ya control **+0.0251 p_tp / +0.0638 R**; sahihi 6 (#12–#17) |
-| **T3 — R2+R3 features** | 🔓 IMEFUNGULIWA | inafuata |
+| **T3 — R2+R3 features** | 🔓 IMEFUNGULIWA · **uamuzi wa mwelekeo unasubiriwa** | pendekezo la kubadilisha msingi: §8 hapa chini |
 | T4–T7 | ⏳ zinasubiri mfuatano | baselines, EV, holdout, live |
 
 **Data:** ticks **bilioni 3.4** · symbols **12** · 2016-01-04 → 2026-08-07 · partitions **25,510**.
@@ -379,17 +379,63 @@ Sahihi #12–#17 zimewekwa 2026-08-13. **T3 (features) imefunguliwa.**
 
 ---
 
-## 8. Kinachofuata — T3 (R2 + R3: FEATURES)
+## 8. Kinachofuata — na pendekezo la kubadilisha mwelekeo
 
-Kilichopo tayari: decision points **52,321** zenye labels nne, dataset iliyogawanywa kwa folds 5,
-na **base rate** ya kila cell. Kinachofuata ni **features** — na hapo ndipo maswali mawili ya T2
-yanapopata majibu:
+> **HADHI: PENDEKEZO. Uamuzi ni wa PD.** Maelezo kamili: §3.9 ya `IMPLEMENTATION_PLAN.md`.
 
-1. **Je makali ya +0.0638 R ni utabiri au uteuzi wa volatility?** Setup ina ATR p50 16.1 dhidi ya
-   control 14.3. Feature za volatility zikiingia, sehemu ya makali itakayobaki ndiyo ya kweli.
-2. **Je base rate inaweza kupandishwa kwa masharti?** E[R] gross ni −0.0505 R. Model haina budi
-   kuzidi hapo, si sifuri.
+### 8.1 Namba iliyokuwa imefichwa
 
-Sheria nane za §6.1 zinatawala: scale-free, point-in-time, as-of, feature card kwa kila feature,
-chanzo kimoja kwa kila kiasi. Na somo la T2 linaingia hapa moja kwa moja — **kigezo
-kisichoweza kufeli si kigezo**.
+R1 ilihesabu EV kwa kila cell tangu mwanzo; jedwali halikuionyesha. `r1-ev` (inasoma tu,
+haiguswi ripoti iliyosainiwa) inaonyesha **umbali** ambao model inapaswa kuufunika:
+
+| sl / tp | EV net | **pengo la p_tp** |
+|---|---|---|
+| 2.0 / 2.0 | −0.013 R | **+0.007** |
+| 1.0 / 1.5 | −0.096 R | +0.038 |
+| 0.5 / 0.5 | −0.211 R | **+0.105** |
+
+**Mara 15 tofauti ndani ya grid ile ile.** Sababu ni hesabu: spread ni umbali usiobadilika wa
+bei, na commission kwa R ni `cost_pips ÷ sl_pips`. SL ikipanuka mara mbili, vyote vinapungua
+nusu. Kwa kulinganisha — SETUP-v1 peke yake ililetea **+0.0251**. Kwenye SL pana, model
+inahitaji **chini ya nusu** ya hicho.
+
+### 8.2 Kosa la kimuundo: N ndogo ilikuwa uamuzi wetu
+
+Pendekezo la kwanza la T3 lilikuwa "punguza features hadi 30 kwa sababu N ni ndogo". Sahihi
+kimahesabu, **mbaya kimkakati**: liliboresha ndani ya kizuizi badala ya kukishambulia.
+
+| Uamuzi wetu | Athari |
+|---|---|
+| kuchuja hadi 4.46% | tulitupa **95.5%** ya decision points |
+| symbols 12, zote FX, sarafu 6 | factors huru **~5**, si 12 |
+| kuanza 2016 | Dukascopy ina majors tangu **2003** |
+
+Kisha N hiyo ndogo ikatumika kama sababu ya kubana features. **Mduara.**
+
+### 8.3 Pendekezo kwa ufupi
+
+| # | Wazo | Athari |
+|---|---|---|
+| 1 | historia hadi **2003** | blocks huru 2,060 → 4,750 (**×2.3**); inaingiza 2008 na CHF 2015 — dirisha la sasa halina **hata tukio moja la mkia** |
+| 2 | symbols **12 → ~28** kwa tabia tofauti (metals, indices, energy) | factors huru ~5 → ~12 (**×2.4**) |
+| 3 | acha kuchuja kwa mkono; **model ijifunze kuchuja** | points 25,314 → **~588,000**; SETUP-v1 inakuwa feature + baseline, sahihi haitupwi |
+| 4 | resolver ya **ngazi mbili** (bars → ticks za bar moja) | nafuu **~×100**; imehalalishwa na kipimo chetu M1≠tick = **0.01%** |
+| 5 | lengo = **kupanga**, si usahihi kwa zote | decile ya juu p_tp 0.55 → EV **+0.078 R**, biashara ~300/mwaka |
+| 6 | ongeza lengo la **cross-sectional** | linafuta factor ya pamoja (USD); **linawezekana kwa data tuliyo nayo leo** |
+| 7 | features hazitakuwa kizuizi | effective **×5.5** → dari halisi 500+, si 120 |
+
+### 8.4 Kisichobadilika
+
+**Ukubwa unaongezeka; nidhamu haipungui.** Holdout imefungwa hadi R8. Pre-registration kwa
+kila sheria mpya. Purged CV, embargo, sentinel, G1–G14 — zote zinabaki.
+
+Si urasimu wa woga: **data kubwa inaongeza uwezo wa kujidanganya kwa kiwango kile kile
+inachoongeza uwezo wa kugundua.** Bila milango, kila namba kutoka kwenye data mara 5 itakuwa
+hadithi nzuri zaidi, si matokeo bora zaidi.
+
+### 8.5 Hatua mbili zinazoweza kuanza leo
+
+Hazihitaji data mpya:
+
+- **Jaribio la cross-sectional** kwa labels zilizopo — siku 3
+- **Resolver ya ngazi mbili** + golden dhidi ya cells 1,308,025 — wiki 1
