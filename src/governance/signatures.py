@@ -374,8 +374,9 @@ def verify(
     base = Path(root or Path.cwd())
     pd_identity = declared_pd(ledger)
     seen_numbers: set[int] = set()
+    signatures = load(ledger)
 
-    for signature in load(ledger):
+    for signature in signatures:
         report.checked += 1
         # Matatizo YA SAHIHI HII pekee. Sahihi yenye tatizo lolote haipandishi
         # hadhi — vinginevyo `verified_items` ingesema uwongo hata wakati lango
@@ -424,15 +425,30 @@ def verify(
 
         if check_evidence and signature.evidence:
             path = base / signature.evidence
+            heir = _superseded_by(signature, signatures, base)
             if not path.is_file():
-                report.problems.append(
-                    f"#{signature.number}: ushahidi haupo tena ({signature.evidence})"
-                )
+                complaint = f"#{signature.number}: ushahidi haupo tena ({signature.evidence})"
+                if heir:
+                    report.notes.append(f"{complaint} — imepitwa na #{heir}")
+                else:
+                    report.problems.append(complaint)
             elif not sha256_of(path).startswith(signature.evidence_sha256):
-                report.problems.append(
+                complaint = (
                     f"#{signature.number}: **ushahidi umebadilika baada ya kusainiwa** "
-                    f"({signature.evidence}) — sahihi haifuniki faili hili tena"
+                    f"({signature.evidence})"
                 )
+                if heir:
+                    # Mstari mpya wa kipengele KILE KILE unaelekeza faili LILE LILE
+                    # na hash yake inalingana na faili la sasa. Rejista ni ya
+                    # kuongezwa tu, kwa hiyo mstari wa zamani hauwezi kufutwa — na
+                    # haupaswi: mfuatano ndio ushahidi. Lakini ukibaki `problem`,
+                    # `verify` ingesema FAIL MILELE, na lango linalolia daima
+                    # linakufa polepole (2026-08-13, sahihi #11 na #18).
+                    report.notes.append(f"{complaint} — imepitwa na #{heir}")
+                else:
+                    report.problems.append(
+                        f"{complaint} — sahihi haifuniki faili hili tena"
+                    )
 
         if len(report.problems) != before:
             continue        # sahihi hii ina tatizo — haihesabiki
@@ -442,6 +458,38 @@ def verify(
             report.verified_items.discard(signature.item)
 
     return report
+
+
+def _superseded_by(
+    signature: "Signature", signatures: list["Signature"], base: Path
+) -> int | None:
+    """Nambari ya mstari MPYA unaofunga kipengele kile kile kwenye ushahidi wa sasa.
+
+    Masharti yote manne, kwa makusudi:
+
+    1. **Kipengele kile kile** — sahihi ya DF-20 haipitwi na ya DF-09.
+    2. **Faili lile lile la ushahidi** — kuhamia faili jingine si kufunga upya,
+       ni uamuzi mwingine.
+    3. **Nambari kubwa zaidi** — historia inasogea mbele pekee.
+    4. **Hash inalingana na faili LILILOPO SASA** — hili ndilo la muhimu.
+       Mstari mpya wenyewe ukiwa umepitwa na wakati, hakuna kinachopitwa;
+       lango linaendelea kulia, kama inavyopaswa.
+
+    Bila hii, mstari mmoja uliopitwa ungefanya `verify` iseme FAIL milele —
+    na lango ambalo halina njia ya kurudi kwenye PASS linafundisha msomaji
+    kulipuuza. Hilo ni hatari kuliko kutokuwa na lango kabisa.
+    """
+    if not signature.evidence:
+        return None
+    for other in signatures:
+        if other.number <= signature.number:
+            continue
+        if other.item != signature.item or other.evidence != signature.evidence:
+            continue
+        path = base / other.evidence
+        if path.is_file() and sha256_of(path).startswith(other.evidence_sha256):
+            return other.number
+    return None
 
 
 def pending(

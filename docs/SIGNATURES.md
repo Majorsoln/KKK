@@ -22,6 +22,18 @@ Author wa commit + muda wake + `config_hash` + SHA256 ya ushahidi ndivyo vinavyo
 mstari huu kuwa sahihi badala ya maandishi. `python -m src.governance.cli verify`
 inakagua kila kitu (lango G14).
 
+> **Kufunga upya (supersession).** Ripoti ya ushahidi ikijengwa upya, hash yake inahama
+> hata kama namba zilizomo hazikubadilika — `built_at`, `code_rev` na `config_hash` zote
+> zinabadilika. Mstari wa zamani hauwezi kufutwa (faili ni la kuongezwa tu), kwa hiyo PD
+> anaweka **mstari MPYA wa kipengele kile kile, ukielekeza faili lile lile**. Lango
+> linabadilisha lawama ya mstari wa zamani kuwa `imepitwa na #N` — inaonekana bado, lakini
+> haizuii `PASS`. Masharti manne, yote ya lazima: kipengele kile kile · faili lile lile ·
+> nambari kubwa zaidi · **hash ya mrithi inalingana na faili lililopo sasa**. Mrithi
+> aliyepitwa naye hapitishi mtu — lango linaendelea kulia, kama inavyopaswa.
+>
+> Sababu: lango lisilo na njia ya kurudi kwenye `PASS` lingesema FAIL milele, na lango
+> linalolia daima linafundisha msomaji kulipuuza. Hilo ni hatari kuliko kutokuwa na lango.
+
 > **Kuhusu #1–#2 na #3–#4 (2026-08-09).** Ni maamuzi mawili yale yale, yakiwa yamewekwa
 > mara mbili. #1–#2 zilisainiwa kabla ya `git pull`, kwa hiyo `code_rev` yake (`7e0795a`)
 > ni commit ambapo `quality.excluded_ranges` **haipo kabisa** na `min_coverage` bado ni

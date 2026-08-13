@@ -113,6 +113,62 @@ def test_ushahidi_ukibadilika_baada_ya_sahihi_uthibitisho_unafeli(ledger, eviden
     assert any("umebadilika baada ya kusainiwa" in p for p in report.problems)
 
 
+def _verify(ledger):
+    return sig.verify(
+        ledger=ledger, plan=REPO / "docs" / "IMPLEMENTATION_PLAN.md", root=ledger.parent
+    )
+
+
+def test_mstari_mpya_unapitisha_wa_zamani_wenye_ushahidi_uliobadilika(ledger, evidence):
+    """Rejista ni ya kuongezwa tu — lango lazima liwe na njia ya kurudi PASS.
+
+    Ripoti ikijengwa upya (stamps zinahama), mstari wa zamani hauwezi kufutwa
+    wala kuhaririwa. Ukibaki `problem`, `verify` inasema FAIL MILELE — na lango
+    lisilo na njia ya kurudi linafundisha msomaji kulipuuza. Hilo ni hatari
+    kuliko kutokuwa na lango (2026-08-13, sahihi #11 na #18).
+    """
+    _sign(ledger, evidence)
+    evidence.write_text(json.dumps({"totals": {"partitions": 400, "failed": 0}}), encoding="utf-8")
+    assert not _verify(ledger).ok, "kabla ya kufunga upya, ni FAIL"
+
+    _sign(ledger, evidence, reason="kufunga upya baada ya ripoti kujengwa upya")
+    report = _verify(ledger)
+    assert report.ok, "baada ya kufunga upya, lango linarudi PASS"
+    assert any("imepitwa na #2" in n for n in report.notes), "mstari wa zamani UNAONEKANA bado"
+    assert "DF-05" in report.verified_items
+
+
+def test_mstari_mpya_wa_kipengele_KINGINE_hauupitishi(ledger, evidence):
+    """Kufunga upya ni kwa kipengele kile kile — si sahihi yoyote mpya.
+
+    Bila sharti hili, kusaini kipengele chochote kingekuwa njia ya kunyamazisha
+    lawama za vipengele vingine vyote.
+    """
+    _sign(ledger, evidence)
+    evidence.write_text(json.dumps({"x": 1}), encoding="utf-8")
+    _sign(ledger, evidence, item="DF-06")
+
+    report = _verify(ledger)
+    assert not report.ok
+    assert any("umebadilika baada ya kusainiwa" in p for p in report.problems)
+
+
+def test_mstari_mpya_uliopitwa_wenyewe_hauupitishi_wa_zamani(ledger, evidence):
+    """Mrithi lazima alingane na faili LILILOPO SASA, si na lolote.
+
+    Vinginevyo mistari miwili iliyopitwa ingefutana, na ripoti isiyoendana na
+    sahihi yoyote ingepita.
+    """
+    _sign(ledger, evidence)
+    evidence.write_text(json.dumps({"x": 1}), encoding="utf-8")
+    _sign(ledger, evidence)                    # inafunga kwenye {"x": 1}
+    evidence.write_text(json.dumps({"x": 2}), encoding="utf-8")   # ...kisha inabadilika TENA
+
+    report = _verify(ledger)
+    assert not report.ok
+    assert sum("umebadilika baada ya kusainiwa" in p for p in report.problems) == 2
+
+
 def test_ushahidi_ukifutwa_uthibitisho_unafeli(ledger, evidence):
     _sign(ledger, evidence)
     evidence.unlink()
