@@ -214,7 +214,7 @@ Amri sasa ni moja: `scripts\labels.bat` (setups → labels → R1), yenye onyo l
 
 ---
 
-## 5. Sahihi zilizowekwa (17)
+## 5. Sahihi zilizowekwa (18)
 
 | # | Kipengele | Uamuzi | Kinachosemwa |
 |---|---|---|---|
@@ -232,8 +232,9 @@ Amri sasa ni moja: `scripts\labels.bat` (setups → labels → R1), yenye onyo l
 | 15 | DF-11 | **VERIFIED** | horizon moja; class balance imeripotiwa, haijasawazishwa |
 | 16 | DF-21 | **LESSON** | mid-vs-trade ni 0.02–0.10 ATR (uamuzi unashikilia); **tie-break haiwezi kuwaka kwa grid hii** |
 | 17 | K1-07 | **VERIFIED** | fill bootstrap: stop ndani ya cap 76.06%; market prior 0.98 haikisiwi |
+| 18 | DF-20 | APPROVED | **kufunga upya** ushahidi baada ya `detect-setups` kuandika faili upya — si pre-registration mpya |
 
-Lango G14: **PASS** · vipengele `VERIFIED`: **11/64** · `LESSON`: **1**.
+Lango G14: **PASS** · zilizokaguliwa **18** · vipengele `VERIFIED`: **11/64** · `LESSON`: **1**.
 
 > **#16 ni LESSON kwa makusudi.** Sehemu ya kwanza ya DF-21 (mid dhidi ya trade) imepimwa na
 > inashikilia. Sehemu ya pili (tie-break SL-kwanza) ni sheria iliyosainiwa ambayo **haiwezi kuwaka
@@ -264,6 +265,16 @@ lilipoteza **saa nane** tarehe 2026-08-09. Sasa kila ripoti inabeba chapa ya tol
 **Uamuzi ulioandikwa hauna maana bila kiungo.** Siku 912 ziliondolewa kwa sahihi, zikaandikwa
 kwenye config, zikakaguliwa na test — na bado zikaingia kwenye decision points, kwa sababu hakuna
 kilichozisoma. Sheria haifanyi kazi hadi kitu kiitumie.
+
+**Kigezo kisichoweza kufeli si kigezo.** `min_labels_per_cell` ilionyesha namba ile ile mara 25 —
+kwa muundo, si kwa data. `clock_drift` ilitoa 0/34,089 kwa sababu ile ile. Ukaguzi ukitoa jibu
+lile lile bila kujali kinachoingia, hauangalii kitu.
+
+**Lango lisilo na njia ya kurudi kwenye PASS linakufa.** `config_hash` ya faili nzima ilifanya
+kigezo cha `labels` kivunje sahihi kuhusu **setups**; kisha rejista ya kuongezwa-tu ilifanya
+lawama hiyo idumu milele. Mara tatu za ONYO lisilo na maana, na msomaji anaanza kuruka mstari —
+kisha siku lango linaposema kitu cha kweli, hakuna anayesikia. Kelele ya lango ni gharama, si
+usalama wa bure.
 
 ---
 
