@@ -1396,13 +1396,15 @@ def cmd_r1_summary(args: argparse.Namespace) -> int:
     cost_grid = (
         [float(x) for x in args.cost_pips.split(",")] if args.cost_pips else [0.0, 0.5, 1.0]
     )
+    plan = SplitPlan.from_config(cfg)
     report = build_report(
         cfg,
         points,
         barriers,
-        SplitPlan.from_config(cfg).holdout_start,
+        plan.holdout_start,
         build_stats=stats,
         cost_grid=cost_grid,
+        folds=plan.folds(),
     )
     p = report.payload
     if not p:
@@ -1428,8 +1430,24 @@ def cmd_r1_summary(args: argparse.Namespace) -> int:
             f"{r['timeout_frac']:>7.1%} {r['p_tp']:>7.3f} {r['geometry']:>9.3f} "
             f"{r['diff']:>+7.3f} {r['z']:>+7.1f}"
         )
-    print(f"   cells ndogo kuliko zote: {t['min_labels_per_cell']:,} "
-          f"(kikomo {int(cfg.get('labels.barrier.min_labels_per_cell'))})\n")
+    kikomo = int(cfg.get("labels.barrier.min_labels_per_cell"))
+    print(f"   cells ndogo kuliko zote (pooled): {t['min_labels_per_cell']:,} (kikomo {kikomo})")
+
+    cov = p.get("cell_coverage") or []
+    if cov:
+        print("\n1b. LABELS KWA CELL x SYMBOL x FOLD — hapa ndipo mafunzo yanafanyika")
+        worst = sorted(cov, key=lambda r: r["n_min"])[:6]
+        for row in worst:
+            alama = "  <-- chini ya kikomo" if row["n_min"] < kikomo else ""
+            print(
+                f"   fold {row['fold']}  {row['symbol']:<8} cell ndogo kuliko zote "
+                f"{row['n_min']:>6,}{alama}"
+            )
+        print(
+            f"   ndogo kuliko zote katika michanganyiko {len(cov)}: "
+            f"{t['min_labels_per_cell_fold']:,} (kikomo {kikomo})"
+        )
+    print()
 
     print("2. UTULIVU KWA MIAKA")
     for row in p["year_stability"]:

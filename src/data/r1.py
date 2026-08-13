@@ -155,6 +155,43 @@ def expected_r(cells: pd.DataFrame, cost_pips: float = 0.0) -> float:
     return float(np.nanmean(gross))
 
 
+def cell_coverage(barriers: pd.DataFrame, folds: list) -> pd.DataFrame:
+    """Labels kwa **cell × symbol × fold** — si pooled.
+
+    `min_labels_per_cell` ikipimwa pooled haiwezi kufeli: kila decision point
+    inapata cells zote 25, kwa hiyo kila cell ina idadi ILE ILE (setups zote).
+    Ukaguzi unaotoa jibu lile lile kwa muundo, bila kujali data, ni ule ule
+    ulioficha `clock_drift` kwa 0/34,089 kwenye T1.
+
+    Kigezo chenye maana ni kile cha **mahali mafunzo yanapofanyika**: fold moja,
+    symbol moja, cell moja. XAUUSD ikiwa na labels 25,314 kwa jumla lakini 40
+    ndani ya fold 3, cell hiyo haiwezi kufundishwa humo — na pooled
+    haitasema neno.
+    """
+    if barriers.empty or not folds:
+        return pd.DataFrame()
+    days = barriers["decision_time"].dt.date
+    rows = []
+    for fold in folds:
+        inside = (days >= fold.val_start) & (days <= fold.val_end)
+        chunk = barriers[inside]
+        if chunk.empty:
+            rows.append({"fold": fold.index, "symbol": "—", "n_min": 0, "cells": 0})
+            continue
+        counts = chunk.groupby(["symbol", "sl_atr", "tp_atr"], sort=False).size()
+        per_symbol = counts.groupby(level="symbol").min()
+        for symbol, n_min in per_symbol.items():
+            rows.append(
+                {
+                    "fold": fold.index,
+                    "symbol": str(symbol),
+                    "n_min": int(n_min),
+                    "cells": int((chunk["symbol"] == symbol).sum()),
+                }
+            )
+    return pd.DataFrame(rows)
+
+
 # --------------------------------------------------------------------------
 # 2. Utulivu kwa miaka
 # --------------------------------------------------------------------------
@@ -377,6 +414,7 @@ def build_report(
     holdout_start: date,
     build_stats: dict[str, Any] | None = None,
     cost_grid: list[float] | None = None,
+    folds: list | None = None,
 ) -> R1Report:
     report = R1Report()
     if barriers.empty:
@@ -403,6 +441,22 @@ def build_report(
         report.fail(
             f"cells {len(thin)} zina labels chini ya {min_per_cell} "
             f"(ndogo kuliko zote: {int(thin['n'].min()):,})"
+        )
+    else:
+        report.notes.append(
+            f"`min_labels_per_cell` pooled ({int(rates['n'].min()):,}) inapita kwa muundo: "
+            "kila point inapata cells 25, kwa hiyo cells zote zina idadi ile ile. "
+            "Kigezo chenye meno ni cha cell x symbol x fold — kimo hapa chini."
+        )
+
+    coverage = cell_coverage(trainable, folds or [])
+    thin_folds = coverage[coverage["n_min"] < min_per_cell] if not coverage.empty else coverage
+    if not coverage.empty and not thin_folds.empty:
+        worst_fold = thin_folds.loc[thin_folds["n_min"].idxmin()]
+        report.fail(
+            f"cell x symbol x fold: michanganyiko {len(thin_folds)} iko chini ya "
+            f"{min_per_cell} (mbaya kuliko zote: {worst_fold['symbol']} fold "
+            f"{int(worst_fold['fold'])} = {int(worst_fold['n_min'])})"
         )
 
     max_timeout = float(cfg.get("labels.barrier.max_timeout_frac"))
@@ -479,6 +533,9 @@ def build_report(
             "tie_breaks": ties,
             "tie_break_frac": tie_frac,
             "min_labels_per_cell": int(rates["n"].min()),
+            "min_labels_per_cell_fold": (
+                int(coverage["n_min"].min()) if not coverage.empty else None
+            ),
             "ev_r_gross": expected_r(barriers),
             "ev_r_gross_setups": expected_r(trainable),
         },
@@ -486,6 +543,7 @@ def build_report(
         "base_rates": rates.to_dict(orient="records"),
         "geometry_worst": None if worst is None else worst.to_dict(),
         "year_stability": years.to_dict(orient="records"),
+        "cell_coverage": coverage.to_dict(orient="records"),
         "setup_vs_control": svc,
         "quantile_mid_vs_trade": qcmp.to_dict(orient="records"),
         "fill_bootstrap": fills,

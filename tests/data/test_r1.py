@@ -356,6 +356,31 @@ def test_quantile_mid_vs_trade_inapewa_ishara_ya_trade():
     assert out.loc[0, "shift_expected_p50"] == pytest.approx(0.10)
 
 
+def test_kigezo_cha_fold_kinaweza_kufeli_pale_pooled_haiwezi(cfg):
+    """`min_labels_per_cell` pooled haiwezi kufeli — cha fold kinaweza.
+
+    Kila point inapata cells zote 25, kwa hiyo pooled kila cell ina idadi ILE
+    ILE: kigezo kinatoa jibu lile lile bila kujali data. Symbol yenye labels
+    za kutosha kwa jumla lakini zilizojaa ndani ya fold MOJA haiwezi
+    kufundishwa kwenye folds nyingine — na pooled haitasema neno.
+    """
+    from src.data.splits import SplitPlan
+
+    from src.data.r1 import cell_coverage
+
+    folds = SplitPlan.from_config(cfg).folds()
+    # Points 300 zote ndani ya fold ya kwanza (2016) — nyingine tupu kabisa.
+    days = pd.date_range("2016-02-01", periods=300, freq="1D").strftime("%Y-%m-%d")
+    rows = [(day, 1.0, 1.0, TP_FIRST if i % 2 else SL_FIRST, True) for i, day in enumerate(days)]
+    rows += [("2017-10-01", 1.0, 1.0, TP_FIRST, True)] * 5      # fold 2: chache mno
+    coverage = cell_coverage(_barriers(rows), folds)
+
+    kwa_fold = dict(zip(coverage["fold"], coverage["n_min"]))
+    assert kwa_fold[1] == 300
+    assert kwa_fold[2] == 5, "fold yenye njaa lazima ionekane"
+    assert coverage["n_min"].min() < 200 <= 300
+
+
 def test_holdout_violations_inahesabu_si_kudhani():
     points = pd.DataFrame(
         {"decision_time": pd.to_datetime(["2024-03-31", "2024-04-01", "2025-01-01"], utc=True)}

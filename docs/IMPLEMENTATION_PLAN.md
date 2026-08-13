@@ -816,6 +816,37 @@ ni **kweli lakini karibu haina athari kwa grid hii** — SL ya 0.5 ATR ni pana i
 range ya dakika moja. Ingekuwa na maana kwa barriers nyembamba. Faida ya kujua hili: ticks
 zikija kuwa kizuizi, M1 ni mbadala unaotetereka kwa 0.01%, si dhana.
 
+**Quantile MID dhidi ya trade — baada ya kurekebishwa, na jibu si dogo:**
+
+| symbol | spread | ATR | `shift` (ATR) | pooled (kosa la awali) |
+|---|---|---|---|---|
+| XAUUSD | 35.0p | 356.6p | **0.1049** | +0.0029 |
+| EURCHF | 1.0p | 9.8p | **0.1043** | −0.0035 |
+| NZDUSD | 1.1p | 12.3p | 0.0905 | −0.0002 |
+| GBPJPY | 1.6p | 26.0p | 0.0633 | −0.0003 |
+| EURUSD | 0.3p | 14.4p | **0.0209** | −0.0009 |
+
+`shift` = `direction × (mid − trade)`. Kila safu inalingana na `(spread_in + spread_out) ÷ 2 ÷ ATR`
+iliyohesabiwa kwa **kujitegemea** hadi tarakimu ya nne — vipimo viwili huru vinavyokubaliana.
+
+**Uamuzi wa §5.1 unashikilia, na sasa una uzito.** Gharama si 0.003 ATR bali **0.02–0.10 ATR**.
+Kuiweka pia kwenye L-A kungekuwa kuihesabu mara tatu kwa kiasi kinachoonekana, si kwa kiasi cha
+kupuuzwa.
+
+**Spec ilitaja symbols zisizo sahihi.** §5.1 inasema R1 ipime "symbols pana (XAUUSD, GBPJPY)".
+XAUUSD ndiyo ya juu (0.1049) — lakini GBPJPY ni ya **kati** (0.0633), na inayoshindana na XAUUSD
+ni **EURCHF** (0.1043), pair "tulivu" yenye spread ya 1.0p tu. Kinachohesabu si spread kwa pips
+bali **spread ÷ ATR ya symbol yenyewe**: EURCHF ina ATR ya 9.8p pekee. Somo lile lile la §6.1
+sheria 1 na la sweep ya `min_atr_mult` — kigezo cha pips kinapima **bei**, cha ATR kinapima
+**fursa**.
+
+**Kigezo kilichokuwa hakiwezi kufeli (kimerekebishwa 2026-08-13).** `min_labels_per_cell` pooled
+ilionyesha 25,314 kwa **kila cell** — si bahati, ni muundo: kila decision point inapata cells zote
+25, kwa hiyo cells zote zina idadi ile ile daima. Kigezo kinachotoa jibu lile lile bila kujali
+data ni kilekile cha `clock_drift` 0/34,089 cha T1. Kigezo chenye meno ni cha **cell × symbol ×
+fold** — mahali mafunzo yanapofanyika. Symbol yenye labels 25,314 kwa jumla lakini 40 ndani ya
+fold moja haiwezi kufundishwa humo, na pooled haitasema neno. R1 sasa inapima na kufeli hapo.
+
 **Kasoro kwenye kipimo changu (imerekebishwa, 2026-08-13).** Quantile mid-dhidi-ya-trade
 ilikuwa ikipimwa **bila ishara ya trade**. `quantile_y_trade` haina mwelekeo: BUY (nunua kwa ask,
 funga kwa bid) iko chini ya mid; SELL iko juu kwa kiasi kile kile. Wastani wa pamoja unafuta

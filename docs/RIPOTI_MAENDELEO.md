@@ -297,7 +297,37 @@ ticks mara **9**. Sheria ya §5 ni kweli lakini karibu haina athari kwa grid hii
 pana kuliko range ya dakika moja. Ingekuwa na maana kwa barriers nyembamba. Sasa tunajua kwa namba
 badala ya kwa hoja.
 
-### 7.4 Kinachofuata
+### 7.4 Quantile MID dhidi ya trade — jibu si dogo
 
-`r1-summary` peke yake (sekunde chache — hakuna ujenzi upya), kisha **sahihi ya exit ya T2:
-R1 PASS.**
+| symbol | spread | ATR | gharama (ATR) |
+|---|---|---|---|
+| XAUUSD | 35.0p | 356.6p | **0.1049** |
+| EURCHF | 1.0p | 9.8p | **0.1043** |
+| GBPJPY | 1.6p | 26.0p | 0.0633 |
+| EURUSD | 0.3p | 14.4p | **0.0209** |
+
+Uamuzi wako wa §5.1 (MID, si bei ya trade) **unashikilia, na sasa una uzito**: gharama ni
+**0.02–0.10 ATR**, si 0.003. Kuiweka pia kwenye L-A kungekuwa kuihesabu mara tatu kwa kiasi
+kinachoonekana.
+
+**Lakini spec ilitaja symbols zisizo sahihi.** Ilisema ipimwe kwa "symbols pana (XAUUSD,
+GBPJPY)". XAUUSD ndiyo ya juu — lakini GBPJPY ni ya kati, na inayoshindana na XAUUSD ni
+**EURCHF**, pair "tulivu" yenye spread ya 1.0p tu. Kinachohesabu si spread bali **spread ÷ ATR ya
+symbol yenyewe**. Somo lile lile la sweep ya `min_atr_mult`: kigezo cha pips kinapima **bei**,
+cha ATR kinapima **fursa**.
+
+### 7.5 Kigezo kimoja kilikuwa hakiwezi kufeli
+
+`min_labels_per_cell` ilionyesha **25,314 kwa kila cell** — namba ile ile mara 25. Si bahati:
+kila decision point inapata cells zote 25, kwa hiyo cells zote zina idadi ile ile **daima**,
+data ikiwa yoyote. Ni ukaguzi wa aina ile ile ya `clock_drift` iliyotoa 0/34,089 kwenye T1 —
+inapita kwa muundo, si kwa ushahidi.
+
+Kigezo chenye meno ni cha **cell × symbol × fold** — mahali mafunzo yanapofanyika. Symbol yenye
+labels 25,314 kwa jumla lakini 40 ndani ya fold moja haiwezi kufundishwa humo, na pooled
+haitasema neno. R1 sasa inapima hapo na inaweza kufeli.
+
+### 7.6 Kinachofuata
+
+`r1-summary` mara moja zaidi (sekunde chache — hakuna ujenzi upya). Ikitoa PASS baada ya kigezo
+cha fold kuongezwa, T2 iko tayari kwa **sahihi ya exit: R1 PASS**.
