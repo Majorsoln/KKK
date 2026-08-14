@@ -2271,10 +2271,33 @@ def cmd_placebo(args: argparse.Namespace) -> int:
     ).sort_values("p_tp")
     span_p = float(per_symbol["p_tp"].max() - per_symbol["p_tp"].min())
     span_r = float(per_symbol["r_net"].max() - per_symbol["r_net"].min())
-    print(f"   {'symbol':<8} {'n':>7} {'p_tp':>8} {'R halisi':>10}")
+
+    # CI kwa block bootstrap ya MIAKA — si rows. Bila hii, jedwali la symbols
+    # 12 ni mwaliko wa kuchagua bora zaidi kwa jicho, na kwa symbols 12 tofauti
+    # ya kubahatisha peke yake inaweza kufika ~3.4 SE. Kikomo cha chini ndicho
+    # kinachotofautisha "symbol hii inalipa" na "symbol hii ilibahatika".
+    boot = np.random.RandomState(args.seed)
+    years_all = joined["decision_time"].dt.year.to_numpy()
+    lows: dict[str, float] = {}
+    for name in per_symbol.index:
+        pick = (joined["symbol"] == name).to_numpy()
+        vals, yrs = joined["r_net"].to_numpy(dtype=float)[pick], years_all[pick]
+        levels = np.unique(yrs)
+        draws = []
+        for _ in range(500):
+            chosen = boot.choice(levels, size=len(levels), replace=True)
+            idx = np.concatenate([np.flatnonzero(yrs == lv) for lv in chosen])
+            draws.append(float(np.nanmean(vals[idx])))
+        lows[name] = float(np.percentile(draws, 5))
+    per_symbol["r_net_p5"] = [lows[n] for n in per_symbol.index]
+
+    print(f"   {'symbol':<8} {'n':>7} {'p_tp':>8} {'R halisi':>10} {'mpaka chini':>12}")
     for name, row in per_symbol.iterrows():
-        print(f"   {name:<8} {int(row['n']):>7,} {row['p_tp']:>8.4f} {row['r_net']:>+10.4f}")
-    print(f"   utofauti kati ya symbols: p_tp {span_p:.4f} · R {span_r:.4f}\n")
+        alama = "  <-- juu ya sifuri" if row["r_net_p5"] > 0 else ""
+        print(f"   {name:<8} {int(row['n']):>7,} {row['p_tp']:>8.4f} "
+              f"{row['r_net']:>+10.4f} {row['r_net_p5']:>+12.4f}{alama}")
+    print(f"   utofauti kati ya symbols: p_tp {span_p:.4f} · R {span_r:.4f}")
+    print(f"   bar ya T3 kwa lift ya jumla: +0.0751 R\n")
 
     halisi = _run(joined, "y")
     if halisi is None:
@@ -2290,7 +2313,12 @@ def cmd_placebo(args: argparse.Namespace) -> int:
     rng = np.random.RandomState(args.seed)
     symbols = joined["symbol"].to_numpy()
     order_key = joined["decision_time"].to_numpy()
-    base_r = float(np.nanmean(joined["r_net"].to_numpy(dtype=float)))
+    # Msingi wa kulinganisha na null. Kwa `--within-symbol`, `r_net` inaondolewa
+    # wastani wa kila symbol ndani ya `_run`, kwa hiyo msingi wake ni **sifuri**,
+    # si wastani ghafi wa sampuli. Kulinganisha decile ya juu iliyoondolewa
+    # wastani na msingi ghafi wa -0.0163 ni kulinganisha vitu viwili tofauti, na
+    # kunatoa onyo la uchafuzi lisilo la kweli (2026-08-14).
+    base_r = 0.0 if args.within_symbol else float(np.nanmean(joined["r_net"].to_numpy(dtype=float)))
     null: list[dict] = []
     for rep in range(args.reps):
         fake = joined.copy()

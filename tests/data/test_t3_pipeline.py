@@ -435,3 +435,27 @@ def test_within_symbol_inaandika_faili_lake(tree, capsys):
         (tree / "reports" / "r3" / "placebo_logistic_block32_ndani.json").read_text(encoding="utf-8")
     )
     assert payload["within_symbol"] is True
+
+
+def test_msingi_wa_ukaguzi_ni_sifuri_kwa_within_symbol(tree, capsys):
+    """`r_net` iliyoondolewa wastani ina msingi 0, si wastani ghafi wa sampuli.
+
+    Kulinganisha na msingi ghafi kunatoa onyo la uchafuzi lisilo la kweli.
+    """
+    main(["--config", CONFIG, "build-features", "--symbols", ",".join(SYMBOLS)])
+    main(["--config", CONFIG, "placebo", "--symbols", ",".join(SYMBOLS),
+          "--reps", "5", "--within-symbol"])
+    out = capsys.readouterr().out
+    assert "msingi wa sampuli +0.0000 R" in out
+
+
+def test_jedwali_la_symbols_lina_mpaka_wa_chini(tree, capsys):
+    """Symbols 12 zikiangaliwa kwa jicho, tofauti ya kubahatisha inaonekana kama edge."""
+    main(["--config", CONFIG, "build-features", "--symbols", ",".join(SYMBOLS)])
+    main(["--config", CONFIG, "placebo", "--symbols", ",".join(SYMBOLS), "--reps", "5"])
+    assert "mpaka chini" in capsys.readouterr().out
+    payload = json.loads(
+        (tree / "reports" / "r3" / "placebo_logistic_block32.json").read_text(encoding="utf-8")
+    )
+    for row in payload["per_symbol"]:
+        assert row["r_net_p5"] <= row["r_net"]

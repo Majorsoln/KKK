@@ -548,6 +548,61 @@ python -m src.data.cli placebo --within-symbol --reps 200
 inayojua symbol pekee inaanguka hadi sifuri. Kinachobaki, kikibaki, ndicho ujuzi wa kweli
 wa wakati.
 
+#### MATOKEO — 2026-08-14 · `block (32)` · marudio 200 · **ndani ya symbol**
+
+| Takwimu | Kabla | Baada | null p95 | p |
+|---|---|---|---|---|
+| discrimination `ρ` | +0.8182 | **+0.5152** | +0.4545 | **0.040** |
+| top `R` halisi | +0.0661 | +0.0586 | +0.0791 | 0.119 |
+
+**Sehemu kubwa ya `ρ` ilikuwa utambuzi wa symbol** — imeanguka kwa **0.30** mara base rate
+za symbols zilipoondolewa. Dhana imethibitishwa.
+
+**Kilichobaki ni halisi lakini kidogo.** `ρ = 0.5152` iko juu ya null p95 (0.4545), p =
+**0.040**, na null bado ni conservative kidogo — kwa hiyo p halisi ni ndogo zaidi. Kuna
+ujuzi wa wakati, umepimika, ni dhaifu.
+
+**Hakizai pesa.** `top R` p = **0.119**. Ujuzi upo, hauvuki gharama.
+
+### Kilichokuwa mbele ya macho yetu tangu mwanzo
+
+| symbol | `p_tp` | `R` halisi |
+|---|---|---|
+| EURCHF | 0.2426 | **−0.1273** |
+| EURGBP | 0.2595 | **−0.1217** |
+| XAUUSD | 0.2826 | −0.0361 |
+| … | … | … |
+| EURJPY | 0.3079 | **+0.0230** |
+| GBPJPY | 0.3220 | **+0.0609** |
+| USDJPY | 0.3343 | **+0.0687** |
+
+**Utofauti wa `R` kati ya symbols ni 0.1959 — mara 2.6 ya lift nzima iliyohitajika
+(+0.0751 R).**
+
+Tulitumia miezi kujenga model itakayotafuta +0.0751 R kutoka kwenye **mchanganyiko** wa
+symbols 12, wakati mchanganyiko wenyewe unaficha utofauti wa 0.1959 R. Crosses tatu za
+JPY zina EV chanya kwenye cell hii **bila model yoyote**; EURCHF na EURGBP zinapoteza
+zaidi ya 0.12 R kila trade.
+
+**Pooling ndilo lilikuwa kosa, si model.** Sheria ya 1 ya §6.1 (scale-free) ilifanya
+features zilinganishwe kati ya symbols — na nikadhani hilo lilitosha kufanya pooling
+iwe halali. Haitoshi. Features zinazolinganishwa hazifanyi **uchumi** ulinganishwe.
+
+#### Onyo la lazima kabla ya hatua yoyote inayofuata
+
+**Kuchagua crosses za JPY baada ya kuona jedwali hili ni uteuzi juu ya label** — dhambi
+ile ile ambayo `r1-ev`, `cost-audit --cell` na muundo huu wote unaizuia. Jedwali sasa
+linaripoti **mpaka wa chini wa block bootstrap ya miaka** kwa kila symbol, kwa sababu
+kwa symbols 12 tofauti ya kubahatisha peke yake inaweza kufika ~3.4 SE, na jicho
+haliwezi kutofautisha.
+
+Config yoyote inayotumia ugunduzi huu **lazima**:
+1. itangazwe kama registered rule mpya pamoja na ukiri kwamba ilitokana na jedwali hili;
+2. iwe na sababu ya **kiuchumi** iliyoandikwa kabla, si "namba ilikuwa kubwa" (mfano: JPY
+   crosses zina trend ndefu zaidi kwa sababu ya carry na sera ya BOJ, kwa hiyo TP:SL ya
+   3:2 inawafaa);
+3. ipimwe kwenye mpaka wa chini, si kwenye nukta.
+
 
 
 Random-label na shuffled-score. Pipeline ikitoa matokeo chanya pale hakuna signal, **kila kitu
