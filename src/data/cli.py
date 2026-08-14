@@ -2278,26 +2278,57 @@ def cmd_placebo(args: argparse.Namespace) -> int:
     # kinachotofautisha "symbol hii inalipa" na "symbol hii ilibahatika".
     boot = np.random.RandomState(args.seed)
     years_all = joined["decision_time"].dt.year.to_numpy()
-    lows: dict[str, float] = {}
+    k = int(len(per_symbol))
+    # Šidák: kuangalia symbols `k` kisha kuchagua bora zaidi si jaribio moja.
+    # Kwa 5% ya FAMILIA nzima, kila symbol inahitaji mpaka wa `1 - 0.95^(1/k)`.
+    # Kwa k = 12 hiyo ni asilimia 0.427, si 5 — tofauti ya mara kumi.
+    q_fwer = 100.0 * (1.0 - 0.95 ** (1.0 / max(k, 1)))
+    n_boot = 5000
+
+    lows: dict[str, tuple[float, float]] = {}
     for name in per_symbol.index:
         pick = (joined["symbol"] == name).to_numpy()
         vals, yrs = joined["r_net"].to_numpy(dtype=float)[pick], years_all[pick]
         levels = np.unique(yrs)
-        draws = []
-        for _ in range(500):
-            chosen = boot.choice(levels, size=len(levels), replace=True)
-            idx = np.concatenate([np.flatnonzero(yrs == lv) for lv in chosen])
-            draws.append(float(np.nanmean(vals[idx])))
-        lows[name] = float(np.percentile(draws, 5))
-    per_symbol["r_net_p5"] = [lows[n] for n in per_symbol.index]
+        # Jumla na idadi kwa kila mwaka — bootstrap inakuwa hesabu ya vector,
+        # si kuunganisha index mara 5,000 × 12.
+        sums = np.array([np.nansum(vals[yrs == lv]) for lv in levels])
+        counts = np.array([int((yrs == lv).sum()) for lv in levels], dtype=float)
+        draw_idx = boot.randint(0, len(levels), size=(n_boot, len(levels)))
+        draws = sums[draw_idx].sum(axis=1) / np.maximum(counts[draw_idx].sum(axis=1), 1.0)
+        lows[name] = (float(np.percentile(draws, 5)), float(np.percentile(draws, q_fwer)))
+    per_symbol["r_net_p5"] = [lows[n][0] for n in per_symbol.index]
+    per_symbol["r_net_fwer"] = [lows[n][1] for n in per_symbol.index]
 
-    print(f"   {'symbol':<8} {'n':>7} {'p_tp':>8} {'R halisi':>10} {'mpaka chini':>12}")
+    print(f"   {'symbol':<8} {'n':>7} {'p_tp':>8} {'R halisi':>10} {'p5':>9} {'FWER':>9}")
     for name, row in per_symbol.iterrows():
-        alama = "  <-- juu ya sifuri" if row["r_net_p5"] > 0 else ""
+        # Bendera inategemea mpaka ULIOREKEBISHWA pekee. Toleo la kwanza
+        # liliweka bendera kwenye p5 ghafi, na kwa symbols 12 hiyo ni mwaliko
+        # wa kosa lile lile ambalo jedwali hili lilipaswa kulizuia: bora kati
+        # ya 12 karibu daima ina p5 chanya kwa bahati (2026-08-14).
+        alama = "  <-- inashikilia" if row["r_net_fwer"] > 0 else ""
         print(f"   {name:<8} {int(row['n']):>7,} {row['p_tp']:>8.4f} "
-              f"{row['r_net']:>+10.4f} {row['r_net_p5']:>+12.4f}{alama}")
+              f"{row['r_net']:>+10.4f} {row['r_net_p5']:>+9.4f} "
+              f"{row['r_net_fwer']:>+9.4f}{alama}")
     print(f"   utofauti kati ya symbols: p_tp {span_p:.4f} · R {span_r:.4f}")
-    print(f"   bar ya T3 kwa lift ya jumla: +0.0751 R\n")
+    print(f"   bar ya T3 kwa lift ya jumla: +0.0751 R")
+    print(f"   FWER = mpaka wa Šidák kwa symbols {k} (asilimia {q_fwer:.3f}, si 5)")
+
+    # Je mpangilio wa symbols unaelezwa na TRENDINESS, si na bahati?
+    #
+    # Hii ndiyo tofauti kati ya nadharia na uchimbaji: `eff_ratio` na `adx`
+    # zinahesabiwa kutoka BEI PEKEE, hazijui label yoyote. Zikipanga symbols
+    # kwa mpangilio ule ule ambao `R` inazipanga, kuna utaratibu wa kiuchumi
+    # nyuma ya jedwali. Zisipopanga, jedwali ni orodha ya matokeo tu.
+    mechanism = {}
+    for column in ("eff_ratio_24h", "adx14"):
+        if column in joined.columns:
+            by_symbol = joined.groupby("symbol")[column].mean().reindex(per_symbol.index)
+            mechanism[column] = float(spearman(by_symbol.to_numpy(), per_symbol["r_net"].to_numpy()))
+    if mechanism:
+        detail = " · ".join(f"{name} ρ {value:+.3f}" for name, value in mechanism.items())
+        print(f"   mpangilio dhidi ya trendiness (bila label): {detail}")
+    print()
 
     halisi = _run(joined, "y")
     if halisi is None:
@@ -2440,6 +2471,8 @@ def cmd_placebo(args: argparse.Namespace) -> int:
                 "per_symbol": per_symbol.reset_index().to_dict(orient="records"),
                 "span_p_tp": span_p,
                 "span_r_net": span_r,
+                "fwer_percentile": q_fwer,
+                "mechanism_spearman": mechanism,
                 "cell": list(data["cell"]),
                 "observed": halisi,
                 "base_r_net": base_r,

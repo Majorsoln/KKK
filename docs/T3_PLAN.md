@@ -603,6 +603,62 @@ Config yoyote inayotumia ugunduzi huu **lazima**:
    3:2 inawafaa);
 3. ipimwe kwenye mpaka wa chini, si kwenye nukta.
 
+#### Mipaka ya chini — 2026-08-14
+
+| symbol | `R` | p5 |
+|---|---|---|
+| EURCHF | −0.1273 | **−0.1662** |
+| EURGBP | −0.1217 | **−0.1582** |
+| XAUUSD | −0.0361 | −0.0949 |
+| USDCAD | −0.0018 | −0.0351 |
+| EURJPY | +0.0230 | −0.0119 |
+| GBPJPY | +0.0609 | −0.0275 |
+| USDJPY | **+0.0687** | **+0.0120** |
+
+**USDJPY pekee ndiyo yenye p5 juu ya sifuri — na hiyo ndiyo tatizo lenyewe.**
+
+Kati ya symbols 12, bora zaidi **karibu daima** itakuwa na p5 chanya kwa bahati tupu.
+Kigezo cha 5% ni cha jaribio **moja**; hapa tumeangalia 12. Marekebisho ya Šidák yanadai
+kila symbol ifikie asilimia `1 − 0.95^(1/12) = 0.427`, si 5 — **tofauti ya mara kumi**.
+
+Kwa `sd` inayokadiriwa kutoka p5 yenyewe (`(0.0687 − 0.0120)/1.645 ≈ 0.0345`), mpaka wa
+USDJPY ulioreikebishwa ni takriban **−0.022**. **Haishikilii.**
+
+Bendera ya toleo la kwanza la jedwali (`<-- juu ya sifuri`) iliwekwa kwenye p5 ghafi. Hiyo
+ilikuwa **mwaliko wa kosa lile lile ambalo jedwali lilipaswa kulizuia**. Sasa bendera
+inategemea mpaka wa FWER pekee, na jedwali linaripoti safu zote mbili.
+
+#### Asymmetry ndiyo ugunduzi halisi
+
+| Upande | Ukubwa dhidi ya kelele | Unashikilia? |
+|---|---|---|
+| **Kuingiza** USDJPY | +0.0687, ≈ 2 SE | **hapana** |
+| **Kuondoa** EURCHF | −0.1273, ≈ 5 SE | **ndiyo** (FWER ≈ −0.19) |
+| **Kuondoa** EURGBP | −0.1217, ≈ 5 SE | **ndiyo** (FWER ≈ −0.18) |
+
+**Hatujui symbol ipi ya kuingiza. Tunajua zipi za kuondoa.** EURCHF na EURGBP zinapoteza
+0.12 R kila trade, mbali kabisa na kelele, na zimekuwa zikizivuta nyingine chini muda wote.
+
+Hii ni habari inayoweza kutumika, na ni kinyume cha ilivyoonekana jana.
+
+#### Mtihani wa utaratibu, si wa jedwali
+
+Jedwali linaloonyesha JPY juu na EUR-crosses chini linaweza kuwa (a) utaratibu wa
+kiuchumi au (b) matokeo ya bahati yaliyopangwa. Kuvitofautisha kunahitaji kipimo
+**kisichojua label**.
+
+`placebo` sasa inaripoti Spearman kati ya mpangilio wa `R` na mpangilio wa **trendiness**
+(`eff_ratio_24h`, `adx14`) — vyote vinahesabiwa **kutoka bei pekee**. Nadharia: SETUP-v1
+ni bet ya kufuata trend yenye TP:SL 3:2; symbols zinazozunguka (EURCHF, EURGBP) zinaiadhibu,
+zinazotrend (JPY crosses) zinailipa.
+
+* `ρ` kubwa ⇒ kuna utaratibu, na sheria inaweza kuandikwa kwa **trendiness**, si kwa majina
+  ya symbols. Sheria kama hiyo si uteuzi juu ya label.
+* `ρ` ndogo ⇒ jedwali ni orodha ya matokeo, na hakuna sheria ya kuandika.
+
+Points 12 pekee, kwa hiyo `ρ` hii ni dalili, si ushahidi. Lakini ndiyo tofauti kati ya
+nadharia inayoweza kupimwa na uchimbaji.
+
 
 
 Random-label na shuffled-score. Pipeline ikitoa matokeo chanya pale hakuna signal, **kila kitu

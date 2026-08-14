@@ -453,9 +453,13 @@ def test_jedwali_la_symbols_lina_mpaka_wa_chini(tree, capsys):
     """Symbols 12 zikiangaliwa kwa jicho, tofauti ya kubahatisha inaonekana kama edge."""
     main(["--config", CONFIG, "build-features", "--symbols", ",".join(SYMBOLS)])
     main(["--config", CONFIG, "placebo", "--symbols", ",".join(SYMBOLS), "--reps", "5"])
-    assert "mpaka chini" in capsys.readouterr().out
+    out = capsys.readouterr().out
+    assert "FWER" in out and "trendiness" in out
     payload = json.loads(
         (tree / "reports" / "r3" / "placebo_logistic_block32.json").read_text(encoding="utf-8")
     )
     for row in payload["per_symbol"]:
-        assert row["r_net_p5"] <= row["r_net"]
+        # Mpaka wa FWER lazima uwe MKALI kuliko p5 — la sivyo marekebisho
+        # ya multiplicity hayafanyi kazi na bendera ni ya uongo.
+        assert row["r_net_fwer"] <= row["r_net_p5"] <= row["r_net"]
+    assert 0.0 < payload["fwer_percentile"] < 5.0
