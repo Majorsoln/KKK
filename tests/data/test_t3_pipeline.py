@@ -282,3 +282,51 @@ def test_bajeti_iliyokwisha_inazuia_jaribio(tree, monkeypatch, tmp_path, capsys)
     main(["--config", CONFIG, "build-features", "--symbols", ",".join(SYMBOLS)])
     with pytest.raises(RuntimeError, match="bajeti"):
         main(["--config", CONFIG, "meta-label", "--symbols", ",".join(SYMBOLS)])
+
+
+# ===========================================================================
+# Hatua 4 — placebo
+# ===========================================================================
+
+
+def test_placebo_inaendesha_na_kuandika_ushahidi(tree, capsys):
+    """Placebo HAITUMII bajeti — hakuna `budget_ipo` hapa kwa makusudi."""
+    main(["--config", CONFIG, "build-features", "--symbols", ",".join(SYMBOLS)])
+    rc = main(["--config", CONFIG, "placebo", "--symbols", ",".join(SYMBOLS), "--reps", "6"])
+    assert rc in (0, 1)
+    payload = json.loads(
+        (tree / "reports" / "r3" / "placebo_logistic_rotation.json").read_text(encoding="utf-8")
+    )
+    assert payload["reps_ok"] >= 5
+    assert set(payload["p_values"]) == {"rho", "top_fitted", "top_r_net"}
+    assert "PLACEBO" in capsys.readouterr().out
+
+
+def test_placebo_haizuiliwi_na_bajeti_iliyokwisha(tree, monkeypatch, tmp_path):
+    """Labels zilizoharibiwa haziwezi kuchagua strategy — hakuna kinachotumika."""
+    from src.governance import budget as bud
+
+    ledger = tmp_path / "spent.md"
+    ledger.write_text(
+        _LEDGER_HEAD + "| 1 | 2026-08-14 | `zote` | EVALUATION | 7.500 | 0.000 | imekwisha |\n",
+        encoding="utf-8",
+        newline="\n",
+    )
+    monkeypatch.setattr(bud, "LEDGER", ledger, raising=False)
+    main(["--config", CONFIG, "build-features", "--symbols", ",".join(SYMBOLS)])
+    assert main(["--config", CONFIG, "placebo", "--symbols", ",".join(SYMBOLS),
+                 "--reps", "5"]) in (0, 1)
+
+
+def test_mzunguko_unahifadhi_base_rate_na_kuvunja_upatanifu(tree):
+    """Njia ya kuharibu isibadilishe idadi ya TP — ibadilishe ZILIPO tu.
+
+    Ikibadilisha base rate, null si null ya kitu kile kile, na kulinganisha
+    nayo hakuna maana.
+    """
+    import numpy as np
+
+    y = np.array([1.0, 0, 0, 1, 0, 1, 1, 0, 0, 0])
+    rolled = np.roll(y, 3)
+    assert rolled.sum() == y.sum()
+    assert not np.array_equal(rolled, y)

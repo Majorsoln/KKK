@@ -314,7 +314,76 @@ nyingine · "ilikaribia".
 | **Kufikika** | null simulation **kabla** ya run. Kigezo kisipofikika, badilisha **design**, si threshold |
 | **Kutotinker** | run **moja**. Ikianguka, bajeti inapungua 1, na rule inayofuata lazima ibadilishe kitu cha **kimuundo** — si hyperparameters |
 
+#### MATOKEO — 2026-08-14 · config 2/7 · **IMEFELI**
+
+`meta_label_logistic.json` · setups 25,314 · folds 5/5 · NaN 0 · N_eff 10,168 ≥ N_req 3,545
+
+| Lango | Thamani | Kizingiti | |
+|---|---|---|---|
+| Calibration | slope **1.0713** | [0.8, 1.2] | **PASS** |
+| Discrimination | ρ **0.8182** | ≥ 0.70 | **PASS** |
+| Kiuchumi | fitted **0.3159** | ≥ 0.3212 | **FAIL** |
+
+Lango la 3 lina masharti **mawili**. Sharti la mpaka wa chini **limepita**
+(0.3043 > breakeven 0.2977). Lililoanguka ni la nukta: **0.3159 dhidi ya 0.3212** —
+pungufu la **0.0053 p_tp**.
+
+**Kilichopatikana ni halisi lakini hakitoshi.** Lift ya decile ya juu ni
+0.3159 − 0.2911 = **0.0248 p_tp**, dhidi ya 0.0300 iliyohitajika. Ni **83%** ya njia.
+Deciles zinapanda kwa mpangilio (ρ 0.82) — model **inapanga**, haibahatishi.
+
+#### Kosa la MUUNDO lililofichuliwa na matokeo haya
+
+`R` halisi kwa decile inasimulia hadithi tofauti na lango:
+
+| | decile 1 | decile 10 | jumla |
+|---|---|---|---|
+| `R` halisi | −0.0600 | **+0.0656** | −0.0163 |
+
+Lift ya `R` ni 0.0656 − (−0.0163) = **+0.0819 R**, wakati bar iliyoandikwa kabla ya
+hatua 3 ilikuwa **+0.0751 R**. Lango la `p_tp` linatoa lift ya 0.0248 × 2.5 = **+0.0620 R**
+kwa data ile ile.
+
+Tofauti ya **0.0199 R** ina chanzo kimoja: lango liliandikwa kwenye nafasi ya `p_tp`
+kwa kutumia `dEV/dp_tp = 1 + tp/sl`, **linearization inayodhania timeout rate haibadiliki**.
+Subset iliyochaguliwa na model ina muundo tofauti wa timeout/overshoot, kwa hiyo proxy
+inapima chini ya uchumi halisi.
+
+**Hili ni kosa langu la muundo, si la data.** Nilichagua kupima kitu kinachokaribiana na
+kile tunachokitaka badala ya kile tunachokitaka chenyewe. Nililiona likiwezekana na
+niliandika onyo kabla ya run — onyo hilo sasa limetimia.
+
+**Halibadilishi hukumu.** Kusoma run hii upya kwa lango jipya ni **kuhamisha lango baada
+ya kuona data**, na ndilo kosa ambalo muundo huu wote upo kulizuia. Config 2 imetumika,
+hukumu ni IMEFELI, na `+0.0656 R` haina CI wala haijapimwa dhidi ya null yoyote.
+
+**Kinachofuata, kwa mpangilio:**
+
+1. **Hatua 4 (placebo) — bure.** Inatoa null ya `ρ` **na** ya `R` ya decile ya juu bila
+   kugharimu chochote. Ndiyo njia pekee ya kujua kama `+0.0656 R` ni kitu au ni kelele,
+   bila kutumia config nyingine.
+2. Uamuzi wa config 3 ni wa PD, ukiwa na ufichuzi huu mezani.
+
 ### Hatua 4 — PLACEBO (haigharimu bajeti — ni ukaguzi wa pipeline)
+
+**Amri (imejengwa 2026-08-14):**
+
+```
+python -m src.data.cli placebo --reps 20
+```
+
+Njia ya kuharibu labels ni **mzunguko wa duara ndani ya kila symbol**, si kuchanganya
+rows. Kuchanganya kunavunja autocorrelation ya labels pia, na null inayotokana nayo ni
+**nyembamba kupita kiasi** — kila kitu kinaonekana muhimu ukilinganisha nayo. Mzunguko
+unahifadhi muundo wote wa mfululizo na unavunja **upatanifu na features pekee**, ambao
+ndio hasa unaodaiwa.
+
+Inaripoti p-value ya upande mmoja `(#{null ≥ halisi} + 1) ÷ (N + 1)` kwa takwimu tatu:
+`ρ`, `top fitted`, na **`top R halisi`**. Ya tatu ndiyo inayojibu swali lililoachwa wazi
+na hatua 3 — bila kugharimu bajeti, kwa sababu labels zilizoharibiwa haziwezi kuchagua
+strategy.
+
+
 
 Random-label na shuffled-score. Pipeline ikitoa matokeo chanya pale hakuna signal, **kila kitu
 kilicho juu yake ni batili.** Hii inaendeshwa **kabla** ya kuamini hatua 3.
