@@ -300,7 +300,7 @@ def _write(signature: Signature, ledger: Path | None = None) -> Path:
     target = Path(ledger or LEDGER)
     if not target.is_file():
         target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_text(_HEADER, encoding="utf-8")
+        target.write_text(_HEADER, encoding="utf-8", newline="\n")
     with target.open("a", encoding="utf-8") as handle:
         handle.write(signature.to_row() + "\n")
     return target
@@ -424,7 +424,7 @@ def verify(
             report.problems.append(f"#{signature.number}: hakuna sababu")
 
         if check_evidence and signature.evidence:
-            path = base / signature.evidence
+            path = base / _as_posix(signature.evidence)
             heir = _superseded_by(signature, signatures, base)
             if not path.is_file():
                 complaint = f"#{signature.number}: ushahidi haupo tena ({signature.evidence})"
@@ -460,6 +460,21 @@ def verify(
     return report
 
 
+def _as_posix(evidence: str) -> str:
+    """Njia ya ushahidi isiyotegemea mfumo wa uendeshaji.
+
+    PD anaendesha Windows, kwa hiyo ledger inabeba `research\\reports\\...`.
+    Kwenye Linux/Mac hiyo si njia — ni **jina moja la faili** lenye backslash
+    ndani yake, na `verify` inasema "ushahidi haupo tena" kwa faili lililopo.
+
+    Halikuwa tatizo pale `research/reports/` haikuwa ikipushwa: hakuna aliyeweza
+    kukagua kwingine hata hivyo. Reports zilipoanza kusafiri na repo
+    (2026-08-14), ushahidi ukawa portable lakini **ukaguzi wake haukuwa** — na
+    lango linalofanya kazi kwenye mashine moja pekee ni lango la mtu mmoja.
+    """
+    return evidence.replace("\\", "/")
+
+
 def _superseded_by(
     signature: "Signature", signatures: list["Signature"], base: Path
 ) -> int | None:
@@ -486,7 +501,7 @@ def _superseded_by(
             continue
         if other.item != signature.item or other.evidence != signature.evidence:
             continue
-        path = base / other.evidence
+        path = base / _as_posix(other.evidence)
         if path.is_file() and sha256_of(path).startswith(other.evidence_sha256):
             return other.number
     return None

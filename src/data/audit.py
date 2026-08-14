@@ -838,7 +838,7 @@ def adopt_existing_l2(
 
     if adopted:
         state_path.parent.mkdir(parents=True, exist_ok=True)
-        state_path.write_text(json.dumps(state, indent=2) + "\n", encoding="utf-8")
+        state_path.write_text(json.dumps(state, indent=2) + "\n", encoding="utf-8", newline="\n")
     return adopted
 
 
@@ -906,5 +906,5 @@ def build_l2(
         # kunapoteza ya tisa pekee, si zote nane.
         state[symbol] = {**build.to_json(), "fingerprint": marker}
         state_path.parent.mkdir(parents=True, exist_ok=True)
-        state_path.write_text(json.dumps(state, indent=2) + "\n", encoding="utf-8")
+        state_path.write_text(json.dumps(state, indent=2) + "\n", encoding="utf-8", newline="\n")
     return out

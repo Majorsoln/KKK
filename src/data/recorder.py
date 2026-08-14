@@ -140,7 +140,7 @@ class RecorderState:
             },
         }
         tmp = self.path.with_suffix(".tmp")
-        tmp.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+        tmp.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8", newline="\n")
         os.replace(tmp, self.path)
 
     def for_symbol(self, symbol: str, default_watermark: datetime) -> SymbolState:

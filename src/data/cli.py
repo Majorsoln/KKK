@@ -354,7 +354,7 @@ def cmd_probe_history(args: argparse.Namespace) -> int:
 
     print(json.dumps(report, indent=2))
     if args.out:
-        Path(args.out).write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
+        Path(args.out).write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8", newline="\n")
     return 0 if report.get("earliest_available") else 1
 
 
@@ -366,7 +366,7 @@ def cmd_check_freshness(args: argparse.Namespace) -> int:
     else:
         print(report.render())
     if args.out:
-        Path(args.out).write_text(json.dumps(report.to_json(), indent=2) + "\n", encoding="utf-8")
+        Path(args.out).write_text(json.dumps(report.to_json(), indent=2) + "\n", encoding="utf-8", newline="\n")
     return report.exit_code
 
 
@@ -839,7 +839,7 @@ def cmd_quality_stats(args: argparse.Namespace) -> int:
     print(render_threshold_study(study))
     target = out_dir / "threshold_study.json"
     target.parent.mkdir(parents=True, exist_ok=True)
-    target.write_text(json.dumps(study, indent=2) + "\n", encoding="utf-8")
+    target.write_text(json.dumps(study, indent=2) + "\n", encoding="utf-8", newline="\n")
     print(f"ripoti: {target}")
     return 0
 
@@ -858,7 +858,7 @@ def cmd_compare_variants(args: argparse.Namespace) -> int:
     summary = compare_variants(cfg, root, calendar=calendar)
     path = out_dir / "variant_comparison.json"
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")
+    path.write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8", newline="\n")
     print(json.dumps(summary.get("variants", {}), indent=2))
     identical = summary.get("canonical_schema_identical")
     print(f"schema ya kawaida inalingana A↔B: {'NDIYO' if identical else 'HAPANA'}")
@@ -880,7 +880,7 @@ def cmd_compare_provenance(args: argparse.Namespace) -> int:
     )
     path = out_dir / "provenance_comparison.json"
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")
+    path.write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8", newline="\n")
 
     if not summary["comparisons"]:
         print(
@@ -1200,7 +1200,7 @@ def cmd_detect_setups(args: argparse.Namespace) -> int:
     }
     report_path = cfg.path_of("storage.reports_root") / "r1" / "setup_rates.json"
     report_path.parent.mkdir(parents=True, exist_ok=True)
-    report_path.write_text(json.dumps(summary, indent=2), encoding="utf-8")
+    report_path.write_text(json.dumps(summary, indent=2), encoding="utf-8", newline="\n")
 
     print(
         f"\npooled (TRAIN+VAL): setups {pooled_setups} / eligible {pooled_eligible} "
@@ -1346,7 +1346,7 @@ def cmd_build_labels(args: argparse.Namespace) -> int:
     }
     report_path = cfg.path_of("storage.reports_root") / "r1" / "label_build.json"
     report_path.parent.mkdir(parents=True, exist_ok=True)
-    report_path.write_text(json.dumps(summary, indent=2, default=str), encoding="utf-8")
+    report_path.write_text(json.dumps(summary, indent=2, default=str), encoding="utf-8", newline="\n")
 
     print(
         f"\njumla: points {totals['points']:,} (setup {totals['setups']:,} · control "
@@ -1553,7 +1553,7 @@ def cmd_r1_summary(args: argparse.Namespace) -> int:
 
     out_path = reports_root / "r1_summary.json"
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    out_path.write_text(json.dumps(p, indent=2, default=str), encoding="utf-8")
+    out_path.write_text(json.dumps(p, indent=2, default=str), encoding="utf-8", newline="\n")
     print(f"\nushahidi: {out_path}")
     print(f"HUKUMU: {'PASS' if report.ok else 'FAIL'}")
     return 0 if report.ok else 1
@@ -1788,7 +1788,7 @@ def cmd_effective_n(args: argparse.Namespace) -> int:
 
     out_path = cfg.path_of("storage.reports_root") / "r1" / "effective_n.json"
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    out_path.write_text(json.dumps(result.to_json(), indent=2), encoding="utf-8")
+    out_path.write_text(json.dumps(result.to_json(), indent=2), encoding="utf-8", newline="\n")
     print(f"\nushahidi: {out_path}")
     return 0
 
@@ -1862,7 +1862,7 @@ def cmd_setup_effect(args: argparse.Namespace) -> int:
 
     out_path = cfg.path_of("storage.reports_root") / "r2" / "setup_effect.json"
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    out_path.write_text(json.dumps(result.to_json(), indent=2, default=str), encoding="utf-8")
+    out_path.write_text(json.dumps(result.to_json(), indent=2, default=str), encoding="utf-8", newline="\n")
     print(f"\nushahidi: {out_path}")
     print(
         "\nbajeti: matumizi hayajaandikwa. Yaandike ukikubali matokeo:\n"
@@ -1908,7 +1908,7 @@ def cmd_splits(args: argparse.Namespace) -> int:
                 for f in plan.folds()
             ],
         }
-        Path(args.out).write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+        Path(args.out).write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8", newline="\n")
         print(f"mpango: {args.out}")
     return 0
 

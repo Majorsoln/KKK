@@ -915,7 +915,7 @@ class QualityReport:
         """Andika muhtasari (`path`) na kina (`quality_detail.json`) pamoja."""
         path = Path(path)
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps(self.to_json(), indent=2) + "\n", encoding="utf-8")
+        path.write_text(json.dumps(self.to_json(), indent=2) + "\n", encoding="utf-8", newline="\n")
         (path.parent / DETAIL_NAME).write_text(
             json.dumps(self.to_detail()) + "\n", encoding="utf-8"
         )

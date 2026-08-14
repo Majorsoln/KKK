@@ -1,16 +1,28 @@
-# Scripts za Windows ZINAHITAJI CRLF — cmd.exe inaweza kuchanganya faili yenye LF
-# pekee (mf. "The system cannot find the path specified"). Repo hii inatengenezwa
-# kwenye Linux na kutumika Windows, kwa hiyo tunailazimisha wakati wa checkout.
-*.bat  text eol=crlf
-*.cmd  text eol=crlf
-*.ps1  text eol=crlf
+# ===========================================================================
+#  Mistari ya mwisho (line endings) — na kwa nini inahusu USHAHIDI
+#
+#  Sahihi za PD zinafunga SHA256 ya faili la ushahidi. Git ikibadilisha CRLF
+#  kuwa LF wakati wa commit, bytes zilizohifadhiwa si zile zilizohashiwa, na
+#  `verify` inasema "ushahidi umebadilika baada ya kusainiwa" kwa faili
+#  ambalo hakuna aliyeligusa.
+#
+#  Halikuwa tatizo pale `research/reports/` haikuwa ikipushwa. Reports
+#  zilipoanza kusafiri na repo (2026-08-14), likawa tatizo mara moja.
+#
+#  `-text` inamaanisha: git isiguse mistari ya faili hizi hata kidogo.
+# ===========================================================================
 
-# Za Unix zinabaki LF
-*.sh   text eol=lf
-*.py   text eol=lf
-*.md   text eol=lf
-*.yaml text eol=lf
-*.yml  text eol=lf
+research/reports/** -text
+*.json                -text
 
-# Data si text
-*.parquet binary
+# HALI ILIYOPO (2026-08-14): sahihi #1–#19 zilihashi faili zilizoandikwa kwa
+# CRLF kwenye Windows, kabla ya `newline="\n"` kuwekwa kwenye waandishi. Faili
+# hizo zilipocommitiwa, git ilizigeuza LF. Kwa hiyo:
+#   · kwenye mashine ya PD  → zinabaki CRLF, `verify` inapita
+#   · kwenye clone mpya      → zitakuwa LF, hash hazitalingana
+# Sio kasoro inayohitaji kurekebishwa leo: mrithi (supersession) unashughulikia,
+# na ripoti zinazoandikwa kuanzia sasa ni LF kila mahali. Lakini isije
+# ikashangaza mtu — imeandikwa hapa.
+
+# Scripts za Windows zinahitaji CRLF ili `cmd` iziendeshe kwa uhakika.
+*.bat text eol=crlf

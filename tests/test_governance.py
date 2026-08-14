@@ -316,3 +316,27 @@ def test_barua_pepe_tofauti_bado_inakataliwa(ledger, evidence):
     report = sig.verify(ledger=ledger, plan=plan, root=ledger.parent)
     assert not report.ok and any("si PD" in p for p in report.problems)
     assert report.notes == []
+
+
+def test_njia_ya_ushahidi_haitegemei_mfumo_wa_uendeshaji(ledger, evidence, monkeypatch):
+    """Ledger inabeba `research\\reports\\...` (Windows). Linux lazima iisome.
+
+    Sio tatizo pale `research/reports/` haikuwa ikipushwa — hakuna aliyeweza
+    kukagua kwingine hata hivyo. Reports zilipoanza kusafiri na repo
+    (2026-08-14), lango likawa la mashine moja pekee. Lango linalofanya kazi
+    kwa mtu mmoja si lango.
+    """
+    nested = ledger.parent / "research" / "reports"
+    nested.mkdir(parents=True)
+    target = nested / "r1.json"
+    target.write_text(json.dumps({"x": 1}), encoding="utf-8", newline="\n")
+
+    _sign(ledger, target)
+    # Badilisha njia iliyohifadhiwa iwe ya mtindo wa Windows.
+    text = ledger.read_text(encoding="utf-8").replace(
+        "research/reports/r1.json", "research\\reports\\r1.json"
+    )
+    ledger.write_text(text, encoding="utf-8", newline="\n")
+
+    report = _verify(ledger)
+    assert report.ok, f"njia ya Windows haikusomeka: {report.problems}"

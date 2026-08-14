@@ -196,7 +196,7 @@ def spend(
         remaining=budget.remaining - (weight if kind == "EVALUATION" else 0.0),
         reason=reason.strip(),
     )
-    with target.open("a", encoding="utf-8") as handle:
+    with target.open("a", encoding="utf-8", newline="\n") as handle:
         handle.write(entry.render() + "\n")
     return entry
 

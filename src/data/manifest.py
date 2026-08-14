@@ -229,7 +229,7 @@ class L0Manifest:
             "mutation_log": self.mutation_log,
         }
         tmp = self.path.with_suffix(self.path.suffix + ".tmp")
-        tmp.write_text(json.dumps(payload, indent=2, sort_keys=False) + "\n", encoding="utf-8")
+        tmp.write_text(json.dumps(payload, indent=2, sort_keys=False) + "\n", encoding="utf-8", newline="\n")
         os.replace(tmp, self.path)
         return self.path
 

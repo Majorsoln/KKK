@@ -226,7 +226,9 @@ def cmd_budget_init(args: argparse.Namespace) -> int:
         print(f"{path} tayari ipo — bajeti haitangazwi mara mbili", file=sys.stderr)
         return 2
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(bud.render_header(args.sr_target, args.years), encoding="utf-8")
+    path.write_text(
+        bud.render_header(args.sr_target, args.years), encoding="utf-8", newline="\n"
+    )
     total = bud.total_for(args.sr_target, args.years)
     print(f"{path} imeandikwa: SR* {args.sr_target} · miaka {args.years} → configs {total:.1f}")
     print("\nHAIJAKAMILIKA HADI UCOMMIT — commit ndiyo sahihi yenyewe:")
