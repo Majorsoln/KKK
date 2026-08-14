@@ -1872,6 +1872,294 @@ def cmd_setup_effect(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_build_features(args: argparse.Namespace) -> int:
+    """L3 — features 25 kwa kila symbol, kutoka bars za H1 za L2 (§6.1).
+
+    TRAIN+VAL PEKEE (G2): bars kuanzia `holdout_start` **hazisomwi kabisa**.
+    Sio kwamba features za holdout zingevuja zenyewe — rolling ni ya nyuma
+    pekee — bali kwamba faili isiyokuwepo haiwezi kutumiwa kimakosa baadaye.
+
+    `setup_v1_flag` inatoka kwenye points za L4, si kuhesabiwa upya (sheria 6).
+    """
+    cfg = _load(args)
+    import pandas as pd
+
+    from .bars import read_bars
+    from .features import FEATURE_SET_VERSION, build, coverage
+    from .r1 import load_labels
+    from .splits import SplitPlan
+
+    symbols = _symbol_list(args) or cfg.symbols
+    holdout_start = SplitPlan.from_config(cfg).holdout_start
+    labels_root = cfg.research_root / "data" / "L4_labels" / "labels"
+    points, _ = load_labels(labels_root, symbols)
+    out_root = cfg.research_root / "data" / "L3_features"
+
+    summary: dict[str, Any] = {}
+    for symbol in symbols:
+        try:
+            bars = read_bars(cfg.l2_root, symbol, "H1")
+        except FileNotFoundError:
+            print(f"{symbol}: bars za H1 hazipo — `build-l2` kwanza", file=sys.stderr)
+            return 2
+        bars = bars[bars.index < pd.Timestamp(holdout_start, tz="UTC")]  # G2
+
+        setups = None
+        if not points.empty and "is_setup" in points.columns:
+            mine = points[points["symbol"] == symbol]
+            if not mine.empty:
+                setups = mine[["decision_time", "is_setup"]]
+
+        frame = build(bars, symbol, setups=setups)
+        target = out_root / f"symbol={symbol}" / "features.parquet"
+        target.parent.mkdir(parents=True, exist_ok=True)
+        tmp = target.with_suffix(".parquet.tmp")
+        frame.reset_index().to_parquet(tmp, index=False, compression="zstd")
+        tmp.replace(target)
+
+        cov = coverage(frame)
+        summary[symbol] = {
+            "bars": int(len(frame)),
+            "setup_flags": int(frame["setup_v1_flag"].sum()),
+            "coverage_min": float(cov.iloc[0]),
+            "coverage_min_feature": str(cov.index[0]),
+        }
+        print(
+            f"{symbol} · bars {len(frame):>7,} · setups {int(frame['setup_v1_flag'].sum()):>5,}"
+            f" · coverage ndogo {cov.iloc[0]:.1%} ({cov.index[0]})"
+        )
+
+    report_path = cfg.path_of("storage.reports_root") / "r3" / "features.json"
+    report_path.parent.mkdir(parents=True, exist_ok=True)
+    report_path.write_text(
+        json.dumps(
+            {
+                "feature_set_version": FEATURE_SET_VERSION,
+                "config_hash": cfg.config_hash,
+                "holdout_start": holdout_start.isoformat(),
+                "per_symbol": summary,
+            },
+            indent=2,
+        ),
+        encoding="utf-8",
+        newline="\n",
+    )
+    print(f"\nL3: {out_root}\nushahidi: {report_path}")
+    return 0
+
+
+def cmd_meta_label(args: argparse.Namespace) -> int:
+    """T3 hatua 3 — je model inaweza kuchuja SETUP-v1 vizuri kuliko SETUP-v1?
+
+    Hii ndiyo amri inayogharimu bajeti. Kila kitu kimekwisha tangazwa kabla
+    yake: cell (sahihi), features (`FEATURE_NAMES`), folds (DF-14),
+    hyperparameters (`experiment.py`), na malango matatu (`metalabel.py`).
+    Kilichobaki ni kuendesha na kusoma jibu.
+
+    **Breakeven inatoka `cost_audit.json`, si hapa.** `gap_to_breakeven` ni
+    umbali wa `p_tp` hadi EV = 0 ukitumia `dEV/dp_tp = 1 + tp/sl`. Hiyo ni
+    linearization kuzunguka base rate: inadhania mzunguko wa uzito ni
+    **TP ↔ SL** huku timeout ikibaki ile ile. Kwa subset iliyochaguliwa na
+    model, timeout rate inaweza kutofautiana — kwa hiyo `R` HALISI ya kila
+    decile inaripotiwa kando kama ushahidi, si kama lango (lango
+    lililotangazwa halibadilishwi baada ya kuona data).
+    """
+    cfg = _load(args)
+    import numpy as np
+    import pandas as pd
+
+    from src.governance import budget as bud
+
+    from .costs import realized_r
+    from .effective_n import estimate
+    from .experiment import EXPERIMENT_VERSION, add_uniqueness, available_models, oof_predict
+    from .features import FEATURE_NAMES, FEATURE_SET_VERSION
+    from .labels import TP_FIRST
+    from .manifest import code_rev
+    from .metalabel import METALABEL_VERSION, evaluate
+    from .r1 import load_labels
+    from .splits import SplitPlan
+
+    bud.guard()
+    models = available_models()
+    if args.model not in models:
+        print(
+            f"model `{args.model}` haipatikani. Zilizopo: {', '.join(sorted(models))}."
+            + ("\n  `xgboost` haijafungwa kwenye mazingira haya." if "xgboost" not in models else ""),
+            file=sys.stderr,
+        )
+        return 2
+
+    reports = cfg.path_of("storage.reports_root")
+    cost_path = reports / "r1" / "cost_audit.json"
+    if not cost_path.exists():
+        print(f"`{cost_path}` haipo — endesha `cost-audit --cell SL/TP` kwanza", file=sys.stderr)
+        return 2
+    identities = json.loads(cost_path.read_text(encoding="utf-8")).get("identities")
+    if not identities:
+        print("`cost_audit.json` haina identities — endesha `cost-audit --cell SL/TP`",
+              file=sys.stderr)
+        return 2
+
+    want_sl, want_tp = (float(x) for x in args.cell.split("/"))
+    if not np.allclose(identities["cell"], [want_sl, want_tp]):
+        print(
+            f"cell {args.cell} haifanani na iliyo kwenye cost_audit.json "
+            f"({identities['cell']}). Kubadilisha cell sasa ni UTEUZI JUU YA LABEL.",
+            file=sys.stderr,
+        )
+        return 2
+
+    # ----------------------------------------------------------------- data
+    labels_root = cfg.research_root / "data" / "L4_labels" / "labels"
+    points, barriers = load_labels(labels_root, _symbol_list(args))
+    if barriers.empty or points.empty:
+        print(f"hakuna labels chini ya {labels_root}", file=sys.stderr)
+        return 2
+    points = points[points["is_setup"].fillna(False)]
+    cells = barriers[
+        np.isclose(barriers["sl_atr"], want_sl) & np.isclose(barriers["tp_atr"], want_tp)
+    ].copy()
+    cells["y"] = (cells["outcome"] == TP_FIRST).astype(float)
+    cells["r_net"] = realized_r(cells, commission_pips=args.commission_pips)
+
+    frame = points.merge(
+        cells[["symbol", "decision_time", "y", "r_net"]],
+        on=["symbol", "decision_time"], how="inner",
+    )
+    # Breakeven kwa idadi ILE ILE iliyotumika kwenye cost-audit (setups zote za
+    # cell hii), si kwa subset iliyobaki baada ya features — la sivyo lango
+    # lingehama pamoja na data linayoipima.
+    p_tp_base = float(frame["y"].mean())
+    breakeven = p_tp_base + float(identities["gap_to_breakeven"])
+    delta = float(identities["delta_mer"])
+
+    features_root = cfg.research_root / "data" / "L3_features"
+    pieces = []
+    for symbol, chunk in frame.groupby("symbol", sort=False):
+        path = features_root / f"symbol={symbol}" / "features.parquet"
+        if not path.exists():
+            print(f"{symbol}: features hazipo — `build-features` kwanza", file=sys.stderr)
+            return 2
+        feats = pd.read_parquet(path).drop(columns=["timestamp"], errors="ignore")
+        pieces.append(chunk.merge(feats, on="decision_time", how="inner", suffixes=("", "_feat")))
+    joined = pd.concat(pieces, ignore_index=True) if pieces else pd.DataFrame()
+    if joined.empty:
+        print("join ya features na points imetoa sifuri", file=sys.stderr)
+        return 2
+
+    # G2 mara ya pili — features zinaweza kuwa zilijengwa kwa config nyingine.
+    plan = SplitPlan.from_config(cfg)
+    intruders = int((joined["decision_time"].dt.date >= plan.holdout_start).sum())
+    if intruders:
+        print(f"G2: FAIL — rows {intruders:,} ziko ndani ya holdout", file=sys.stderr)
+        return 1
+
+    horizon = int(cfg.get("labels.horizon_bars"))
+    joined = add_uniqueness(joined, horizon)
+    folds = list(plan.folds())
+
+    result_oof = oof_predict(
+        joined, FEATURE_NAMES, "y", folds,
+        models[args.model], weight_col=None if args.unweighted else "uniqueness",
+    )
+    scored = joined[result_oof.mask].copy()
+    scored["score"] = result_oof.score[result_oof.mask]
+    if len(scored) < 500:
+        print(f"rows zilizopata score ni {len(scored):,} pekee — jaribio haliwezi kuendelea",
+              file=sys.stderr)
+        return 2
+
+    # N_eff INAHESABIWA UPYA kwa rows zilizopata score. Ile ya `effective_n.json`
+    # ni ya setups 25,314; baada ya NaN za features na coverage ya folds sampuli
+    # ni ndogo, na kutumia namba kubwa kungefanya kifungu cha nguvu kisifanye kazi.
+    neff = estimate(scored, horizon_bars=horizon)
+    n_required = float(identities["n_required"])
+
+    result = evaluate(
+        scored["score"].to_numpy(),
+        scored["y"].to_numpy(),
+        scored["decision_time"].dt.year.to_numpy(),
+        breakeven=breakeven,
+        delta_mer=delta,
+        n_eff=neff.n_eff,
+        n_required=n_required,
+        n_boot=args.bootstrap,
+    )
+
+    # --------------------------------------------------------------- ripoti
+    print(f"META-LABELLING — cell {want_sl}/{want_tp} · model `{args.model}`"
+          f" · features {len(FEATURE_NAMES)}\n")
+    print(f"   points za setup   {len(frame):>8,}")
+    print(f"   baada ya features {len(joined):>8,}   (NaN zilizotolewa: {result_oof.dropped_nan:,})")
+    print(f"   zenye score OOF   {len(scored):>8,}   folds {len(result_oof.folds)}/{len(folds)}")
+    print(f"   N_eff             {neff.n_eff:>8,.0f}   dhidi ya N_req {n_required:,.0f}")
+    print(f"\n   p_tp ya msingi {p_tp_base:.4f}  ·  breakeven {breakeven:.4f}"
+          f"  ·  lengo {breakeven + delta:.4f}")
+
+    if result.deciles:
+        # Mgawanyo ULE ULE wa `decile_table` — argsort + array_split, si quantiles.
+        # Quantiles zingetoa `n` tofauti kwenye scores zenye ties, na jedwali
+        # lingeonyesha safu mbili zisizolingana zikiitwa "decile ile ile".
+        groups = np.array_split(np.argsort(scored["score"].to_numpy()), 10)
+        r_all = scored["r_net"].to_numpy(dtype=float)
+        print(f"\n   {'dec':>4} {'n':>7} {'empirical':>10} {'fitted':>8} {'R halisi':>10}")
+        for row in result.deciles:
+            g = groups[int(row["decile"]) - 1]
+            r_mean = float(np.nanmean(r_all[g])) if len(g) else float("nan")
+            print(f"   {row['decile']:>4} {row['n']:>7,} {row['empirical']:>10.4f} "
+                  f"{row.get('fitted', float('nan')):>8.4f} {r_mean:>+10.4f}")
+            row["r_net_mean"] = r_mean
+
+    print()
+    for gate in result.gates:
+        mark = "PASS" if gate.passed else "FAIL"
+        print(f"   {gate.name:<15} {gate.value:>8.4f}  dhidi ya {gate.threshold:>8.4f}  {mark}")
+        if gate.detail:
+            print(f"       {gate.detail}")
+    if result.inconclusive:
+        print("\n   HUKUMU: INCONCLUSIVE — sampuli haitoshi, matokeo hayasomwi")
+    else:
+        print(f"\n   HUKUMU: {'IMEPITA' if result.passed else 'IMEFELI'}")
+    for note in result.notes + result_oof.notes:
+        print(f"\nkumbuka: {note}")
+
+    payload = result.to_json()
+    payload.update(
+        {
+            "experiment_version": EXPERIMENT_VERSION,
+            "metalabel_version": METALABEL_VERSION,
+            "feature_set_version": FEATURE_SET_VERSION,
+            "config_hash": cfg.config_hash,
+            "section_hashes": {k: cfg.section_hash(k) for k in ("setups", "labels", "splits")},
+            "code_rev": code_rev(),
+            "cell": [want_sl, want_tp],
+            "model": args.model,
+            "weighted": not args.unweighted,
+            "commission_pips": args.commission_pips,
+            "features": list(FEATURE_NAMES),
+            "n_points": int(len(frame)),
+            "n_joined": int(len(joined)),
+            "n_scored": int(len(scored)),
+            "dropped_nan": int(result_oof.dropped_nan),
+            "p_tp_base": p_tp_base,
+            "effective_n_scored": neff.to_json(),
+            "folds": [f.__dict__ for f in result_oof.folds],
+            "oof_notes": result_oof.notes,
+        }
+    )
+    out_path = reports / "r3" / f"meta_label_{args.model}.json"
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_path.write_text(json.dumps(payload, indent=2, default=str), encoding="utf-8", newline="\n")
+    print(f"\nushahidi: {out_path}")
+    print(
+        "\nbajeti: matumizi hayajaandikwa. Yaandike ukikubali matokeo:\n"
+        f"  python -m src.governance.cli budget-spend meta-label-{args.model}"
+        ' --reason "..."'
+    )
+    return 0
+
+
 def cmd_splits(args: argparse.Namespace) -> int:
     """DF-14 / lango G2 — mpango wa splits kutoka config PEKEE (spec §7)."""
     cfg = _load(args)
@@ -2288,6 +2576,31 @@ def build_parser() -> argparse.ArgumentParser:
     p_eff.add_argument("--commission-pips", type=float, default=0.7)
     p_eff.add_argument("--bootstrap", type=int, default=500)
     p_eff.set_defaults(func=cmd_setup_effect)
+
+    p_feat = subparsers.add_parser(
+        "build-features",
+        help="L3 — features 25 kwa kila symbol kutoka bars za H1 (§6.1)",
+        parents=[common],
+    )
+    p_feat.add_argument("--symbols")
+    p_feat.set_defaults(func=cmd_build_features)
+
+    p_meta = subparsers.add_parser(
+        "meta-label",
+        help="T3 hatua 3 — purged CV + malango matatu (INAGHARIMU BAJETI)",
+        parents=[common],
+    )
+    p_meta.add_argument("--symbols")
+    p_meta.add_argument("--cell", default="2.0/3.0", help="cell iliyosainiwa")
+    p_meta.add_argument("--model", default="logistic", help="`logistic` (msingi) au `xgboost`")
+    p_meta.add_argument("--commission-pips", type=float, default=0.7)
+    p_meta.add_argument("--bootstrap", type=int, default=500)
+    p_meta.add_argument(
+        "--unweighted",
+        action="store_true",
+        help="ondoa uzito wa uniqueness — kwa kulinganisha PEKEE, si kwa hukumu",
+    )
+    p_meta.set_defaults(func=cmd_meta_label)
 
     p_split = subparsers.add_parser(
         "splits", help="DF-14 / G2 — mpango wa splits + holdout guard (§7)", parents=[common]

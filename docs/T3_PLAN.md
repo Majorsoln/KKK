@@ -243,11 +243,56 @@ Lakini ni bar ya juu, na imeandikwa **kabla ya jaribio**, si baada.
 **Hakuna label mpya. Hakuna rebuild.** Points 25,374 zilizosainiwa.
 
 - Sample: setups 25,374 · purged 5-fold · embargo 36 bars · holdout haiguswi
-- Model: XGBoost **moja**, hyperparameters zimefungwa kwenye ledger **kabla** ya run
+- Model: **moja**, hyperparameters zimefungwa kwenye code **kabla** ya run
 - Cell: **moja iliyofungwa mapema.** Kuichagua baada ya kuona jedwali la EV ni **uteuzi juu ya
   label** — irekodiwe kama registered rule mpya pamoja na ukiri huo
 - Baseline: SETUP-v1 chukua-zote
 - Uzito: `uniqueness` kutoka `effective-n`, si idadi ghafi
+
+**Amri (zikiwa zimejengwa 2026-08-14, tests 383 zinapita):**
+
+```
+python -m src.data.cli build-features
+python -m src.data.cli meta-label --cell 2.0/3.0
+```
+
+`build-features` inajenga L3 — features 25 kwa kila symbol, holdout haisomwi kabisa (G2).
+`meta-label` inaunganisha: features → points za cell → uzito wa `uniqueness` → purged 5-fold →
+malango matatu. `budget.guard()` iko **kabla** ya kazi yoyote.
+
+#### Model ya kwanza ni logistic yenye L2, si XGBoost — na kwa nini
+
+Mpango wa awali ulisema "XGBoost moja". Umebadilika baada ya kupima mazingira: **`xgboost`,
+`sklearn` na `lightgbm` hazijafungwa** popote kwenye mnyororo wetu. Chaguo lilikuwa kati ya
+kuongeza dependency isiyopimika hapa, au kuanza na baseline ambayo wataalamu wote wawili
+walikuwa **wameidai kama ya lazima kabla ya chochote kigumu zaidi**. Nimechagua la pili.
+
+Hii si kupunguza lengo. Sehemu ngumu ya jaribio hili si model — ni purged CV, standardization ya
+ndani ya fold, uzito wa uniqueness, na malango yasiyoweza kupindishwa. Vyote hivyo ni
+**model-agnostic**, na ndivyo vilivyojengwa na kupimwa. Model ni kipande kinachobadilishwa kwa
+flag moja:
+
+```
+python -m src.data.cli meta-label --model xgboost      # `pip install xgboost` ikishafanyika
+```
+
+Booster ikiingia, inapita **malango yale yale**, na inagharimu **config nyingine ya bajeti** —
+si "run ile ile kwa model bora". Kama logistic ikifaulu na booster ikaongeza kidogo, tofauti hiyo
+ni ndogo kuliko kelele ya sampuli yetu; kama logistic ikianguka na booster ikafaulu, hilo ni dai
+kubwa linalohitaji hatua 4 kwanza.
+
+#### Breakeven inatoka wapi — na dhana yake
+
+`breakeven = p_tp ya msingi + gap_to_breakeven`, ambapo `gap` inatoka `cost_audit.json`
+(`−EV_net ÷ dev_dp`, `dev_dp = 1 + tp/sl = 2.5`). Hiyo ni **linearization** inayodhania uzito
+unahama **TP ↔ SL** huku timeout ikibaki ile ile. Subset iliyochaguliwa na model inaweza kuwa na
+timeout rate tofauti, kwa hiyo `R` **halisi** ya kila decile inaripotiwa kando kama ushahidi —
+**si kama lango**. Lango lililotangazwa kabla ya run halibadilishwi baada ya kuona data.
+
+`N_eff` **inahesabiwa upya kwa rows zilizopata score**, si kunakiliwa kutoka `effective_n.json`.
+Ile ni ya setups 25,314; baada ya NaN za features na coverage ya folds sampuli ni ndogo, na
+kutumia namba kubwa kungefanya kifungu cha nguvu kisifanye kazi — ndicho kitu pekee
+kinachozuia sampuli ndogo kutoa jibu la kusadikisha.
 
 **Kufaulu kunahitaji vyote vitatu:**
 
