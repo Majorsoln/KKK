@@ -330,3 +330,35 @@ def test_mzunguko_unahifadhi_base_rate_na_kuvunja_upatanifu(tree):
     rolled = np.roll(y, 3)
     assert rolled.sum() == y.sum()
     assert not np.array_equal(rolled, y)
+
+
+def test_mzunguko_unafanyika_kwa_mpangilio_wa_muda(tree, capsys):
+    """Bila `argsort`, `np.roll` inazungusha mpangilio wa parquet, si wa muda.
+
+    Ni permutation halali vyovyote — lakini dai la "muundo wa mfululizo
+    unabaki" lingekuwa la uongo, na null ingekuwa nyembamba kimya.
+    """
+    import numpy as np
+
+    stamps = np.array([5, 1, 3, 2, 4])
+    values = np.array([1.0, 0.0, 0.0, 1.0, 0.0])
+
+    order = np.argsort(stamps, kind="stable")          # 1,2,3,4,5
+    kwa_muda = values.copy()
+    kwa_muda[order] = np.roll(kwa_muda[order], 1)
+    kwa_rows = np.roll(values, 1)
+
+    assert kwa_muda.sum() == values.sum() == kwa_rows.sum()
+    assert not np.array_equal(kwa_muda, kwa_rows), "njia mbili zinapaswa kutofautiana"
+
+
+def test_ukaguzi_wa_null_unaripotiwa(tree, capsys):
+    """Null inayochagua trades bora kuliko msingi si null — na lazima iseme."""
+    main(["--config", CONFIG, "build-features", "--symbols", ",".join(SYMBOLS)])
+    main(["--config", CONFIG, "placebo", "--symbols", ",".join(SYMBOLS), "--reps", "6"])
+    out = capsys.readouterr().out
+    assert "UKAGUZI WA NULL" in out
+    payload = json.loads(
+        (tree / "reports" / "r3" / "placebo_logistic_rotation.json").read_text(encoding="utf-8")
+    )
+    assert "base_r_net" in payload and "null_contaminated" in payload

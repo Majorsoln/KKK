@@ -383,6 +383,61 @@ Inaripoti p-value ya upande mmoja `(#{null ≥ halisi} + 1) ÷ (N + 1)` kwa takw
 na hatua 3 — bila kugharimu bajeti, kwa sababu labels zilizoharibiwa haziwezi kuchagua
 strategy.
 
+#### MATOKEO — 2026-08-14 · `rotation` · marudio 20
+
+| Takwimu | Halisi | null p50 | null p95 | null max | p |
+|---|---|---|---|---|---|
+| discrimination `ρ` | +0.8182 | +0.3763 | +0.8067 | **+0.8182** | 0.095 |
+| top fitted | +0.3159 | +0.2972 | +0.3087 | +0.3095 | 0.048 |
+| top `R` halisi | +0.0661 | +0.0275 | +0.0537 | +0.0573 | 0.048 |
+
+**Lango la placebo limewaka: `ρ` haitofautishiki na kelele.** Marudio ya 20 yalitoa
+`ρ = +0.8182` — sawa kabisa na halisi.
+
+#### Jambo la kwanza: kizingiti cha 0.7 hakikuwa lango hata siku moja
+
+null p95 ni **+0.8067**. Kizingiti nilichokitangaza, **0.70**, kiko **ndani** ya mgawanyo
+wa kelele — chini ya asilimia 95. Maana yake: `ρ ≥ 0.7` ingepatikana kwa bahati **zaidi ya
+mara moja kati ya kumi**. Lango lililopita hatua 3 halikuwa likipima chochote.
+
+Nilichagua 0.7 **kwa hoja**, si kwa kupima. §5 ya mpango huu inasema wazi *"null simulation
+**kabla** ya run"*. Niliandika sharti hilo mimi mwenyewe kisha nikaendesha hatua 3 kabla ya
+hatua 4. Hilo ni kosa la mpangilio, si la takwimu, na ni langu.
+
+#### Jambo la pili: null yenyewe imechafuliwa
+
+Chini ya null **halisi**, model iliyofundishwa kwa labels zilizoharibiwa haipaswi kuwa na
+uwezo wowote wa kuchagua trades bora. `R` ya decile yake ya juu ingepaswa kukaa kwenye
+msingi wa sampuli: **−0.0163**.
+
+Imekaa **+0.0275**.
+
+Null haiwezi kuchagua trades zenye faida kwa bahati. Kwa hiyo **mzunguko haukuvunja
+uhusiano — umeuhifadhi**. Sababu: labels zina kumbukumbu ndefu (regimes za volatility
+zinaishi miezi), kwa hiyo `y(t − k)` bado inatabirika kutoka features za `t` hata `k`
+ikiwa kubwa. Model inajifunza *"volatility ikiwa juu, `p_tp` inapanda"* kutoka kwenye
+labels zilizozungushwa, na dai hilo linabaki kweli.
+
+**Matokeo ya hili:** p-value zote tatu hapo juu ni **CONSERVATIVE** — kubwa kuliko
+zinavyostahili. Null iliyochafuliwa ni ngumu kupita kiasi kuishinda.
+
+`placebo` sasa inakagua hili yenyewe na kuripoti `null_contaminated`. Ukaguzi huo unapima
+**chombo cha kupimia**, si strategy — hauguzi lango lolote la hatua 3 wala haubadilishi
+hukumu yoyote. Ndiyo maana kuongezwa kwake baada ya kuona matokeo ni halali.
+
+#### Hitimisho lisilo na kupendeza
+
+Hatujui bado kama `+0.0661 R` ni kitu. Tunajua mambo matatu:
+
+1. **Hukumu ya hatua 3 inabaki IMEFELI**, na sasa kwa sababu mbili badala ya moja: lango
+   la kiuchumi lilianguka, **na** lango la discrimination lililo "pita" halikuwa lango.
+2. **Kizingiti chochote cha baadaye lazima kitoke kwenye null iliyopimwa**, si kwenye
+   hoja. Hii ndiyo faida halisi ya hatua 4, na imelipwa kwa config moja.
+3. **Null ya `rotation` haitoshi peke yake.** Inahitaji `shuffle` kama mpaka wa pili:
+   `shuffle` inavunja kila kitu (null NYEMBAMBA MNO), `rotation` inahifadhi kumbukumbu
+   ndefu (null PANA MNO). Ukweli uko kati yao, na kuripoti mmoja pekee ni kudanganya
+   upande mmoja.
+
 
 
 Random-label na shuffled-score. Pipeline ikitoa matokeo chanya pale hakuna signal, **kila kitu

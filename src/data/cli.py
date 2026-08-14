@@ -2256,15 +2256,20 @@ def cmd_placebo(args: argparse.Namespace) -> int:
 
     rng = np.random.RandomState(args.seed)
     symbols = joined["symbol"].to_numpy()
+    order_key = joined["decision_time"].to_numpy()
+    base_r = float(np.nanmean(joined["r_net"].to_numpy(dtype=float)))
     null: list[dict] = []
     for rep in range(args.reps):
         fake = joined.copy()
         values = fake["y"].to_numpy(dtype=float).copy()
         if args.mode == "rotation":
-            # Mzunguko wa duara NDANI ya kila symbol — muundo wa mfululizo
-            # unabaki kamili, upatanifu na features pekee unavunjika.
+            # Mzunguko wa duara NDANI ya kila symbol, KWA MPANGILIO WA MUDA.
+            # Bila `argsort` hapa, `np.roll` inazungusha mpangilio wa rows
+            # kwenye parquet — permutation halali, lakini SI mzunguko wa muda,
+            # na dai la "muundo wa mfululizo unabaki" lingekuwa la uongo.
             for symbol in np.unique(symbols):
                 idx = np.flatnonzero(symbols == symbol)
+                idx = idx[np.argsort(order_key[idx], kind="stable")]
                 shift = int(rng.randint(1, max(len(idx) - 1, 2)))
                 values[idx] = np.roll(values[idx], shift)
         elif args.mode == "shuffle":
@@ -2305,6 +2310,36 @@ def cmd_placebo(args: argparse.Namespace) -> int:
     if not verdict_ok:
         print("   discrimination ya kelele inafikia ile halisi — matokeo ya hatua 3 ni batili")
 
+    # ------------------------------------------------------------------
+    # UKAGUZI WA NULL YENYEWE — je null ni null kweli?
+    #
+    # Model iliyofundishwa kwa labels ZILIZOHARIBIWA haipaswi kuwa na uwezo
+    # wowote wa kuchagua trades bora. Kwa hiyo `R` HALISI ya decile yake ya
+    # juu inapaswa kukaa kwenye msingi wa sampuli nzima. Ikikaa juu yake kwa
+    # utaratibu, null imehifadhi taarifa iliyodaiwa kuiharibu — na p-value
+    # zote hapo juu ni KUBWA KULIKO ZINAVYOSTAHILI (conservative), si ndogo.
+    #
+    # Kipimo hiki kinaangalia CHOMBO cha kupimia, si strategy. Kimeongezwa
+    # 2026-08-14 baada ya kuona `rotation` ikitoa null median +0.0275 dhidi ya
+    # msingi -0.0163. Hakigusi lango lolote la hatua 3 wala halibadilishi
+    # hukumu yoyote — ndiyo maana kuongezwa kwake baada ya kuona matokeo ni
+    # halali, tofauti na kuhamisha lango.
+    null_top_r = float(np.median([n["top_r_net"] for n in null]))
+    print(f"\n   UKAGUZI WA NULL: msingi wa sampuli {base_r:+.4f} R · "
+          f"null median ya decile ya juu {null_top_r:+.4f} R")
+    if null_top_r > base_r + 0.01:
+        print(
+            "   NULL IMECHAFULIWA. Model iliyofundishwa kwa labels zilizoharibiwa\n"
+            "   bado inachagua trades bora kuliko msingi — kwa hiyo `--mode "
+            f"{args.mode}`\n   haikuvunja uhusiano, imeuhifadhi. p-value hapo juu ni "
+            "CONSERVATIVE.\n"
+            "   Linganisha na `--mode shuffle`, ambayo inavunja kila kitu\n"
+            "   (ikiwemo autocorrelation, kwa hiyo null yake ni NYEMBAMBA MNO).\n"
+            "   Ukweli uko kati ya hizo mbili."
+        )
+    else:
+        print("   null iko kwenye msingi — haijahifadhi taarifa.")
+
     out_path = data["reports"] / "r3" / f"placebo_{args.model}_{args.mode}.json"
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(
@@ -2318,6 +2353,9 @@ def cmd_placebo(args: argparse.Namespace) -> int:
                 "weighted": not args.unweighted,
                 "cell": list(data["cell"]),
                 "observed": halisi,
+                "base_r_net": base_r,
+                "null_top_r_median": null_top_r,
+                "null_contaminated": bool(null_top_r > base_r + 0.01),
                 "null": null,
                 "p_values": {
                     key: float((sum(n[key] >= halisi[key] for n in null) + 1) / (len(null) + 1))
