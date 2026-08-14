@@ -393,3 +393,45 @@ def test_njia_zote_tatu_zinaendesha(tree):
         rc = main(["--config", CONFIG, "placebo", "--symbols", ",".join(SYMBOLS),
                    "--mode", mode, "--reps", "5"])
         assert rc in (0, 1), mode
+
+
+# ===========================================================================
+# Utambuzi wa symbol dhidi ya ujuzi wa wakati
+# ===========================================================================
+
+
+def test_jedwali_la_kila_symbol_linaripotiwa(tree, capsys):
+    """Utofauti wa `p_tp` kati ya symbols ndio unaochafua null mbili kati ya tatu."""
+    main(["--config", CONFIG, "build-features", "--symbols", ",".join(SYMBOLS)])
+    main(["--config", CONFIG, "placebo", "--symbols", ",".join(SYMBOLS), "--reps", "5"])
+    out = capsys.readouterr().out
+    assert "utofauti kati ya symbols" in out
+    payload = json.loads(
+        (tree / "reports" / "r3" / "placebo_logistic_block32.json").read_text(encoding="utf-8")
+    )
+    assert len(payload["per_symbol"]) == len(SYMBOLS)
+    assert payload["span_p_tp"] >= 0.0
+
+
+def test_within_symbol_inaondoa_base_rate_ya_kila_symbol(tree):
+    """Model inayojua symbol PEKEE lazima ianguke hadi sifuri baada ya kuondoa."""
+    import numpy as np
+
+    y = np.array([1.0, 1, 1, 0, 0, 0, 0, 0])
+    sym = np.array(["A", "A", "A", "A", "B", "B", "B", "B"])
+    for one in np.unique(sym):
+        pick = sym == one
+        y[pick] -= y[pick].mean()
+    for one in np.unique(sym):
+        assert y[sym == one].mean() == pytest.approx(0.0)
+
+
+def test_within_symbol_inaandika_faili_lake(tree, capsys):
+    main(["--config", CONFIG, "build-features", "--symbols", ",".join(SYMBOLS)])
+    main(["--config", CONFIG, "placebo", "--symbols", ",".join(SYMBOLS),
+          "--reps", "5", "--within-symbol"])
+    assert "NDANI YA SYMBOL" in capsys.readouterr().out
+    payload = json.loads(
+        (tree / "reports" / "r3" / "placebo_logistic_block32_ndani.json").read_text(encoding="utf-8")
+    )
+    assert payload["within_symbol"] is True

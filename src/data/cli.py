@@ -2237,20 +2237,52 @@ def cmd_placebo(args: argparse.Namespace) -> int:
         y = frame[target].to_numpy(dtype=float)[out.mask]
         r_net = frame["r_net"].to_numpy(dtype=float)[out.mask]
         a, b = logistic_calibrate(score, y)
-        table = decile_table(score, y, calibration=(a, b))
         top = score >= float(np.quantile(score, 0.9))
-        return {
-            "rho": float(spearman(table["decile"], table["empirical"])),
+        stats = {
             "top_fitted": float(apply_calibration(score[top], a, b).mean()),
-            "top_r_net": float(np.nanmean(r_net[top])),
         }
+
+        if args.within_symbol:
+            # Ondoa base rate ya KILA symbol kabla ya kupima chochote.
+            #
+            # Bila hii, model inayojua tu "hii ni XAUUSD, ile ni EURCHF"
+            # inapata deciles zinazopanda vizuri kabisa — kwa sababu symbols
+            # zina `p_tp` tofauti. Hicho si kupanga kwa WAKATI; ni upendeleo
+            # tuli ambao base rate tayari inaubeba. Hapa kinaondolewa.
+            sym = frame["symbol"].to_numpy()[out.mask]
+            for column in (y, r_net):
+                for one in np.unique(sym):
+                    pick = sym == one
+                    column[pick] -= column[pick].mean()
+
+        table = decile_table(score, y, calibration=(a, b))
+        stats["rho"] = float(spearman(table["decile"], table["empirical"]))
+        stats["top_r_net"] = float(np.nanmean(r_net[top]))
+        return stats
+
+    # Jedwali la kila symbol — msingi wa uchunguzi wote wa uchafuzi.
+    #
+    # `rotation` na `block` zinazungusha NDANI ya symbol, kwa hiyo zinahifadhi
+    # `p_tp` ya kila symbol **kamili**. `shuffle` pekee ndiyo inayoivunja. Kwa
+    # hiyo tofauti kubwa kati ya symbols inatosha kuchafua null mbili kati ya
+    # tatu, bila uvujaji wowote wa muda kuhusika.
+    per_symbol = joined.groupby("symbol").agg(
+        n=("y", "size"), p_tp=("y", "mean"), r_net=("r_net", "mean")
+    ).sort_values("p_tp")
+    span_p = float(per_symbol["p_tp"].max() - per_symbol["p_tp"].min())
+    span_r = float(per_symbol["r_net"].max() - per_symbol["r_net"].min())
+    print(f"   {'symbol':<8} {'n':>7} {'p_tp':>8} {'R halisi':>10}")
+    for name, row in per_symbol.iterrows():
+        print(f"   {name:<8} {int(row['n']):>7,} {row['p_tp']:>8.4f} {row['r_net']:>+10.4f}")
+    print(f"   utofauti kati ya symbols: p_tp {span_p:.4f} · R {span_r:.4f}\n")
 
     halisi = _run(joined, "y")
     if halisi is None:
         print("rows zilizopata score hazitoshi", file=sys.stderr)
         return 2
     njia = f"{args.mode} ({args.block})" if args.mode == "block" else args.mode
-    print(f"PLACEBO — model `{args.model}` · njia `{njia}` · marudio {args.reps}")
+    upeo = " · NDANI YA SYMBOL" if args.within_symbol else ""
+    print(f"PLACEBO — model `{args.model}` · njia `{njia}` · marudio {args.reps}{upeo}")
     print("labels zimeharibiwa; features, folds na uzito ni vile vile.\n")
     print(f"   HALISI:  rho {halisi['rho']:+.4f} · top fitted {halisi['top_fitted']:.4f} "
           f"· top R {halisi['top_r_net']:+.4f}\n")
@@ -2362,6 +2394,8 @@ def cmd_placebo(args: argparse.Namespace) -> int:
         print("   null iko kwenye msingi — haijahifadhi taarifa.")
 
     tag = f"{args.mode}{args.block}" if args.mode == "block" else args.mode
+    if args.within_symbol:
+        tag += "_ndani"
     out_path = data["reports"] / "r3" / f"placebo_{args.model}_{tag}.json"
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(
@@ -2374,6 +2408,10 @@ def cmd_placebo(args: argparse.Namespace) -> int:
                 "reps_ok": len(null),
                 "seed": args.seed,
                 "weighted": not args.unweighted,
+                "within_symbol": bool(args.within_symbol),
+                "per_symbol": per_symbol.reset_index().to_dict(orient="records"),
+                "span_p_tp": span_p,
+                "span_r_net": span_r,
                 "cell": list(data["cell"]),
                 "observed": halisi,
                 "base_r_net": base_r,
@@ -2863,6 +2901,12 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p_plac.add_argument("--seed", type=int, default=20260814)
     p_plac.add_argument("--unweighted", action="store_true")
+    p_plac.add_argument(
+        "--within-symbol",
+        action="store_true",
+        help="ondoa base rate ya kila symbol kabla ya kupima — inatenganisha "
+             "ujuzi wa WAKATI na utambuzi wa SYMBOL",
+    )
     p_plac.set_defaults(func=cmd_placebo)
 
     p_split = subparsers.add_parser(

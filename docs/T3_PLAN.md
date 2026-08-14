@@ -482,6 +482,72 @@ python -m src.data.cli placebo --mode block --reps 200
 
 Marudio 20 yana p ndogo kabisa ya `1/21 = 0.048`. Dai lolote lenye nguvu linahitaji ≥ 200.
 
+#### MATOKEO — 2026-08-14 · `block (32)` · marudio 200
+
+| Takwimu | Halisi | null p50 | null p95 | null max | p |
+|---|---|---|---|---|---|
+| discrimination `ρ` | +0.8182 | +0.4219 | **+0.8545** | +0.9273 | **0.075** |
+| top fitted | +0.3159 | +0.2985 | +0.3126 | +0.3173 | 0.025 |
+| top `R` halisi | +0.0661 | +0.0283 | +0.0864 | +0.1160 | **0.124** |
+
+**Ukaguzi wa null: +0.0283 dhidi ya msingi −0.0163 — IMECHAFULIWA TENA.**
+
+### Chanzo halisi cha uchafuzi: si muda, ni SYMBOL
+
+Nilidhani `block` ingetatua tatizo kwa sababu nilidhani uchafuzi ulikuwa wa **kumbukumbu
+ya muda**. Sikuwa sahihi. Jedwali linaonyesha mchoro tofauti kabisa:
+
+| Njia | Inavunja `symbol → label`? | Null imechafuliwa? |
+|---|---|---|
+| `rotation` (ndani ya symbol) | **hapana** | ndiyo (+0.0275) |
+| `block` (ndani ya symbol) | **hapana** | ndiyo (+0.0283) |
+| `shuffle` (kila kitu) | **ndiyo** | **hapana** (−0.0080) |
+
+Mchoro ni safi kabisa: **null zote zinazozungusha NDANI ya symbol zimechafuliwa; ile
+inayovunja mipaka ya symbol haijachafuliwa.** Urefu wa kipande hauhusiki.
+
+Sababu: symbols zina `p_tp` tofauti. Model inaweza kutambua symbol kutoka features
+(`spread_atr`, `atr_pct`, mgawanyo wa `rsi` — vyote vina alama ya symbol), kisha
+kutabiri base rate ya symbol hiyo. Hiyo inatoa:
+
+* deciles zinazopanda (`ρ` chanya) ✓
+* decile ya juu yenye `p_tp` kubwa ✓
+* decile ya juu yenye `R` bora ✓
+
+...bila **ujuzi wowote wa wakati**. Na kwa sababu mzunguko wa ndani ya symbol unahifadhi
+base rate ya kila symbol kamili, **ujuzi huo unabaki ndani ya null**.
+
+### Hitimisho la hatua 4 — na ni hasi
+
+`rotation` na `block` **zinashikilia base rate ya kila symbol sawa**. Kwa hiyo
+kulinganisha nazo ndiko hasa kupima: *"je model inaongeza chochote ZAIDI ya kujua ni
+symbol ipi?"*
+
+Jibu: **hapana.**
+
+| | p chini ya null inayoshikilia symbol |
+|---|---|
+| discrimination `ρ` | **0.075** — haitoshi |
+| top `R` halisi | **0.124** — haitoshi |
+
+`top fitted` p = 0.025 ni pekee iliyo chini ya 0.05. Ni takwimu dhaifu kuliko zote kati ya
+tatu (inahusu ukubwa wa calibration, si uchumi), iko kwenye ukingo wa null p95 (0.3159
+dhidi ya 0.3126), na ni moja kati ya vipimo vitatu vilivyoangaliwa. Haibebi hitimisho.
+
+**`ρ = 0.8182` iliyoonekana kubwa kwenye hatua 3 ni utambuzi wa symbol, si ujuzi wa
+wakati.** Model haikujifunza *lini* kuchukua trade; ilijifunza *symbol ipi* ina base rate
+kubwa. Hilo si meta-labelling — na base rate tayari inalibeba.
+
+**Amri ya kuthibitisha moja kwa moja** (haigharimu bajeti):
+
+```
+python -m src.data.cli placebo --within-symbol --reps 200
+```
+
+`--within-symbol` inaondoa base rate ya kila symbol kabla ya kupima chochote. Model
+inayojua symbol pekee inaanguka hadi sifuri. Kinachobaki, kikibaki, ndicho ujuzi wa kweli
+wa wakati.
+
 
 
 Random-label na shuffled-score. Pipeline ikitoa matokeo chanya pale hakuna signal, **kila kitu
