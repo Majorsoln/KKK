@@ -2326,8 +2326,30 @@ def cmd_placebo(args: argparse.Namespace) -> int:
             by_symbol = joined.groupby("symbol")[column].mean().reindex(per_symbol.index)
             mechanism[column] = float(spearman(by_symbol.to_numpy(), per_symbol["r_net"].to_numpy()))
     if mechanism:
+        # Symbols 12 SI observations 12. Sarafu 6 zinazounda jozi 12 zinatoa
+        # blocs chache zaidi: EUR-crosses zinasogea pamoja, JPY-crosses pamoja,
+        # dollar za commodity pamoja. `ρ` ya jozi 12 ikihukumiwa kama n = 12
+        # inarudia kosa lile lile la `effective-n` (mapitio ya nje: *"you cannot
+        # infer effective N from raw instrument count"*), likiwa kwenye mhimili
+        # wa cross-section badala ya wa muda.
+        from .effective_n import participation_ratio
+
+        panel = joined.pivot_table(
+            index=joined["decision_time"].dt.floor("1D"),
+            columns="symbol", values="r_net", aggfunc="mean",
+        ).sort_index()
+        blocs = participation_ratio(panel)
+        # Fisher: `ρ` inayohitajika kwa 5% ya upande mmoja kwa n huru.
+        rho_crit = 1.645 / np.sqrt(max(blocs - 1.0, 1.0))
         detail = " · ".join(f"{name} ρ {value:+.3f}" for name, value in mechanism.items())
         print(f"   mpangilio dhidi ya trendiness (bila label): {detail}")
+        print(f"   blocs huru {blocs:.2f} (si {k}) → ρ inayohitajika {rho_crit:.3f} "
+              f"kwa 5% ya upande mmoja")
+        best = max(mechanism.values())
+        print("   " + ("utaratibu UMETHIBITIKA" if best >= rho_crit
+                       else f"HAIJATHIBITIKA — kubwa ni {best:+.3f}, pungufu ya {rho_crit:.3f}"))
+        mechanism["_blocs"] = blocs
+        mechanism["_rho_required"] = float(rho_crit)
     print()
 
     halisi = _run(joined, "y")

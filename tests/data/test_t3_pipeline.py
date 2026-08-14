@@ -463,3 +463,18 @@ def test_jedwali_la_symbols_lina_mpaka_wa_chini(tree, capsys):
         # ya multiplicity hayafanyi kazi na bendera ni ya uongo.
         assert row["r_net_fwer"] <= row["r_net_p5"] <= row["r_net"]
     assert 0.0 < payload["fwer_percentile"] < 5.0
+
+
+def test_trendiness_inahukumiwa_kwa_blocs_huru_si_idadi_ya_symbols(tree, capsys):
+    """Jozi 12 kutoka sarafu 6 si observations 12 — ni kosa la `effective-n`
+    likirudiwa kwenye mhimili wa cross-section."""
+    main(["--config", CONFIG, "build-features", "--symbols", ",".join(SYMBOLS)])
+    main(["--config", CONFIG, "placebo", "--symbols", ",".join(SYMBOLS), "--reps", "5"])
+    out = capsys.readouterr().out
+    assert "blocs huru" in out and "inayohitajika" in out
+    payload = json.loads(
+        (tree / "reports" / "r3" / "placebo_logistic_block32.json").read_text(encoding="utf-8")
+    )
+    mech = payload["mechanism_spearman"]
+    assert 0 < mech["_blocs"] <= len(SYMBOLS)
+    assert mech["_rho_required"] > 0

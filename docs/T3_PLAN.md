@@ -659,6 +659,84 @@ zinazotrend (JPY crosses) zinailipa.
 Points 12 pekee, kwa hiyo `ρ` hii ni dalili, si ushahidi. Lakini ndiyo tofauti kati ya
 nadharia inayoweza kupimwa na uchimbaji.
 
+#### MATOKEO — 2026-08-14
+
+| symbol | `R` | p5 | **FWER** |
+|---|---|---|---|
+| EURCHF | −0.1273 | −0.1683 | **−0.2032** |
+| EURGBP | −0.1217 | −0.1592 | **−0.1795** |
+| … | … | … | … |
+| EURJPY | +0.0230 | −0.0095 | −0.0288 |
+| GBPJPY | +0.0609 | −0.0263 | −0.0632 |
+| USDJPY | +0.0687 | +0.0168 | **−0.0094** |
+
+**Hakuna symbol yenye FWER chanya.** USDJPY, iliyokuwa na p5 chanya, imeanguka hadi
+−0.0094 marekebisho ya multiplicity yalipowekwa. (Utabiri wangu ulikuwa −0.022; mwelekeo
+sahihi, ukubwa umekosea kwa 0.013.)
+
+Upande wa kuondoa unashikilia kwa nguvu: EURCHF **−0.2032**, EURGBP **−0.1795**.
+
+**Trendiness: `eff_ratio_24h` ρ +0.545 · `adx14` ρ +0.434.**
+
+Mwelekeo ni sahihi — vipimo vyote viwili, vikihesabiwa **bila kujua label yoyote**,
+vinapanga symbols kwa mpangilio unaokaribiana na wa `R`. Nadharia haijakanushwa.
+
+Lakini **jozi 12 si observations 12**. Sarafu 6 zinazounda jozi hizo zinatoa blocs
+chache: EUR-crosses zinasogea pamoja, JPY-crosses pamoja, dollar za commodity pamoja.
+Participation ratio ni **7.54**, kwa hiyo `ρ` inayohitajika kwa 5% ni **0.643** — si 0.497
+ya `n = 12`.
+
+**+0.545 < 0.643. HAIJATHIBITIKA.**
+
+Hili ni kosa lile lile la `effective-n` — "instrument count si observation count" — likiwa
+limehamia kwenye mhimili wa cross-section badala ya ule wa muda. `placebo` sasa
+inalihesabu yenyewe na kuripoti kizingiti, si kuacha jicho lihukumu.
+
+## 9. Hitimisho la T3 — kilichojulikana baada ya configs 2
+
+**Kinachoshikilia:**
+
+1. **EURCHF na EURGBP zinapoteza 0.12 R kila trade**, mbali kabisa na kelele, zikishikilia
+   baada ya marekebisho ya symbols 12. Ndiyo ugunduzi pekee wa mradi huu unaosimama peke
+   yake.
+2. **Pipeline ni safi** — `shuffle` haikuonyesha uchafuzi, na uvujaji wa muda haukupatikana
+   popote.
+3. **Ujuzi wa wakati upo lakini ni dhaifu** — `ρ` 0.5152 ndani ya symbol, p 0.040.
+
+**Kisichoshikilia:**
+
+1. `ρ = 0.8182` ya hatua 3 — **sehemu kubwa ilikuwa utambuzi wa symbol**.
+2. `+0.0661 R` ya decile ya juu — p 0.119, si tofauti na kelele.
+3. USDJPY kama symbol ya kuchagua — FWER −0.0094.
+4. Nadharia ya trendiness — mwelekeo sahihi, ushahidi pungufu (0.545 dhidi ya 0.643).
+
+**Kilichoshindwa si model. Ni mkabala.**
+
+Tulitumia bajeti kutafuta lift ya **+0.0751 R** kutoka kwa model, wakati:
+
+* utofauti kati ya symbols ni **0.1959 R** — mara 2.6 ya lengo;
+* msingi wa SETUP-v1 ni **−0.0163 R**, yaani model ilipaswa kwanza kulipa hasara kabla ya
+  kuanza kutafuta faida;
+* kizuizi cha kupima sheria yoyote ya cross-section si rows (25,314) bali **blocs (7.54)**.
+
+Model haikuwa kizuizi siku moja. §3.9 iliahirisha upanuzi wa symbols kwa sababu `N_eff`
+ilitosha — na ilitosha, **kwenye mhimili wa muda**. Mhimili unaobana ni mwingine.
+
+### Hatua inayofuata — kipimo kimoja, bila bajeti
+
+```
+python -m src.data.cli cost-audit --cell 2.0/3.0 --symbols <zote ISIPOKUWA EURCHF,EURGBP>
+```
+
+Swali: msingi wa pool ukiondoa mbili zilizothibitika kupoteza, `ev_r_net` inakuwa nini?
+Ikitoka −0.0163 kwenda karibu na sifuri, **lengo lote la T3 linabadilika** — na linabadilika
+kwa kipimo, si kwa model.
+
+**Ukiri wa lazima:** uteuzi huu umetokana na jedwali la `placebo` la 2026-08-14. Ni uteuzi
+juu ya label, umefanywa kwa macho wazi, na umewekwa hapa ili usije ukasahaulika.
+`cost-audit` ni **kipimo**, si tathmini ya strategy, kwa hiyo haigharimu config — lakini
+kutumia matokeo yake kuchagua strategy kutagharimu.
+
 
 
 Random-label na shuffled-score. Pipeline ikitoa matokeo chanya pale hakuna signal, **kila kitu
