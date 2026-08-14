@@ -114,6 +114,35 @@ def test_ci_inatoka_block_bootstrap_ya_mwaka():
     assert result.ci_low < result.matched_diff < result.ci_high
 
 
+def test_bootstrap_haikimbii_kwa_kujiita_yenyewe():
+    """Ukubwa halisi wa data, bootstrap kamili — lazima imalize kwa sekunde.
+
+    Toleo la kwanza lilijenga frame upya kwa kila sampuli na kujiita lenyewe,
+    likimaanisha `agg("|".join, axis=1)` (row-wise Python) mara 500 juu ya rows
+    52,000. PD aliiacha ikikimbia **zaidi ya saa tano** bila output hata mstari
+    mmoja. Test hii inashika kurudi kwa kasoro hiyo: ikirudi, suite nzima
+    itaning'inia badala ya kufeli kimya.
+    """
+    import time
+
+    frame = build_strata(_frame(n=50_000, effect=0.02, confound=0.3, seed=9))
+    started = time.monotonic()
+    result = matched_effect(frame, n_boot=300)
+    elapsed = time.monotonic() - started
+
+    assert np.isfinite(result.ci_low) and np.isfinite(result.ci_high)
+    assert result.ci_low < result.matched_diff < result.ci_high
+    assert elapsed < 60, f"bootstrap ilichukua {elapsed:.0f}s — kasoro ya kurudi imerudi"
+
+
+def test_bootstrap_haibadilishi_makadirio_ya_kati():
+    """CI ni nyongeza — haipaswi kuhamisha jibu lenyewe."""
+    frame = build_strata(_frame(n=6000, effect=0.08, confound=0.2, seed=10))
+    bila = matched_effect(frame, n_boot=0)
+    nayo = matched_effect(frame, n_boot=200)
+    assert nayo.matched_diff == pytest.approx(bila.matched_diff)
+
+
 def test_strata_zinajengwa_kwa_data_yote_si_kwa_kundi():
     """Bins zilizohesabiwa kwa kila kundi peke yake si bins zinazolingana."""
     frame = build_strata(_frame(n=1000, seed=6))

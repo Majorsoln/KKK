@@ -135,6 +135,14 @@ def matched_effect(
 
     CI inatoka **block bootstrap kwa mwaka** — resampling ya rows moja moja
     ingedhania uhuru ambao haupo (labels zinapishana, symbols zinahusiana).
+
+    **Bootstrap inafanyika kwenye jedwali lililokusanywa, si kwenye rows.**
+    Toleo la kwanza lilijenga frame upya kwa kila sampuli na kuiita function hii
+    tena — ikimaanisha `agg("|".join, axis=1)` (row-wise Python) mara 500 juu ya
+    rows 52,000. Ni **milioni 26 za string joins**, na PD aliiacha ikikimbia
+    **zaidi ya saa tano** bila output hata mstari mmoja. Sasa strata
+    zinakusanywa MARA MOJA kwenda `(mwaka, stratum)`, na kila sampuli ni
+    `bincount` chache — sekunde, si masaa.
     """
     result = MatchResult(cell=cell)
     if frame.empty:
@@ -150,7 +158,10 @@ def matched_effect(
 
     result.raw_diff = float(setups[outcome].mean() - controls[outcome].mean())
 
-    key = frame[list(strata)].astype(str).agg("|".join, axis=1)
+    # Ufungaji wa strata kwa VECTOR, si `agg(axis=1)`. Tofauti ni mara ~200.
+    key = frame[strata[0]].astype(str)
+    for column in strata[1:]:
+        key = key.str.cat(frame[column].astype(str), sep="|")
     work = frame.assign(_stratum=key)
     grouped = work.groupby("_stratum", sort=False)
 
@@ -195,22 +206,68 @@ def matched_effect(
             "control inayolingana; makadirio ni ya sehemu ndogo ya kundi"
         )
 
-    # Block bootstrap kwa mwaka.
-    rng = np.random.RandomState(seed)
-    years = sorted(work["year"].unique()) if "year" in work else []
-    if len(years) >= 3:
-        samples = []
-        for _ in range(n_boot):
-            picked = rng.choice(years, size=len(years), replace=True)
-            chunk = pd.concat([work[work["year"] == y] for y in picked], ignore_index=True)
-            sub = matched_effect(
-                chunk, outcome=outcome, strata=strata, cell=cell, n_boot=0
-            )
-            if np.isfinite(sub.matched_diff):
-                samples.append(sub.matched_diff)
-        if len(samples) >= 20:
-            result.ci_low = float(np.percentile(samples, 5))
-            result.ci_high = float(np.percentile(samples, 95))
-    else:
-        result.notes.append("miaka chini ya 3 — block bootstrap haijafanyika")
+    if n_boot > 0:
+        low, high, note = _block_bootstrap(work, outcome, n_boot, seed)
+        result.ci_low, result.ci_high = low, high
+        if note:
+            result.notes.append(note)
     return result
+
+
+def _block_bootstrap(
+    work: pd.DataFrame, outcome: str, n_boot: int, seed: int
+) -> tuple[float, float, str]:
+    """CI kwa kuchagua MIAKA upya — ikifanyika kwenye jedwali lililokusanywa.
+
+    Kila sampuli ni `bincount` nne juu ya rows chache elfu za `(mwaka, stratum)`,
+    si ujenzi upya wa frame ya rows 52,000. Hakuna Python loop juu ya rows.
+    """
+    if "year" not in work.columns or work["year"].nunique() < 3:
+        return float("nan"), float("nan"), "miaka chini ya 3 — bootstrap haijafanyika"
+
+    is_setup = work["is_setup"].fillna(False).to_numpy()
+    values = work[outcome].to_numpy(dtype=float)
+    year_code, years = pd.factorize(work["year"], sort=True)
+    stratum_code, strata_levels = pd.factorize(work["_stratum"], sort=False)
+
+    n_years, n_strata = len(years), len(strata_levels)
+    flat = year_code * n_strata + stratum_code
+    size = n_years * n_strata
+
+    # Jedwali lililokusanywa: idadi na jumla kwa kila (mwaka, stratum, kundi).
+    n_s = np.bincount(flat[is_setup], minlength=size)
+    s_s = np.bincount(flat[is_setup], weights=values[is_setup], minlength=size)
+    n_c = np.bincount(flat[~is_setup], minlength=size)
+    s_c = np.bincount(flat[~is_setup], weights=values[~is_setup], minlength=size)
+
+    keep = (n_s + n_c) > 0
+    cells_year = (np.arange(size) // n_strata)[keep]
+    cells_stratum = (np.arange(size) % n_strata)[keep]
+    n_s, s_s, n_c, s_c = n_s[keep], s_s[keep], n_c[keep], s_c[keep]
+
+    rng = np.random.RandomState(seed)
+    samples = np.empty(n_boot, dtype=float)
+    taken = 0
+    for _ in range(n_boot):
+        multiplicity = np.bincount(
+            rng.randint(0, n_years, n_years), minlength=n_years
+        ).astype(float)
+        weight = multiplicity[cells_year]
+        ns = np.bincount(cells_stratum, weights=weight * n_s, minlength=n_strata)
+        ss = np.bincount(cells_stratum, weights=weight * s_s, minlength=n_strata)
+        nc = np.bincount(cells_stratum, weights=weight * n_c, minlength=n_strata)
+        sc = np.bincount(cells_stratum, weights=weight * s_c, minlength=n_strata)
+        usable = (ns > 0) & (nc > 0)
+        if not usable.any():
+            continue
+        diff = ss[usable] / ns[usable] - sc[usable] / nc[usable]
+        samples[taken] = float(np.average(diff, weights=ns[usable]))
+        taken += 1
+
+    if taken < 20:
+        return float("nan"), float("nan"), "sampuli chache mno za bootstrap"
+    return (
+        float(np.percentile(samples[:taken], 5)),
+        float(np.percentile(samples[:taken], 95)),
+        "",
+    )
