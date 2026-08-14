@@ -1,0 +1,314 @@
+{
+  "partitions": 25510,
+  "unit": "siku",
+  "legacy": false,
+  "stale": "",
+  "checks": {
+    "clock_drift": {
+      "direction": "max",
+      "measured": 34089,
+      "current_threshold": 60.0,
+      "thresholds": [
+        60.0
+      ],
+      "failing_now": 0,
+      "quantiles": {
+        "p0.1": 0.0,
+        "p1": 0.0,
+        "p5": 0.0,
+        "p10": 0.0,
+        "p50": 0.0,
+        "p90": 0.0,
+        "p95": 0.0,
+        "p99": 0.0,
+        "p99.9": 0.0
+      },
+      "min": 0.0,
+      "max": 0.0,
+      "candidates": [],
+      "top_offenders": {}
+    },
+    "coverage": {
+      "direction": "min",
+      "measured": 32275,
+      "current_threshold": 0.95,
+      "thresholds": [
+        0.95
+      ],
+      "failing_now": 250,
+      "quantiles": {
+        "p0.1": 0.8129,
+        "p1": 0.9545,
+        "p5": 0.9916,
+        "p10": 0.9958,
+        "p50": 1.0,
+        "p90": 1.0028,
+        "p95": 1.0042,
+        "p99": 1.0105,
+        "p99.9": 1.0476
+      },
+      "min": 0.0428,
+      "max": 1.2018,
+      "candidates": [
+        {
+          "threshold": 0.8129,
+          "would_fail": 33
+        },
+        {
+          "threshold": 0.9545,
+          "would_fail": 299
+        },
+        {
+          "threshold": 0.9916,
+          "would_fail": 1535
+        },
+        {
+          "threshold": 0.9958,
+          "would_fail": 3200
+        }
+      ],
+      "top_offenders": {
+        "XAUUSD/2024": 11,
+        "XAUUSD/2025": 10,
+        "XAUUSD/2020": 9,
+        "XAUUSD/2022": 9,
+        "XAUUSD/2016": 8,
+        "XAUUSD/2017": 8,
+        "XAUUSD/2018": 8,
+        "XAUUSD/2019": 8
+      }
+    },
+    "gaps": {
+      "direction": "max",
+      "measured": 34088,
+      "current_threshold": null,
+      "thresholds": [
+        3600.0,
+        5400.0
+      ],
+      "failing_now": 178,
+      "quantiles": {
+        "p0.1": 10.4361,
+        "p1": 23.1497,
+        "p5": 41.8157,
+        "p10": 54.0961,
+        "p50": 126.2725,
+        "p90": 366.0771,
+        "p95": 3600.8363,
+        "p99": 3678.2335,
+        "p99.9": 50759.5952
+      },
+      "min": 4.514,
+      "max": 76005.224,
+      "candidates": [
+        {
+          "threshold": 366.0771,
+          "would_fail": 3409
+        },
+        {
+          "threshold": 3600.8363,
+          "would_fail": 1705
+        },
+        {
+          "threshold": 3678.2335,
+          "would_fail": 341
+        },
+        {
+          "threshold": 50759.5952,
+          "would_fail": 35
+        }
+      ],
+      "top_offenders": {
+        "XAUUSD/2022": 7,
+        "XAUUSD/2024": 7,
+        "XAUUSD/2016": 6,
+        "XAUUSD/2017": 6,
+        "XAUUSD/2018": 6,
+        "XAUUSD/2019": 6,
+        "XAUUSD/2025": 6,
+        "XAUUSD/2020": 5
+      }
+    },
+    "monotonicity": {
+      "direction": "max",
+      "measured": 34089,
+      "current_threshold": 0.0,
+      "thresholds": [
+        0.0
+      ],
+      "failing_now": 33,
+      "quantiles": {
+        "p0.1": 0.0,
+        "p1": 0.0,
+        "p5": 0.0,
+        "p10": 0.0,
+        "p50": 0.0,
+        "p90": 0.0,
+        "p95": 0.0,
+        "p99": 1.0,
+        "p99.9": 48.12
+      },
+      "min": 0.0,
+      "max": 14005.0,
+      "candidates": [
+        {
+          "threshold": 0.0,
+          "would_fail": 372
+        },
+        {
+          "threshold": 1.0,
+          "would_fail": 204
+        },
+        {
+          "threshold": 48.12,
+          "would_fail": 35
+        }
+      ],
+      "top_offenders": {
+        "EURCHF/2018": 5,
+        "GBPJPY/2018": 5,
+        "GBPJPY/2016": 2,
+        "XAUUSD/2016": 2,
+        "EURCHF/2016": 1,
+        "EURCHF/2019": 1,
+        "EURCHF/2020": 1,
+        "EURCHF/2021": 1
+      }
+    },
+    "quote_sanity": {
+      "direction": "max",
+      "measured": 34089,
+      "current_threshold": 0.0,
+      "thresholds": [
+        0.0
+      ],
+      "failing_now": 6,
+      "quantiles": {
+        "p0.1": 0.0,
+        "p1": 0.0,
+        "p5": 0.0,
+        "p10": 0.0,
+        "p50": 0.0,
+        "p90": 0.0,
+        "p95": 0.0,
+        "p99": 0.0,
+        "p99.9": 0.0
+      },
+      "min": 0.0,
+      "max": 1361.0,
+      "candidates": [
+        {
+          "threshold": 0.0,
+          "would_fail": 6
+        }
+      ],
+      "top_offenders": {
+        "AUDUSD/2024": 2,
+        "EURUSD/2024": 2,
+        "EURCHF/2016": 1,
+        "XAUUSD/2016": 1
+      }
+    },
+    "session_match": {
+      "direction": "max",
+      "measured": 32275,
+      "current_threshold": 15.0,
+      "thresholds": [
+        15.0
+      ],
+      "failing_now": 131,
+      "quantiles": {
+        "p0.1": 0.0,
+        "p1": 0.0,
+        "p5": 0.0,
+        "p10": 0.0,
+        "p50": 0.04,
+        "p90": 0.26,
+        "p95": 0.54,
+        "p99": 59.95,
+        "p99.9": 195.7224
+      },
+      "min": 0.0,
+      "max": 1381.02,
+      "candidates": [
+        {
+          "threshold": 0.26,
+          "would_fail": 3151
+        },
+        {
+          "threshold": 0.54,
+          "would_fail": 1596
+        },
+        {
+          "threshold": 59.95,
+          "would_fail": 321
+        },
+        {
+          "threshold": 195.7224,
+          "would_fail": 33
+        }
+      ],
+      "top_offenders": {
+        "XAUUSD/2025": 7,
+        "XAUUSD/2026": 7,
+        "XAUUSD/2020": 6,
+        "XAUUSD/2019": 5,
+        "XAUUSD/2024": 5,
+        "XAUUSD/2018": 4,
+        "XAUUSD/2021": 4,
+        "EURCHF/2026": 3
+      }
+    },
+    "stale_feed": {
+      "direction": "max",
+      "measured": 34088,
+      "current_threshold": null,
+      "thresholds": [
+        1800.0,
+        5400.0
+      ],
+      "failing_now": 213,
+      "quantiles": {
+        "p0.1": 10.6174,
+        "p1": 24.3,
+        "p5": 46.6,
+        "p10": 59.9,
+        "p50": 139.05,
+        "p90": 386.79,
+        "p95": 3600.8,
+        "p99": 3685.239,
+        "p99.9": 50759.5996
+      },
+      "min": 4.5,
+      "max": 76005.2,
+      "candidates": [
+        {
+          "threshold": 386.79,
+          "would_fail": 3409
+        },
+        {
+          "threshold": 3600.8,
+          "would_fail": 1701
+        },
+        {
+          "threshold": 3685.239,
+          "would_fail": 341
+        },
+        {
+          "threshold": 50759.5996,
+          "would_fail": 35
+        }
+      ],
+      "top_offenders": {
+        "XAUUSD/2016": 7,
+        "XAUUSD/2022": 7,
+        "XAUUSD/2024": 7,
+        "XAUUSD/2017": 6,
+        "XAUUSD/2018": 6,
+        "XAUUSD/2019": 6,
+        "XAUUSD/2025": 6,
+        "GBPJPY/2025": 5
+      }
+    }
+  }
+}

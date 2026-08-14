@@ -1,0 +1,63 @@
+{
+  "symbol": "EURUSD",
+  "earliest_available": "2026-04-27",
+  "probes": [
+    {
+      "day": "2026-08-05",
+      "weekday": "Wednesday",
+      "has_ticks": true
+    },
+    {
+      "day": "2025-01-02",
+      "weekday": "Thursday",
+      "has_ticks": false
+    },
+    {
+      "day": "2025-10-17",
+      "weekday": "Friday",
+      "has_ticks": false
+    },
+    {
+      "day": "2026-03-13",
+      "weekday": "Friday",
+      "has_ticks": false
+    },
+    {
+      "day": "2026-05-25",
+      "weekday": "Monday",
+      "has_ticks": true
+    },
+    {
+      "day": "2026-04-17",
+      "weekday": "Friday",
+      "has_ticks": false
+    },
+    {
+      "day": "2026-05-06",
+      "weekday": "Wednesday",
+      "has_ticks": true
+    },
+    {
+      "day": "2026-04-27",
+      "weekday": "Monday",
+      "has_ticks": true
+    },
+    {
+      "day": "2026-04-22",
+      "weekday": "Wednesday",
+      "has_ticks": false
+    },
+    {
+      "day": "2026-04-23",
+      "weekday": "Thursday",
+      "has_ticks": false
+    },
+    {
+      "day": "2026-04-24",
+      "weekday": "Friday",
+      "has_ticks": false
+    }
+  ],
+  "checked": "2025-01-01 -> 2026-08-05",
+  "trading_days_in_window": 413
+}

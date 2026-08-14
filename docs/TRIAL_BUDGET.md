@@ -53,3 +53,4 @@ Kila **evaluation ya model dhidi ya labels**. Configs zinazohusiana zinapungua k
 
 | # | Tarehe (UTC) | Config | Aina | Uzito | Imebaki | Sababu |
 |---|---|---|---|---|---|---|
+| 1 | 2026-08-14T16:04:18+00:00 | `setup-effect-2.0-3.0` | EVALUATION | 1.000 | 6.548 | athari ya SETUP-v1 haielezwi na mazingira: +0.0348 R ndani ya strata (ATR/spread/session/symbol/mwaka), imepungua 32% kutoka +0.0515 ghafi, CI 90% [+0.0051, +0.0612] haiguzi sifuri, common support 96.4%. Momentum HAIKUDHIBITIWA - ndiyo treatment yenyewe |

@@ -1,0 +1,95 @@
+{
+  "built_at": "2026-08-10T21:18:23+00:00",
+  "config_hash": "sha256:8110cb5bd6d5d4f61a897fa56167bf1719c4287019305fa40731c3d0b11962a1",
+  "variants": {
+    "A": {
+      "declared_columns": [
+        "timestamp",
+        "bid",
+        "ask",
+        "bid_vol",
+        "ask_vol"
+      ],
+      "precision": "us",
+      "symbols": [
+        "AUDUSD",
+        "EURGBP",
+        "EURJPY",
+        "EURUSD",
+        "GBPUSD",
+        "NZDUSD",
+        "USDCAD",
+        "USDCHF",
+        "USDJPY"
+      ],
+      "partitions": 24913,
+      "sample_partition": "C:\\Users\\Hp\\project\\elitefx-engine\\scripts\\..\\research\\data\\L0_raw\\provenance=aggregator\\symbol=GBPUSD\\year=2022\\month=06\\day=20\\ticks.parquet",
+      "sample_symbol": "GBPUSD",
+      "canonical_columns": [
+        "timestamp",
+        "bid",
+        "ask",
+        "bid_vol",
+        "ask_vol"
+      ],
+      "timestamp_dtype": "datetime64[us, UTC]",
+      "sample_stats": {
+        "rows": 130760,
+        "minutes_with_quotes": 1432,
+        "spread_p50_pips": 1.0,
+        "spread_p95_pips": 1.5,
+        "first_ts": "2022-06-20T00:00:00.070000+00:00",
+        "last_ts": "2022-06-20T23:59:57.296000+00:00"
+      }
+    },
+    "B": {
+      "declared_columns": [
+        "ts",
+        "bid",
+        "ask",
+        "bid_volume",
+        "ask_volume"
+      ],
+      "precision": "ms",
+      "symbols": [
+        "EURCHF",
+        "GBPJPY",
+        "XAUUSD"
+      ],
+      "partitions": 597,
+      "sample_partition": "C:\\Users\\Hp\\project\\elitefx-engine\\scripts\\..\\research\\data\\L0_raw\\provenance=aggregator\\symbol=XAUUSD\\year=2020\\month=03\\ticks-2020-03.parquet",
+      "sample_symbol": "XAUUSD",
+      "canonical_columns": [
+        "timestamp",
+        "bid",
+        "ask",
+        "bid_vol",
+        "ask_vol"
+      ],
+      "timestamp_dtype": "datetime64[us, UTC]",
+      "sample_stats": {
+        "rows": 6638885,
+        "minutes_with_quotes": 30624,
+        "spread_p50_pips": 36.4,
+        "spread_p95_pips": 151.4,
+        "first_ts": "2020-03-01T23:00:00.444000+00:00",
+        "last_ts": "2020-04-01T04:59:58.839000+00:00"
+      }
+    }
+  },
+  "canonical_schema_identical": true,
+  "median_minutes_by_symbol": {
+    "AUDUSD": 1434.0,
+    "EURCHF": 1428.0,
+    "EURGBP": 1434.0,
+    "EURJPY": 1436.0,
+    "EURUSD": 1436.0,
+    "GBPJPY": 1435.0,
+    "GBPUSD": 1436.0,
+    "NZDUSD": 1433.0,
+    "USDCAD": 1435.0,
+    "USDCHF": 1430.0,
+    "USDJPY": 1436.0,
+    "XAUUSD": 1379.0
+  }
+}

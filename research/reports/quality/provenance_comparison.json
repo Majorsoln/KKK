@@ -1,0 +1,1104 @@
+{
+  "built_at": "2026-08-10T21:22:08+00:00",
+  "config_hash": "sha256:8110cb5bd6d5d4f61a897fa56167bf1719c4287019305fa40731c3d0b11962a1",
+  "overlap_days": [
+    "2026-04-27",
+    "2026-04-28",
+    "2026-04-29",
+    "2026-04-30",
+    "2026-05-01"
+  ],
+  "symbols": [
+    "AUDUSD",
+    "EURCHF",
+    "EURGBP",
+    "EURJPY",
+    "EURUSD",
+    "GBPJPY",
+    "GBPUSD",
+    "NZDUSD",
+    "USDCAD",
+    "USDCHF",
+    "USDJPY",
+    "XAUUSD"
+  ],
+  "comparisons": 51,
+  "spread_p50_ratio": {
+    "median": 1.0,
+    "min": 0.8714,
+    "max": 1.0
+  },
+  "rows": [
+    {
+      "symbol": "AUDUSD",
+      "day": "2026-04-27",
+      "aggregator": {
+        "ticks": 55630,
+        "minutes": 1424,
+        "spread_p50": 0.9,
+        "spread_p95": 1.1,
+        "spread_mean": 0.914
+      },
+      "broker": {
+        "ticks": 55943,
+        "minutes": 1432,
+        "spread_p50": 0.9,
+        "spread_p95": 1.2,
+        "spread_mean": 0.9587
+      },
+      "spread_p50_diff_pips": 0.0,
+      "spread_p50_ratio": 1.0,
+      "tick_ratio": 1.0056
+    },
+    {
+      "symbol": "AUDUSD",
+      "day": "2026-04-28",
+      "aggregator": {
+        "ticks": 82198,
+        "minutes": 1427,
+        "spread_p50": 0.9,
+        "spread_p95": 1.1,
+        "spread_mean": 0.9113
+      },
+      "broker": {
+        "ticks": 80796,
+        "minutes": 1416,
+        "spread_p50": 0.9,
+        "spread_p95": 1.1,
+        "spread_mean": 0.9045
+      },
+      "spread_p50_diff_pips": 0.0,
+      "spread_p50_ratio": 1.0,
+      "tick_ratio": 0.9829
+    },
+    {
+      "symbol": "AUDUSD",
+      "day": "2026-04-29",
+      "aggregator": {
+        "ticks": 103106,
+        "minutes": 1435,
+        "spread_p50": 0.9,
+        "spread_p95": 1.2,
+        "spread_mean": 0.9077
+      },
+      "broker": {
+        "ticks": 100229,
+        "minutes": 1428,
+        "spread_p50": 0.9,
+        "spread_p95": 1.1,
+        "spread_mean": 0.9055
+      },
+      "spread_p50_diff_pips": 0.0,
+      "spread_p50_ratio": 1.0,
+      "tick_ratio": 0.9721
+    },
+    {
+      "symbol": "AUDUSD",
+      "day": "2026-04-30",
+      "aggregator": {
+        "ticks": 123682,
+        "minutes": 1436,
+        "spread_p50": 0.9,
+        "spread_p95": 1.1,
+        "spread_mean": 0.8935
+      },
+      "broker": {
+        "ticks": 122117,
+        "minutes": 1435,
+        "spread_p50": 0.9,
+        "spread_p95": 1.1,
+        "spread_mean": 0.8947
+      },
+      "spread_p50_diff_pips": 0.0,
+      "spread_p50_ratio": 1.0,
+      "tick_ratio": 0.9873
+    },
+    {
+      "symbol": "EURCHF",
+      "day": "2026-04-27",
+      "aggregator": {
+        "ticks": 43498,
+        "minutes": 1429,
+        "spread_p50": 1.0,
+        "spread_p95": 1.4,
+        "spread_mean": 1.3395
+      },
+      "broker": {
+        "ticks": 42621,
+        "minutes": 1432,
+        "spread_p50": 1.0,
+        "spread_p95": 1.3,
+        "spread_mean": 1.2541
+      },
+      "spread_p50_diff_pips": 0.0,
+      "spread_p50_ratio": 1.0,
+      "tick_ratio": 0.9798
+    },
+    {
+      "symbol": "EURCHF",
+      "day": "2026-04-28",
+      "aggregator": {
+        "ticks": 58904,
+        "minutes": 1428,
+        "spread_p50": 0.9,
+        "spread_p95": 1.2,
+        "spread_mean": 1.036
+      },
+      "broker": {
+        "ticks": 59029,
+        "minutes": 1427,
+        "spread_p50": 0.9,
+        "spread_p95": 1.3,
+        "spread_mean": 1.2031
+      },
+      "spread_p50_diff_pips": 0.0,
+      "spread_p50_ratio": 1.0,
+      "tick_ratio": 1.0021
+    },
+    {
+      "symbol": "EURCHF",
+      "day": "2026-04-29",
+      "aggregator": {
+        "ticks": 65708,
+        "minutes": 1426,
+        "spread_p50": 1.0,
+        "spread_p95": 1.5,
+        "spread_mean": 1.1771
+      },
+      "broker": {
+        "ticks": 63746,
+        "minutes": 1427,
+        "spread_p50": 1.0,
+        "spread_p95": 1.3,
+        "spread_mean": 1.0551
+      },
+      "spread_p50_diff_pips": 0.0,
+      "spread_p50_ratio": 1.0,
+      "tick_ratio": 0.9701
+    },
+    {
+      "symbol": "EURCHF",
+      "day": "2026-04-30",
+      "aggregator": {
+        "ticks": 97176,
+        "minutes": 1436,
+        "spread_p50": 0.9,
+        "spread_p95": 1.2,
+        "spread_mean": 1.1098
+      },
+      "broker": {
+        "ticks": 96781,
+        "minutes": 1427,
+        "spread_p50": 0.9,
+        "spread_p95": 1.3,
+        "spread_mean": 1.0766
+      },
+      "spread_p50_diff_pips": 0.0,
+      "spread_p50_ratio": 1.0,
+      "tick_ratio": 0.9959
+    },
+    {
+      "symbol": "EURCHF",
+      "day": "2026-05-01",
+      "aggregator": {
+        "ticks": 7479,
+        "minutes": 299,
+        "spread_p50": 1.1,
+        "spread_p95": 1.3,
+        "spread_mean": 1.1158
+      },
+      "broker": {
+        "ticks": 67065,
+        "minutes": 1431,
+        "spread_p50": 1.0,
+        "spread_p95": 1.3,
+        "spread_mean": 1.2694
+      },
+      "spread_p50_diff_pips": -0.1,
+      "spread_p50_ratio": 0.9091,
+      "tick_ratio": 8.9671
+    },
+    {
+      "symbol": "EURGBP",
+      "day": "2026-04-27",
+      "aggregator": {
+        "ticks": 50468,
+        "minutes": 1427,
+        "spread_p50": 0.7,
+        "spread_p95": 1.0,
+        "spread_mean": 0.7623
+      },
+      "broker": {
+        "ticks": 47485,
+        "minutes": 1426,
+        "spread_p50": 0.7,
+        "spread_p95": 1.0,
+        "spread_mean": 0.7858
+      },
+      "spread_p50_diff_pips": 0.0,
+      "spread_p50_ratio": 1.0,
+      "tick_ratio": 0.9409
+    },
+    {
+      "symbol": "EURGBP",
+      "day": "2026-04-28",
+      "aggregator": {
+        "ticks": 60733,
+        "minutes": 1426,
+        "spread_p50": 0.7,
+        "spread_p95": 0.9,
+        "spread_mean": 0.7623
+      },
+      "broker": {
+        "ticks": 56695,
+        "minutes": 1428,
+        "spread_p50": 0.7,
+        "spread_p95": 0.9,
+        "spread_mean": 0.7448
+      },
+      "spread_p50_diff_pips": 0.0,
+      "spread_p50_ratio": 1.0,
+      "tick_ratio": 0.9335
+    },
+    {
+      "symbol": "EURGBP",
+      "day": "2026-04-29",
+      "aggregator": {
+        "ticks": 63399,
+        "minutes": 1434,
+        "spread_p50": 0.7,
+        "spread_p95": 1.3,
+        "spread_mean": 0.9336
+      },
+      "broker": {
+        "ticks": 57774,
+        "minutes": 1426,
+        "spread_p50": 0.7,
+        "spread_p95": 1.1,
+        "spread_mean": 0.8073
+      },
+      "spread_p50_diff_pips": 0.0,
+      "spread_p50_ratio": 1.0,
+      "tick_ratio": 0.9113
+    },
+    {
+      "symbol": "EURGBP",
+      "day": "2026-04-30",
+      "aggregator": {
+        "ticks": 97575,
+        "minutes": 1435,
+        "spread_p50": 0.7,
+        "spread_p95": 1.0,
+        "spread_mean": 0.7334
+      },
+      "broker": {
+        "ticks": 93268,
+        "minutes": 1435,
+        "spread_p50": 0.7,
+        "spread_p95": 1.0,
+        "spread_mean": 0.8221
+      },
+      "spread_p50_diff_pips": 0.0,
+      "spread_p50_ratio": 1.0,
+      "tick_ratio": 0.9559
+    },
+    {
+      "symbol": "EURJPY",
+      "day": "2026-04-27",
+      "aggregator": {
+        "ticks": 130878,
+        "minutes": 1436,
+        "spread_p50": 0.9,
+        "spread_p95": 1.3,
+        "spread_mean": 1.0106
+      },
+      "broker": {
+        "ticks": 122707,
+        "minutes": 1435,
+        "spread_p50": 0.9,
+        "spread_p95": 1.4,
+        "spread_mean": 0.9961
+      },
+      "spread_p50_diff_pips": 0.0,
+      "spread_p50_ratio": 1.0,
+      "tick_ratio": 0.9376
+    },
+    {
+      "symbol": "EURJPY",
+      "day": "2026-04-28",
+      "aggregator": {
+        "ticks": 161331,
+        "minutes": 1433,
+        "spread_p50": 1.0,
+        "spread_p95": 1.6,
+        "spread_mean": 1.0489
+      },
+      "broker": {
+        "ticks": 159553,
+        "minutes": 1436,
+        "spread_p50": 1.0,
+        "spread_p95": 1.6,
+        "spread_mean": 1.0932
+      },
+      "spread_p50_diff_pips": 0.0,
+      "spread_p50_ratio": 1.0,
+      "tick_ratio": 0.989
+    },
+    {
+      "symbol": "EURJPY",
+      "day": "2026-04-29",
+      "aggregator": {
+        "ticks": 188120,
+        "minutes": 1435,
+        "spread_p50": 1.0,
+        "spread_p95": 1.6,
+        "spread_mean": 1.2192
+      },
+      "broker": {
+        "ticks": 181475,
+        "minutes": 1431,
+        "spread_p50": 1.0,
+        "spread_p95": 1.6,
+        "spread_mean": 1.0972
+      },
+      "spread_p50_diff_pips": 0.0,
+      "spread_p50_ratio": 1.0,
+      "tick_ratio": 0.9647
+    },
+    {
+      "symbol": "EURJPY",
+      "day": "2026-04-30",
+      "aggregator": {
+        "ticks": 292589,
+        "minutes": 1434,
+        "spread_p50": 1.0,
+        "spread_p95": 2.2,
+        "spread_mean": 1.1565
+      },
+      "broker": {
+        "ticks": 284281,
+        "minutes": 1435,
+        "spread_p50": 1.0,
+        "spread_p95": 2.2,
+        "spread_mean": 1.2047
+      },
+      "spread_p50_diff_pips": 0.0,
+      "spread_p50_ratio": 1.0,
+      "tick_ratio": 0.9716
+    },
+    {
+      "symbol": "EURUSD",
+      "day": "2026-04-27",
+      "aggregator": {
+        "ticks": 62346,
+        "minutes": 1436,
+        "spread_p50": 0.3,
+        "spread_p95": 0.5,
+        "spread_mean": 0.3213
+      },
+      "broker": {
+        "ticks": 61779,
+        "minutes": 1435,
+        "spread_p50": 0.3,
+        "spread_p95": 0.5,
+        "spread_mean": 0.3197
+      },
+      "spread_p50_diff_pips": 0.0,
+      "spread_p50_ratio": 1.0,
+      "tick_ratio": 0.9909
+    },
+    {
+      "symbol": "EURUSD",
+      "day": "2026-04-28",
+      "aggregator": {
+        "ticks": 79463,
+        "minutes": 1425,
+        "spread_p50": 0.3,
+        "spread_p95": 0.5,
+        "spread_mean": 0.297
+      },
+      "broker": {
+        "ticks": 79038,
+        "minutes": 1437,
+        "spread_p50": 0.3,
+        "spread_p95": 0.5,
+        "spread_mean": 0.3124
+      },
+      "spread_p50_diff_pips": 0.0,
+      "spread_p50_ratio": 1.0,
+      "tick_ratio": 0.9947
+    },
+    {
+      "symbol": "EURUSD",
+      "day": "2026-04-29",
+      "aggregator": {
+        "ticks": 89470,
+        "minutes": 1434,
+        "spread_p50": 0.3,
+        "spread_p95": 1.1,
+        "spread_mean": 0.6287
+      },
+      "broker": {
+        "ticks": 83469,
+        "minutes": 1425,
+        "spread_p50": 0.3,
+        "spread_p95": 0.5,
+        "spread_mean": 0.3037
+      },
+      "spread_p50_diff_pips": 0.0,
+      "spread_p50_ratio": 1.0,
+      "tick_ratio": 0.9329
+    },
+    {
+      "symbol": "EURUSD",
+      "day": "2026-04-30",
+      "aggregator": {
+        "ticks": 133632,
+        "minutes": 1436,
+        "spread_p50": 0.3,
+        "spread_p95": 0.5,
+        "spread_mean": 0.306
+      },
+      "broker": {
+        "ticks": 135170,
+        "minutes": 1435,
+        "spread_p50": 0.3,
+        "spread_p95": 0.6,
+        "spread_mean": 0.5099
+      },
+      "spread_p50_diff_pips": 0.0,
+      "spread_p50_ratio": 1.0,
+      "tick_ratio": 1.0115
+    },
+    {
+      "symbol": "GBPJPY",
+      "day": "2026-04-27",
+      "aggregator": {
+        "ticks": 102038,
+        "minutes": 1431,
+        "spread_p50": 1.7,
+        "spread_p95": 2.5,
+        "spread_mean": 1.9709
+      },
+      "broker": {
+        "ticks": 100024,
+        "minutes": 1428,
+        "spread_p50": 1.7,
+        "spread_p95": 2.4,
+        "spread_mean": 1.9556
+      },
+      "spread_p50_diff_pips": 0.0,
+      "spread_p50_ratio": 1.0,
+      "tick_ratio": 0.9803
+    },
+    {
+      "symbol": "GBPJPY",
+      "day": "2026-04-28",
+      "aggregator": {
+        "ticks": 132198,
+        "minutes": 1437,
+        "spread_p50": 1.7,
+        "spread_p95": 2.5,
+        "spread_mean": 1.9904
+      },
+      "broker": {
+        "ticks": 132456,
+        "minutes": 1431,
+        "spread_p50": 1.7,
+        "spread_p95": 2.5,
+        "spread_mean": 1.937
+      },
+      "spread_p50_diff_pips": 0.0,
+      "spread_p50_ratio": 1.0,
+      "tick_ratio": 1.002
+    },
+    {
+      "symbol": "GBPJPY",
+      "day": "2026-04-29",
+      "aggregator": {
+        "ticks": 128731,
+        "minutes": 1435,
+        "spread_p50": 1.7,
+        "spread_p95": 3.0,
+        "spread_mean": 2.2088
+      },
+      "broker": {
+        "ticks": 123927,
+        "minutes": 1436,
+        "spread_p50": 1.7,
+        "spread_p95": 2.5,
+        "spread_mean": 1.9851
+      },
+      "spread_p50_diff_pips": 0.0,
+      "spread_p50_ratio": 1.0,
+      "tick_ratio": 0.9627
+    },
+    {
+      "symbol": "GBPJPY",
+      "day": "2026-04-30",
+      "aggregator": {
+        "ticks": 255812,
+        "minutes": 1435,
+        "spread_p50": 1.9,
+        "spread_p95": 3.6,
+        "spread_mean": 2.1752
+      },
+      "broker": {
+        "ticks": 255861,
+        "minutes": 1435,
+        "spread_p50": 1.9,
+        "spread_p95": 3.7,
+        "spread_mean": 2.3133
+      },
+      "spread_p50_diff_pips": 0.0,
+      "spread_p50_ratio": 1.0,
+      "tick_ratio": 1.0002
+    },
+    {
+      "symbol": "GBPJPY",
+      "day": "2026-05-01",
+      "aggregator": {
+        "ticks": 34683,
+        "minutes": 300,
+        "spread_p50": 2.3,
+        "spread_p95": 2.6,
+        "spread_mean": 2.2585
+      },
+      "broker": {
+        "ticks": 189008,
+        "minutes": 1435,
+        "spread_p50": 2.1,
+        "spread_p95": 2.8,
+        "spread_mean": 2.1607
+      },
+      "spread_p50_diff_pips": -0.2,
+      "spread_p50_ratio": 0.913,
+      "tick_ratio": 5.4496
+    },
+    {
+      "symbol": "GBPUSD",
+      "day": "2026-04-27",
+      "aggregator": {
+        "ticks": 72738,
+        "minutes": 1435,
+        "spread_p50": 0.7,
+        "spread_p95": 1.0,
+        "spread_mean": 0.7217
+      },
+      "broker": {
+        "ticks": 71797,
+        "minutes": 1429,
+        "spread_p50": 0.7,
+        "spread_p95": 1.0,
+        "spread_mean": 0.7396
+      },
+      "spread_p50_diff_pips": 0.0,
+      "spread_p50_ratio": 1.0,
+      "tick_ratio": 0.9871
+    },
+    {
+      "symbol": "GBPUSD",
+      "day": "2026-04-28",
+      "aggregator": {
+        "ticks": 94002,
+        "minutes": 1424,
+        "spread_p50": 0.6,
+        "spread_p95": 0.9,
+        "spread_mean": 0.6753
+      },
+      "broker": {
+        "ticks": 95984,
+        "minutes": 1434,
+        "spread_p50": 0.6,
+        "spread_p95": 1.0,
+        "spread_mean": 0.6753
+      },
+      "spread_p50_diff_pips": 0.0,
+      "spread_p50_ratio": 1.0,
+      "tick_ratio": 1.0211
+    },
+    {
+      "symbol": "GBPUSD",
+      "day": "2026-04-29",
+      "aggregator": {
+        "ticks": 93902,
+        "minutes": 1430,
+        "spread_p50": 0.7,
+        "spread_p95": 1.1,
+        "spread_mean": 0.8577
+      },
+      "broker": {
+        "ticks": 90033,
+        "minutes": 1424,
+        "spread_p50": 0.7,
+        "spread_p95": 1.0,
+        "spread_mean": 0.7296
+      },
+      "spread_p50_diff_pips": 0.0,
+      "spread_p50_ratio": 1.0,
+      "tick_ratio": 0.9588
+    },
+    {
+      "symbol": "GBPUSD",
+      "day": "2026-04-30",
+      "aggregator": {
+        "ticks": 142403,
+        "minutes": 1431,
+        "spread_p50": 0.7,
+        "spread_p95": 1.0,
+        "spread_mean": 0.686
+      },
+      "broker": {
+        "ticks": 144451,
+        "minutes": 1429,
+        "spread_p50": 0.7,
+        "spread_p95": 1.0,
+        "spread_mean": 0.7821
+      },
+      "spread_p50_diff_pips": 0.0,
+      "spread_p50_ratio": 1.0,
+      "tick_ratio": 1.0144
+    },
+    {
+      "symbol": "NZDUSD",
+      "day": "2026-04-27",
+      "aggregator": {
+        "ticks": 40106,
+        "minutes": 1428,
+        "spread_p50": 1.0,
+        "spread_p95": 2.5,
+        "spread_mean": 1.1892
+      },
+      "broker": {
+        "ticks": 38095,
+        "minutes": 1431,
+        "spread_p50": 1.0,
+        "spread_p95": 3.4,
+        "spread_mean": 1.2456
+      },
+      "spread_p50_diff_pips": 0.0,
+      "spread_p50_ratio": 1.0,
+      "tick_ratio": 0.9499
+    },
+    {
+      "symbol": "NZDUSD",
+      "day": "2026-04-28",
+      "aggregator": {
+        "ticks": 48522,
+        "minutes": 1425,
+        "spread_p50": 1.0,
+        "spread_p95": 1.7,
+        "spread_mean": 1.1779
+      },
+      "broker": {
+        "ticks": 46533,
+        "minutes": 1429,
+        "spread_p50": 1.0,
+        "spread_p95": 1.4,
+        "spread_mean": 1.1325
+      },
+      "spread_p50_diff_pips": 0.0,
+      "spread_p50_ratio": 1.0,
+      "tick_ratio": 0.959
+    },
+    {
+      "symbol": "NZDUSD",
+      "day": "2026-04-29",
+      "aggregator": {
+        "ticks": 54450,
+        "minutes": 1432,
+        "spread_p50": 1.0,
+        "spread_p95": 1.4,
+        "spread_mean": 1.1736
+      },
+      "broker": {
+        "ticks": 51708,
+        "minutes": 1424,
+        "spread_p50": 1.0,
+        "spread_p95": 1.6,
+        "spread_mean": 1.1709
+      },
+      "spread_p50_diff_pips": 0.0,
+      "spread_p50_ratio": 1.0,
+      "tick_ratio": 0.9496
+    },
+    {
+      "symbol": "NZDUSD",
+      "day": "2026-04-30",
+      "aggregator": {
+        "ticks": 75905,
+        "minutes": 1434,
+        "spread_p50": 1.0,
+        "spread_p95": 1.2,
+        "spread_mean": 1.0217
+      },
+      "broker": {
+        "ticks": 73840,
+        "minutes": 1431,
+        "spread_p50": 1.0,
+        "spread_p95": 1.2,
+        "spread_mean": 1.1043
+      },
+      "spread_p50_diff_pips": 0.0,
+      "spread_p50_ratio": 1.0,
+      "tick_ratio": 0.9728
+    },
+    {
+      "symbol": "USDCAD",
+      "day": "2026-04-27",
+      "aggregator": {
+        "ticks": 56425,
+        "minutes": 1432,
+        "spread_p50": 1.1,
+        "spread_p95": 1.4,
+        "spread_mean": 1.1241
+      },
+      "broker": {
+        "ticks": 48570,
+        "minutes": 1434,
+        "spread_p50": 1.1,
+        "spread_p95": 1.5,
+        "spread_mean": 1.1729
+      },
+      "spread_p50_diff_pips": 0.0,
+      "spread_p50_ratio": 1.0,
+      "tick_ratio": 0.8608
+    },
+    {
+      "symbol": "USDCAD",
+      "day": "2026-04-28",
+      "aggregator": {
+        "ticks": 76669,
+        "minutes": 1426,
+        "spread_p50": 1.1,
+        "spread_p95": 1.5,
+        "spread_mean": 1.1409
+      },
+      "broker": {
+        "ticks": 65433,
+        "minutes": 1431,
+        "spread_p50": 1.1,
+        "spread_p95": 1.4,
+        "spread_mean": 1.1163
+      },
+      "spread_p50_diff_pips": 0.0,
+      "spread_p50_ratio": 1.0,
+      "tick_ratio": 0.8534
+    },
+    {
+      "symbol": "USDCAD",
+      "day": "2026-04-29",
+      "aggregator": {
+        "ticks": 85363,
+        "minutes": 1438,
+        "spread_p50": 1.1,
+        "spread_p95": 1.4,
+        "spread_mean": 1.1483
+      },
+      "broker": {
+        "ticks": 66921,
+        "minutes": 1425,
+        "spread_p50": 1.1,
+        "spread_p95": 1.4,
+        "spread_mean": 1.1065
+      },
+      "spread_p50_diff_pips": 0.0,
+      "spread_p50_ratio": 1.0,
+      "tick_ratio": 0.784
+    },
+    {
+      "symbol": "USDCAD",
+      "day": "2026-04-30",
+      "aggregator": {
+        "ticks": 105718,
+        "minutes": 1433,
+        "spread_p50": 1.1,
+        "spread_p95": 1.5,
+        "spread_mean": 1.1483
+      },
+      "broker": {
+        "ticks": 89586,
+        "minutes": 1438,
+        "spread_p50": 1.1,
+        "spread_p95": 1.4,
+        "spread_mean": 1.1489
+      },
+      "spread_p50_diff_pips": 0.0,
+      "spread_p50_ratio": 1.0,
+      "tick_ratio": 0.8474
+    },
+    {
+      "symbol": "USDCHF",
+      "day": "2026-04-27",
+      "aggregator": {
+        "ticks": 44539,
+        "minutes": 1422,
+        "spread_p50": 0.8,
+        "spread_p95": 1.2,
+        "spread_mean": 0.9797
+      },
+      "broker": {
+        "ticks": 41806,
+        "minutes": 1430,
+        "spread_p50": 0.8,
+        "spread_p95": 1.1,
+        "spread_mean": 0.929
+      },
+      "spread_p50_diff_pips": 0.0,
+      "spread_p50_ratio": 1.0,
+      "tick_ratio": 0.9386
+    },
+    {
+      "symbol": "USDCHF",
+      "day": "2026-04-28",
+      "aggregator": {
+        "ticks": 59104,
+        "minutes": 1419,
+        "spread_p50": 0.8,
+        "spread_p95": 1.0,
+        "spread_mean": 0.866
+      },
+      "broker": {
+        "ticks": 58119,
+        "minutes": 1427,
+        "spread_p50": 0.8,
+        "spread_p95": 1.1,
+        "spread_mean": 0.9224
+      },
+      "spread_p50_diff_pips": 0.0,
+      "spread_p50_ratio": 1.0,
+      "tick_ratio": 0.9833
+    },
+    {
+      "symbol": "USDCHF",
+      "day": "2026-04-29",
+      "aggregator": {
+        "ticks": 65999,
+        "minutes": 1436,
+        "spread_p50": 0.8,
+        "spread_p95": 1.5,
+        "spread_mean": 1.3659
+      },
+      "broker": {
+        "ticks": 61261,
+        "minutes": 1420,
+        "spread_p50": 0.8,
+        "spread_p95": 1.1,
+        "spread_mean": 0.893
+      },
+      "spread_p50_diff_pips": 0.0,
+      "spread_p50_ratio": 1.0,
+      "tick_ratio": 0.9282
+    },
+    {
+      "symbol": "USDCHF",
+      "day": "2026-04-30",
+      "aggregator": {
+        "ticks": 99245,
+        "minutes": 1436,
+        "spread_p50": 0.8,
+        "spread_p95": 1.1,
+        "spread_mean": 0.9791
+      },
+      "broker": {
+        "ticks": 95726,
+        "minutes": 1434,
+        "spread_p50": 0.8,
+        "spread_p95": 1.1,
+        "spread_mean": 1.1568
+      },
+      "spread_p50_diff_pips": 0.0,
+      "spread_p50_ratio": 1.0,
+      "tick_ratio": 0.9645
+    },
+    {
+      "symbol": "USDJPY",
+      "day": "2026-04-27",
+      "aggregator": {
+        "ticks": 61699,
+        "minutes": 1432,
+        "spread_p50": 0.5,
+        "spread_p95": 0.8,
+        "spread_mean": 0.5159
+      },
+      "broker": {
+        "ticks": 59509,
+        "minutes": 1425,
+        "spread_p50": 0.5,
+        "spread_p95": 0.8,
+        "spread_mean": 0.5348
+      },
+      "spread_p50_diff_pips": 0.0,
+      "spread_p50_ratio": 1.0,
+      "tick_ratio": 0.9645
+    },
+    {
+      "symbol": "USDJPY",
+      "day": "2026-04-28",
+      "aggregator": {
+        "ticks": 83068,
+        "minutes": 1429,
+        "spread_p50": 0.5,
+        "spread_p95": 0.9,
+        "spread_mean": 0.5722
+      },
+      "broker": {
+        "ticks": 78524,
+        "minutes": 1431,
+        "spread_p50": 0.5,
+        "spread_p95": 0.9,
+        "spread_mean": 0.5608
+      },
+      "spread_p50_diff_pips": 0.0,
+      "spread_p50_ratio": 1.0,
+      "tick_ratio": 0.9453
+    },
+    {
+      "symbol": "USDJPY",
+      "day": "2026-04-29",
+      "aggregator": {
+        "ticks": 82821,
+        "minutes": 1435,
+        "spread_p50": 0.5,
+        "spread_p95": 0.8,
+        "spread_mean": 0.5746
+      },
+      "broker": {
+        "ticks": 75864,
+        "minutes": 1426,
+        "spread_p50": 0.5,
+        "spread_p95": 0.8,
+        "spread_mean": 0.5473
+      },
+      "spread_p50_diff_pips": 0.0,
+      "spread_p50_ratio": 1.0,
+      "tick_ratio": 0.916
+    },
+    {
+      "symbol": "USDJPY",
+      "day": "2026-04-30",
+      "aggregator": {
+        "ticks": 185490,
+        "minutes": 1438,
+        "spread_p50": 0.6,
+        "spread_p95": 1.4,
+        "spread_mean": 0.6816
+      },
+      "broker": {
+        "ticks": 177457,
+        "minutes": 1439,
+        "spread_p50": 0.6,
+        "spread_p95": 1.4,
+        "spread_mean": 0.692
+      },
+      "spread_p50_diff_pips": 0.0,
+      "spread_p50_ratio": 1.0,
+      "tick_ratio": 0.9567
+    },
+    {
+      "symbol": "XAUUSD",
+      "day": "2026-04-27",
+      "aggregator": {
+        "ticks": 315932,
+        "minutes": 1380,
+        "spread_p50": 55.0,
+        "spread_p95": 70.0,
+        "spread_mean": 55.8733
+      },
+      "broker": {
+        "ticks": 320155,
+        "minutes": 1380,
+        "spread_p50": 55.0,
+        "spread_p95": 71.0,
+        "spread_mean": 56.8196
+      },
+      "spread_p50_diff_pips": 0.0,
+      "spread_p50_ratio": 1.0,
+      "tick_ratio": 1.0134
+    },
+    {
+      "symbol": "XAUUSD",
+      "day": "2026-04-28",
+      "aggregator": {
+        "ticks": 419821,
+        "minutes": 1380,
+        "spread_p50": 57.0,
+        "spread_p95": 71.0,
+        "spread_mean": 57.0665
+      },
+      "broker": {
+        "ticks": 417788,
+        "minutes": 1380,
+        "spread_p50": 57.0,
+        "spread_p95": 71.0,
+        "spread_mean": 57.1129
+      },
+      "spread_p50_diff_pips": 0.0,
+      "spread_p50_ratio": 1.0,
+      "tick_ratio": 0.9952
+    },
+    {
+      "symbol": "XAUUSD",
+      "day": "2026-04-29",
+      "aggregator": {
+        "ticks": 433573,
+        "minutes": 1380,
+        "spread_p50": 59.0,
+        "spread_p95": 71.0,
+        "spread_mean": 58.7835
+      },
+      "broker": {
+        "ticks": 428568,
+        "minutes": 1380,
+        "spread_p50": 59.0,
+        "spread_p95": 71.0,
+        "spread_mean": 58.6659
+      },
+      "spread_p50_diff_pips": 0.0,
+      "spread_p50_ratio": 1.0,
+      "tick_ratio": 0.9885
+    },
+    {
+      "symbol": "XAUUSD",
+      "day": "2026-04-30",
+      "aggregator": {
+        "ticks": 446189,
+        "minutes": 1380,
+        "spread_p50": 59.0,
+        "spread_p95": 70.0,
+        "spread_mean": 60.2233
+      },
+      "broker": {
+        "ticks": 443085,
+        "minutes": 1380,
+        "spread_p50": 59.0,
+        "spread_p95": 70.0,
+        "spread_mean": 60.0791
+      },
+      "spread_p50_diff_pips": 0.0,
+      "spread_p50_ratio": 1.0,
+      "tick_ratio": 0.993
+    },
+    {
+      "symbol": "XAUUSD",
+      "day": "2026-05-01",
+      "aggregator": {
+        "ticks": 37307,
+        "minutes": 300,
+        "spread_p50": 70.0,
+        "spread_p95": 92.0,
+        "spread_mean": 73.2924
+      },
+      "broker": {
+        "ticks": 312360,
+        "minutes": 1380,
+        "spread_p50": 61.0,
+        "spread_p95": 77.0,
+        "spread_mean": 64.1117
+      },
+      "spread_p50_diff_pips": -9.0,
+      "spread_p50_ratio": 0.8714,
+      "tick_ratio": 8.3727
+    }
+  ]
+}
