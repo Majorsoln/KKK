@@ -36,6 +36,7 @@ Exit codes: 0 = sawa/skipped · 1 = ONYO au ukiukaji · 2 = hitilafu ya matumizi
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import logging
 import sys
@@ -1636,7 +1637,11 @@ def cmd_cost_audit(args: argparse.Namespace) -> int:
     cfg = _load(args)
     import numpy as np
 
-    from .costs import audit, config_budget, delta_mer, n_max_from_cost, n_required
+    import pandas as pd
+
+    from .costs import (
+        audit, config_budget, delta_mer, n_max_from_cost, n_required, realized_r,
+    )
     from .r1 import load_labels
 
     labels_root = cfg.research_root / "data" / "L4_labels" / "labels"
@@ -1701,8 +1706,28 @@ def cmd_cost_audit(args: argparse.Namespace) -> int:
         delta = delta_mer(args.sr_target, n_max, dev_dp=dev_dp)
         need = n_required(delta)
         # Bar HALISI: umbali hadi breakeven, JUMLISHA edge inayolipa.
-        gap_to_breakeven = -float(row["ev_r_net"]) / dev_dp
+        ev_net = float(row["ev_r_net"])
+        gap_to_breakeven = -ev_net / dev_dp
         total_lift = gap_to_breakeven + delta
+
+        # CI kwenye `ev_r_net` — block bootstrap ya MIAKA.
+        #
+        # `ev_r_net` ndiyo namba inayoamua kama pool inalipa kabisa, na hadi
+        # sasa ilikuwa ikiripotiwa kama nukta tupu. Nukta ya +0.0039 na nukta
+        # ya +0.0039 yenye mpaka wa chini wa -0.02 ni hukumu mbili tofauti
+        # kabisa, na tofauti hiyo ndiyo inayoamua kama kuna kitu cha kujenga.
+        cell_rows = barriers[
+            np.isclose(barriers["sl_atr"], want_sl) & np.isclose(barriers["tp_atr"], want_tp)
+        ]
+        r_rows = realized_r(cell_rows, commission_pips=args.commission_pips)
+        yrs = pd.to_datetime(cell_rows["decision_time"]).dt.year.to_numpy()
+        levels = np.unique(yrs)
+        sums = np.array([np.nansum(r_rows[yrs == lv]) for lv in levels])
+        counts = np.array([int((yrs == lv).sum()) for lv in levels], dtype=float)
+        boot = np.random.RandomState(20260814)
+        pick = boot.randint(0, len(levels), size=(5000, len(levels)))
+        draws = sums[pick].sum(axis=1) / np.maximum(counts[pick].sum(axis=1), 1.0)
+        ev_low, ev_high = (float(np.percentile(draws, 5)), float(np.percentile(draws, 95)))
 
         print(f"\nIDENTITIES (cell {want_sl:.2f}/{want_tp:.2f} · SR* {args.sr_target} · κ {args.kappa})")
         print(f"   dEV/dp_tp = 1 + tp/sl = {dev_dp:.2f}")
@@ -1711,6 +1736,9 @@ def cmd_cost_audit(args: argparse.Namespace) -> int:
         if naive_cost > 0:
             print(f"   overshoot inaongeza gharama kwa {cost_r / naive_cost - 1:.0%}"
                   f" na inashusha n_max kwa {1 - n_max / n_max_naive:.0%}")
+        print(f"\n   EV net  {ev_net:>+8.4f} R   ·   90% CI [{ev_low:+.4f}, {ev_high:+.4f}]")
+        print("   " + ("pool INALIPA (mpaka wa chini juu ya sifuri)" if ev_low > 0
+                       else "pool HAIJATHIBITIKA kulipa — mpaka wa chini uko chini ya sifuri"))
         print(f"\n   hadi breakeven        {gap_to_breakeven:>8.4f} p_tp")
         print(f"   δ_MER (SR* {args.sr_target})        {delta:>8.4f} p_tp")
         print(f"   ---------------------------------------")
@@ -1719,12 +1747,30 @@ def cmd_cost_audit(args: argparse.Namespace) -> int:
               f"{config_budget(args.sr_target, args.years):.1f}")
         print(f"\n   endelea: python -m src.data.cli effective-n --delta {delta:.4f}")
 
-    out_path = cfg.path_of("storage.reports_root") / "r1" / "cost_audit.json"
+    # Faili la ushahidi linaitwa kwa IDADI YA SYMBOLS lililopimwa.
+    #
+    # Toleo la kwanza liliandika `cost_audit.json` daima. Kuendesha
+    # `--symbols <subset>` kuliandika juu ya ushahidi wa pool nzima —
+    # ushahidi ule ule uliotajwa na sahihi #19 ya DF-20. Populations mbili
+    # tofauti, jina moja: hiyo ni provenance iliyovunjika, na inaonekana kama
+    # sahihi iliyoharibika badala ya kipimo kipya (2026-08-14).
+    chosen = _symbol_list(args)
+    stem = "cost_audit"
+    if chosen:
+        digest = hashlib.sha256(",".join(sorted(chosen)).encode("utf-8")).hexdigest()[:8]
+        stem = f"cost_audit_{len(chosen)}sym_{digest}"
+        print(f"\n   POPULATION NDOGO: symbols {len(chosen)} — ushahidi unaandikwa `{stem}.json`,")
+        print("   si juu ya `cost_audit.json` ya pool nzima.")
+    out_path = cfg.path_of("storage.reports_root") / "r1" / f"{stem}.json"
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(
         json.dumps(
             {
                 "commission_pips": args.commission_pips,
+                # Population LAZIMA iandikwe ndani ya faili, si kwenye jina pekee:
+                # jina linaweza kunakiliwa, yaliyomo hayawezi.
+                "symbols": sorted(chosen) if chosen else "zote",
+                "n_symbols": len(chosen) if chosen else None,
                 "sr_target": args.sr_target,
                 "kappa": args.kappa,
                 "years": args.years,
@@ -1736,6 +1782,9 @@ def cmd_cost_audit(args: argparse.Namespace) -> int:
                     "cost_r_total": cost_r,
                     "n_max": n_max,
                     "n_max_commission_only": n_max_naive,
+                    "ev_r_net": ev_net,
+                    "ev_r_net_ci90": [ev_low, ev_high],
+                    "ev_r_net_positive": bool(ev_low > 0),
                     "gap_to_breakeven": gap_to_breakeven,
                     "delta_mer": delta,
                     "total_lift_required": total_lift,

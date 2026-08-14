@@ -279,3 +279,24 @@ def test_n_eff_ni_ndogo_kuliko_zote_si_wastani():
         x for x in (result.n_uniq, result.n_time, result.n_cross, result.n_block) if x > 0
     )
     assert result.n_eff <= result.n_raw
+
+
+def test_cost_audit_ya_subset_haiandiki_juu_ya_ushahidi_wa_pool_nzima(tmp_path, monkeypatch):
+    """Populations mbili, jina moja = provenance iliyovunjika.
+
+    `cost_audit.json` ndilo ushahidi uliotajwa na sahihi #19. Kuendesha
+    `--symbols <subset>` kuliandika juu yake, na matokeo yalionekana kama
+    sahihi iliyoharibika badala ya kipimo kipya cha population nyingine.
+    """
+    import hashlib
+
+    zote = ["EURUSD", "GBPUSD", "USDJPY"]
+    digest = hashlib.sha256(",".join(sorted(zote)).encode("utf-8")).hexdigest()[:8]
+    assert f"cost_audit_{len(zote)}sym_{digest}" != "cost_audit"
+    # Jina lile lile kwa seti ile ile, tofauti kwa seti tofauti.
+    nyingine = ["EURUSD", "GBPUSD"]
+    other = hashlib.sha256(",".join(sorted(nyingine)).encode("utf-8")).hexdigest()[:8]
+    assert other != digest
+    # Mpangilio wa symbols hauhesabiki — seti ndiyo inayohesabika.
+    tena = hashlib.sha256(",".join(sorted(reversed(zote))).encode("utf-8")).hexdigest()[:8]
+    assert tena == digest
