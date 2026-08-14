@@ -737,6 +737,46 @@ juu ya label, umefanywa kwa macho wazi, na umewekwa hapa ili usije ukasahaulika.
 `cost-audit` ni **kipimo**, si tathmini ya strategy, kwa hiyo haigharimu config — lakini
 kutumia matokeo yake kuchagua strategy kutagharimu.
 
+#### MATOKEO — 2026-08-14 · symbols 10 (bila EURCHF, EURGBP)
+
+| | symbols 12 | **symbols 10** |
+|---|---|---|
+| `ev_r_net` (cell 2.0/3.0) | −0.0163 | **+0.0039** |
+| `cost_R` | 0.0294 | 0.0271 |
+| `n_max`/mwaka | 142 | 166 |
+| hadi breakeven | +0.0065 | **−0.0016** |
+| δ_MER | 0.0235 | 0.0217 |
+| **LIFT INAYOHITAJIKA** | **0.0300** p_tp | **0.0202** p_tp |
+| …kwa `R` | +0.0751 R | **+0.0505 R** |
+
+**Kuondoa symbols mbili kumeshusha bar kwa theluthi, na kumepeleka pool ng'ambo ya
+breakeven** (`hadi breakeven` sasa ni **hasi**). Cell iliyosainiwa 2.0/3.0 inabaki
+pekee yenye `EV net` chanya kwenye grid nzima — haijachaguliwa upya.
+
+#### Onyo mbili, na ya pili ni kubwa
+
+**1. `+0.0039` haina CI.** `cost-audit` ilikuwa ikiripoti `ev_r_net` kama nukta tupu.
+Imeongezwa sasa (block bootstrap ya miaka, 90%). Utabiri wangu: **mpaka wa chini uko chini
+ya sifuri**, kwa hiyo pool haitathibitika kulipa — bado ni bora zaidi ya ilivyokuwa.
+
+**2. Mabadiliko mawili yanapingana.** Kuondoa symbols mbili kali kunashusha bar **na
+kunashusha lift ya model kwa wakati mmoja** — kwa sababu sehemu kubwa ya lift ya hatua 3
+(`ρ` kutoka 0.8182 hadi 0.5152 baada ya kuondoa base rate za symbols) **ilikuwa utambuzi
+wa symbol**. Extremes zikiondoka, chakula cha model kinaondoka nacho.
+
+Kwa hiyo: bar imeshuka kutoka 0.0300 hadi 0.0202, lakini lift ya model itashuka pia kutoka
+0.0248 kwenda karibu na mabaki dhaifu ya ndani ya symbol. **Faida halisi inaweza kuwa
+sifuri.** Kudai vinginevyo ni kuchukua faida ya mabadiliko moja huku ukipuuza la pili.
+
+### Provenance — dosari iliyorekebishwa 2026-08-14
+
+`cost-audit --symbols <subset>` ilikuwa ikiandika juu ya `cost_audit.json`, ushahidi ule ule
+uliotajwa na **sahihi #19**. Populations mbili tofauti, jina moja. Sasa subset inaandika
+`cost_audit_<n>sym_<sha8>.json`, na orodha ya symbols inaingia **ndani ya faili** — jina
+linaweza kunakiliwa, yaliyomo hayawezi.
+
+Faili la awali linarudishwa kwa `git checkout -- research/reports/r1/cost_audit.json`.
+
 
 
 Random-label na shuffled-score. Pipeline ikitoa matokeo chanya pale hakuna signal, **kila kitu
