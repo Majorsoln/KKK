@@ -179,16 +179,64 @@ kusainiwa kwenye `SIGNATURES.md` kabla ya hatua 2:
 | `κ` = **0.50** | `n_max` = 142/mwaka | sehemu ya return unayokubali kuipoteza kwa gharama |
 | cell = **2.0/3.0** | lengo la jaribio | **kuichagua baada ya kuona jedwali la EV ni uteuzi juu ya label** — lazima ikiriwe kwenye sababu, si kufichwa |
 
-### Hatua 2 — UA ATHARI YA SETUP (config 1)
+### Hatua 2 — UA ATHARI YA SETUP ✅ **IMEKAMILIKA 2026-08-14 · config 1/7**
 
-Stratified bins zilizotangazwa: ATR percentile · spread percentile · momentum magnitude ·
-session · pair · mwaka. Linganisha setup dhidi ya control **ndani ya strata**.
+Stratified bins zilizotangazwa: `atr_bin` (quantile 5) · `spread_bin` (4) · `session` ·
+`symbol` · `year`. Kipimo: **`r_net` halisi** kwenye cell 2.0/3.0 — ikiwemo overshoot ya
+stop na commission, si `p_tp`.
 
-| +0.0638R inakuwa | Hitimisho |
+**HUKUMU: HALISI.**
+
+| | |
 |---|---|
-| ~+0.032R | nusu ilikuwa uteuzi; **iliyobaki ni halisi** — endelea |
-| ~+0.01R | dhaifu; endelea kwa tahadhari |
-| ~0 | ni **volatility/selection artefact**. Kichujio hakikuwa kikitabiri chochote |
+| setups · controls | 25,314 · 27,007 |
+| strata · zenye zote mbili | 2,966 · **2,503** |
+| **common support** | **96.4%** |
+| tofauti ghafi | **+0.0515 R** |
+| **tofauti ndani ya strata** | **+0.0348 R** |
+| imepungua | **32%** |
+| 90% CI (block bootstrap kwa mwaka) | **[+0.0051, +0.0612]** — haiguzi sifuri |
+
+**Theluthi mbili imebaki.** Kichujio si kioo cha volatility.
+
+**Common support 96.4% — bora kuliko ilivyoogopwa.** Nilikuwa nimeonya kwamba gate ya
+momentum ingeacha setups bila controls zinazolingana. Haikutokea.
+
+#### Kikwazo cha dai hili — kisomwe kabla ya kuendelea
+
+**Momentum HAIKUDHIBITIWA, na siyo kwa kusahau.** Orodha ya mtaalamu wa 1 iliitaja; niliiacha
+kwa sababu **huwezi kudhibiti kinachofafanua treatment**. Setups zina `|impulse| ≥ 2.5·ATR`
+**daima**; controls zenye msukumo huo ni zile zilizofeli gate nyingine tu. Common support
+isingekuwepo.
+
+Kwa hiyo dai halisi ni finyu kuliko linavyoonekana:
+
+> Makali **hayaelezwi na** kiwango cha volatility, spread, saa, symbol, wala mwaka.
+> **Hayasemi** makali si "momentum tu" — kwa sababu momentum ndiyo sheria yenyewe.
+
+Hilo linajibu swali lililoulizwa (*je ni uteuzi wa volatility?* — **hapana**), lakini
+lisidaiwe kujibu zaidi ya hapo.
+
+**CI ni pana.** Mpaka wa chini ni `+0.0051` — karibu na sifuri. Block bootstrap kwa miaka 9
+inatoa resampling ya mikubwa. Athari ni chanya, **haijabanwa vizuri**.
+
+#### Bar ya kweli, kwa R — iandikwe KABLA ya hatua 3
+
+Vitu vyote kwa units zilezile, cell 2.0/3.0 (`dEV/dp_tp = 2.5`):
+
+| | R |
+|---|---|
+| EV net ya setups sasa | **−0.0163** |
+| hadi breakeven | +0.0163 |
+| δ_MER (0.0235 p_tp × 2.5) | +0.0588 |
+| **JUMLA INAYOHITAJIKA** | **+0.0751** |
+| kichujio kizima kililetea | **+0.0348** |
+
+**Model inahitaji mara 2.2 ya kile kichujio kizima kilifanya** — lakini kwenye **decile ya
+juu** badala ya wastani wa setups zote.
+
+Inawezekana **kama** kuna heterogeneity ndani ya setups; ndicho hasa kupanga kunanunua.
+Lakini ni bar ya juu, na imeandikwa **kabla ya jaribio**, si baada.
 
 ### Hatua 3 — META-LABELLING KWENYE L4 ILIYOPO (config 2)
 
