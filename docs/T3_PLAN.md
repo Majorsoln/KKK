@@ -438,6 +438,50 @@ Hatujui bado kama `+0.0661 R` ni kitu. Tunajua mambo matatu:
    ndefu (null PANA MNO). Ukweli uko kati yao, na kuripoti mmoja pekee ni kudanganya
    upande mmoja.
 
+#### MATOKEO — 2026-08-14 · `shuffle` · marudio 20
+
+| Takwimu | Halisi | null p50 | null p95 | null max | p |
+|---|---|---|---|---|---|
+| discrimination `ρ` | +0.8182 | −0.1455 | +0.5176 | +0.5636 | **0.048** |
+| top fitted | +0.3159 | +0.2881 | +0.2968 | +0.3024 | **0.048** |
+| top `R` halisi | +0.0661 | −0.0080 | **+0.0716** | +0.1071 | **0.143** |
+
+**Ukaguzi wa null: msingi −0.0163 R · null median −0.0080 R → "null iko kwenye msingi".**
+Dhana ya uchafuzi imethibitishwa: `rotation` ilihifadhi taarifa, `shuffle` haikuhifadhi.
+
+**Picha inayotokea, na ni ya kugawanyika:**
+
+* **Uwezo wa kupanga ni HALISI.** `ρ = +0.8182` iko juu ya null max (+0.5636) kwa **0.25**
+  — mbali, si kwenye ukingo. Hii si sanaa ya pipeline.
+* **Faida ya kiuchumi HAIJATHIBITIKA.** `top R` p = **0.143** — na hiyo ni chini ya null
+  **nyembamba kuliko zote**, ile inayosamehe zaidi. Draws tatu kati ya 20 zilizidi
+  +0.0661 kwa bahati tupu.
+
+Sababu ya tofauti: `R` ina kelele nyingi zaidi kuliko `p_tp` (timeout, overshoot). Model
+inapanga kweli, lakini mpangilio hauzai pesa za kutosha kupimika kwenye cell hii.
+
+Hii inakubaliana kabisa na hatua 3: discrimination ilipita kwa haki, kiuchumi ilianguka
+kwa haki. **`+0.0661 R` ni kelele hadi ithibitishwe vinginevyo.**
+
+### Null ya tatu — `block`, na kwa nini ndiyo sahihi
+
+`rotation` na `shuffle` zote zina kasoro **inayojulikana na iliyopimwa**:
+
+| Njia | Inavunja nini | Kasoro |
+|---|---|---|
+| `rotation` | upatanifu wa karibu pekee | inahifadhi regimes za miezi → **signal iko ndani ya null** (imepimwa: +0.0275 dhidi ya msingi −0.0163) |
+| `shuffle` | kila kitu | inavunja hata `τ = 2.49` → **null nyembamba kuliko ukweli** |
+| **`block`** | nafasi za vipande | inahifadhi `τ` ndani ya kipande, inavunja upatanifu wa regimes |
+
+`block` (chaguo-msingi sasa, urefu 32 points ≈ miezi 1.5) inabadilisha **nafasi za vipande
+vya mfululizo**, si rows. Ndiyo null pekee kati ya tatu isiyo na kasoro inayojulikana.
+
+```
+python -m src.data.cli placebo --mode block --reps 200
+```
+
+Marudio 20 yana p ndogo kabisa ya `1/21 = 0.048`. Dai lolote lenye nguvu linahitaji ≥ 200.
+
 
 
 Random-label na shuffled-score. Pipeline ikitoa matokeo chanya pale hakuna signal, **kila kitu

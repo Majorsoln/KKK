@@ -292,7 +292,8 @@ def test_bajeti_iliyokwisha_inazuia_jaribio(tree, monkeypatch, tmp_path, capsys)
 def test_placebo_inaendesha_na_kuandika_ushahidi(tree, capsys):
     """Placebo HAITUMII bajeti — hakuna `budget_ipo` hapa kwa makusudi."""
     main(["--config", CONFIG, "build-features", "--symbols", ",".join(SYMBOLS)])
-    rc = main(["--config", CONFIG, "placebo", "--symbols", ",".join(SYMBOLS), "--reps", "6"])
+    rc = main(["--config", CONFIG, "placebo", "--symbols", ",".join(SYMBOLS),
+               "--mode", "rotation", "--reps", "6"])
     assert rc in (0, 1)
     payload = json.loads(
         (tree / "reports" / "r3" / "placebo_logistic_rotation.json").read_text(encoding="utf-8")
@@ -355,10 +356,40 @@ def test_mzunguko_unafanyika_kwa_mpangilio_wa_muda(tree, capsys):
 def test_ukaguzi_wa_null_unaripotiwa(tree, capsys):
     """Null inayochagua trades bora kuliko msingi si null — na lazima iseme."""
     main(["--config", CONFIG, "build-features", "--symbols", ",".join(SYMBOLS)])
-    main(["--config", CONFIG, "placebo", "--symbols", ",".join(SYMBOLS), "--reps", "6"])
+    main(["--config", CONFIG, "placebo", "--symbols", ",".join(SYMBOLS),
+          "--mode", "rotation", "--reps", "6"])
     out = capsys.readouterr().out
     assert "UKAGUZI WA NULL" in out
     payload = json.loads(
         (tree / "reports" / "r3" / "placebo_logistic_rotation.json").read_text(encoding="utf-8")
     )
     assert "base_r_net" in payload and "null_contaminated" in payload
+
+
+def test_block_ndiyo_njia_ya_chaguo_msingi(tree, capsys):
+    """Kati ya null tatu, ya kati ndiyo sahihi — na ndiyo inayotumika bila kuombwa."""
+    main(["--config", CONFIG, "build-features", "--symbols", ",".join(SYMBOLS)])
+    main(["--config", CONFIG, "placebo", "--symbols", ",".join(SYMBOLS), "--reps", "5"])
+    assert "njia `block" in capsys.readouterr().out
+    assert (tree / "reports" / "r3" / "placebo_logistic_block32.json").exists()
+
+
+def test_block_inahifadhi_base_rate(tree):
+    """Kubadilisha nafasi za vipande kusibadilishe idadi ya TP."""
+    import numpy as np
+
+    rng = np.random.RandomState(0)
+    y = (rng.uniform(size=120) < 0.3).astype(float)
+    idx = np.arange(120)
+    chunks = [idx[i:i + 32] for i in range(0, 120, 32)]
+    mixed = y[np.concatenate([chunks[j] for j in rng.permutation(len(chunks))])]
+    assert mixed.sum() == y.sum()
+    assert len(mixed) == len(y)
+
+
+def test_njia_zote_tatu_zinaendesha(tree):
+    main(["--config", CONFIG, "build-features", "--symbols", ",".join(SYMBOLS)])
+    for mode in ("block", "rotation", "shuffle", "bernoulli"):
+        rc = main(["--config", CONFIG, "placebo", "--symbols", ",".join(SYMBOLS),
+                   "--mode", mode, "--reps", "5"])
+        assert rc in (0, 1), mode

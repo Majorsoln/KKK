@@ -2249,7 +2249,8 @@ def cmd_placebo(args: argparse.Namespace) -> int:
     if halisi is None:
         print("rows zilizopata score hazitoshi", file=sys.stderr)
         return 2
-    print(f"PLACEBO — model `{args.model}` · njia `{args.mode}` · marudio {args.reps}")
+    njia = f"{args.mode} ({args.block})" if args.mode == "block" else args.mode
+    print(f"PLACEBO — model `{args.model}` · njia `{njia}` · marudio {args.reps}")
     print("labels zimeharibiwa; features, folds na uzito ni vile vile.\n")
     print(f"   HALISI:  rho {halisi['rho']:+.4f} · top fitted {halisi['top_fitted']:.4f} "
           f"· top R {halisi['top_r_net']:+.4f}\n")
@@ -2272,6 +2273,26 @@ def cmd_placebo(args: argparse.Namespace) -> int:
                 idx = idx[np.argsort(order_key[idx], kind="stable")]
                 shift = int(rng.randint(1, max(len(idx) - 1, 2)))
                 values[idx] = np.roll(values[idx], shift)
+        elif args.mode == "block":
+            # Vipande vya mfululizo vinabadilishwa NAFASI, si rows.
+            #
+            # Hii ndiyo null sahihi kati ya zile mbili nyingine, na sababu
+            # imepimwa si kudhaniwa:
+            #   * `rotation` inahifadhi kumbukumbu ndefu (regimes za miezi),
+            #     kwa hiyo signal inabaki NDANI ya null. Ilipimwa: decile ya
+            #     juu ya null ilitoa +0.0275 R dhidi ya msingi -0.0163.
+            #   * `shuffle` inavunja hata autocorrelation ya karibu (τ 2.49),
+            #     kwa hiyo null ni nyembamba kuliko ukweli.
+            # Kipande cha ~mwezi mmoja na nusu kinahifadhi τ ndani yake na
+            # kinavunja upatanifu wa regimes kati ya features na labels.
+            for symbol in np.unique(symbols):
+                idx = np.flatnonzero(symbols == symbol)
+                idx = idx[np.argsort(order_key[idx], kind="stable")]
+                chunks = [idx[i:i + args.block] for i in range(0, len(idx), args.block)]
+                if len(chunks) < 3:
+                    continue
+                taken = values[np.concatenate([chunks[j] for j in rng.permutation(len(chunks))])]
+                values[idx] = taken
         elif args.mode == "shuffle":
             rng.shuffle(values)
         else:  # bernoulli
@@ -2340,13 +2361,15 @@ def cmd_placebo(args: argparse.Namespace) -> int:
     else:
         print("   null iko kwenye msingi — haijahifadhi taarifa.")
 
-    out_path = data["reports"] / "r3" / f"placebo_{args.model}_{args.mode}.json"
+    tag = f"{args.mode}{args.block}" if args.mode == "block" else args.mode
+    out_path = data["reports"] / "r3" / f"placebo_{args.model}_{tag}.json"
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(
         json.dumps(
             {
                 "model": args.model,
                 "mode": args.mode,
+                "block": args.block if args.mode == "block" else None,
                 "reps": args.reps,
                 "reps_ok": len(null),
                 "seed": args.seed,
@@ -2827,9 +2850,16 @@ def build_parser() -> argparse.ArgumentParser:
     p_plac.add_argument("--reps", type=int, default=20)
     p_plac.add_argument(
         "--mode",
-        default="rotation",
-        choices=("rotation", "shuffle", "bernoulli"),
-        help="rotation (chaguo-msingi) inahifadhi autocorrelation; shuffle inaivunja",
+        default="block",
+        choices=("block", "rotation", "shuffle", "bernoulli"),
+        help="block (chaguo-msingi) ndiyo sahihi; rotation inahifadhi kumbukumbu "
+             "ndefu (null imechafuliwa), shuffle inavunja hata τ (null nyembamba mno)",
+    )
+    p_plac.add_argument(
+        "--block",
+        type=int,
+        default=32,
+        help="urefu wa kipande kwa `--mode block` (points ~32 = miezi 1.5)",
     )
     p_plac.add_argument("--seed", type=int, default=20260814)
     p_plac.add_argument("--unweighted", action="store_true")
