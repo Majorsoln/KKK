@@ -2720,6 +2720,155 @@ def cmd_placebo(args: argparse.Namespace) -> int:
     return 0 if verdict_ok else 1
 
 
+def cmd_select_symbols(args: argparse.Namespace) -> int:
+    """T4 hatua 1b — vunja sare ya §3 kwa LENGO, si kwa ladha.
+
+    Sheria ya §3 imeishia kwenye sare: wagombea 36, kila mmoja analeta sarafu
+    **moja** mpya. Kuchagua kati yao kwa hisia kungekuwa uteuzi ulioomba
+    kutangazwa lakini haukutangazwa.
+
+    Lengo lenyewe si "sarafu mpya" — ni **blocs**. Sarafu mpya inaleta bloc
+    **ikiwa tu** haiendi pamoja na zilizopo. `USDAED` inaleta AED, lakini AED
+    imefungwa kwa USD: correlation ~1, bloc mpya ~0. `USDMXN` inaleta MXN
+    ambayo inajitembea yenyewe.
+
+    Kwa hiyo uchaguzi ni **greedy juu ya participation ratio**: kila hatua
+    inachukua mgombea anayeipandisha zaidi. Kipimo ni bei pekee (returns za
+    D1) — **hakuna label, hakuna `R`, hakuna trendiness**. Ndiyo maana
+    kinaweza kuendeshwa kabla ya sahihi bila kuchafua chochote.
+    """
+    cfg = _load(args)
+    from datetime import datetime, timezone
+
+    import numpy as np
+    import pandas as pd
+
+    from .effective_n import participation_ratio
+    from .mt5_source import MT5Credentials, MT5TickSource, SourceError
+    from .splits import SplitPlan
+
+    catalogue = cfg.path_of("storage.reports_root") / "r4" / "broker_catalogue.json"
+    if not catalogue.exists():
+        print(f"`{catalogue}` haipo — endesha `check-mt5 --catalogue` kwanza", file=sys.stderr)
+        return 2
+    wagombea = [r["symbol"] for r in json.loads(catalogue.read_text(encoding="utf-8"))["candidates"]]
+    tunazo = list(cfg.symbols)
+
+    plan = SplitPlan.from_config(cfg)
+    start = datetime.fromisoformat(str(cfg.get("splits.data_start"))).replace(tzinfo=timezone.utc)
+    end = datetime.combine(plan.holdout_start, datetime.min.time()).replace(tzinfo=timezone.utc)
+
+    source = MT5TickSource(
+        credentials=MT5Credentials.from_env(cfg),
+        symbol_suffix=str(cfg.get("recorder.mt5.symbol_suffix", "")),
+        timeout_ms=int(cfg.get("recorder.mt5.timeout_ms", 15000)),
+    )
+    try:
+        source.connect()
+    except SourceError as exc:
+        print(f"muunganisho: IMESHINDIKANA — {exc}", file=sys.stderr)
+        return 2
+
+    print(f"Inavuta D1 kutoka {start.date()} hadi {end.date()} "
+          f"— tunazo {len(tunazo)}, wagombea {len(wagombea)}\n")
+    series: dict[str, pd.Series] = {}
+    fupi: list[tuple[str, str]] = []
+    try:
+        for symbol in tunazo + wagombea:
+            close = source.fetch_daily_close(symbol, start, end)
+            if close.empty:
+                fupi.append((symbol, "hakuna data"))
+                continue
+            kwanza = close.index.min().date()
+            # Kina cha D1 ni **mpaka wa juu** wa kina cha ticks: broker asiye na
+            # bar ya D1 ya 2016 hana ticks za 2016. Kwa hiyo mgombea anakataliwa
+            # hapa kwa sekunde, badala ya kwa saa za `probe-history`.
+            kuchelewa = (kwanza - plan.data_start).days
+            if kuchelewa > args.tolerance_days:
+                fupi.append((symbol, f"inaanza {kwanza} (+siku {kuchelewa})"))
+                if symbol in wagombea:
+                    continue
+            series[symbol] = close
+    finally:
+        source.shutdown()
+
+    if fupi:
+        print("   zisizo na kina cha kutosha (D1 ni MPAKA WA JUU wa kina cha ticks):")
+        for symbol, sababu in fupi[: args.limit]:
+            print(f"      {symbol:<10} {sababu}")
+        if len(fupi) > args.limit:
+            print(f"      … na {len(fupi) - args.limit} nyingine")
+        print()
+
+    hai = [s for s in wagombea if s in series]
+    msingi = [s for s in tunazo if s in series]
+    if len(msingi) < 2 or not hai:
+        print("hakuna data ya kutosha kuchagua", file=sys.stderr)
+        return 2
+
+    panel = pd.DataFrame({k: v for k, v in series.items()}).sort_index()
+    returns = np.log(panel / panel.shift()).dropna(how="all")
+
+    def _pr(names: list[str]) -> float:
+        return participation_ratio(returns[names])
+
+    base_pr = _pr(msingi)
+    print(f"   blocs za sasa: {base_pr:.2f} (symbols {len(msingi)})")
+
+    chosen: list[str] = []
+    current = list(msingi)
+    pr = base_pr
+    for step in range(args.take):
+        best, best_pr = None, pr
+        for candidate in hai:
+            if candidate in chosen:
+                continue
+            got = _pr(current + [candidate])
+            if got > best_pr:
+                best, best_pr = candidate, got
+        if best is None:
+            print("   hakuna mgombea anayeongeza blocs zaidi — imesimama hapa")
+            break
+        chosen.append(best)
+        current.append(best)
+        print(f"   {step + 1}. {best:<10} blocs {pr:.2f} → {best_pr:.2f} "
+              f"(+{best_pr - pr:.2f})")
+        pr = best_pr
+
+    need = 1.0 + (1.645 / args.rho) ** 2
+    print(f"\n   blocs baada ya kuchagua: {pr:.2f}   ·   zinazohitajika {need:.1f}")
+    print("   " + ("INATOSHA" if pr >= need else
+                   f"HAITOSHI — pungufu ya {need - pr:.2f}"))
+    print(f"\n   ORODHA INAYOPENDEKEZWA: {', '.join(chosen)}")
+    print("   (imechaguliwa kwa bei pekee — hakuna label iliyoguswa)")
+
+    out_path = cfg.path_of("storage.reports_root") / "r4" / "symbol_selection.json"
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_path.write_text(
+        json.dumps(
+            {
+                "data_start": str(plan.data_start),
+                "holdout_start": str(plan.holdout_start),
+                "existing": msingi,
+                "candidates_live": hai,
+                "rejected": [{"symbol": s, "reason": r} for s, r in fupi],
+                "blocs_before": base_pr,
+                "blocs_after": pr,
+                "blocs_required": need,
+                "rho_target": args.rho,
+                "sufficient": bool(pr >= need),
+                "chosen": chosen,
+            },
+            indent=2,
+        ) + "\n",
+        encoding="utf-8",
+        newline="\n",
+    )
+    print(f"\nushahidi: {out_path}")
+    print("hatua: `probe-history` kwa kila moja, kisha SAHIHI ya PD (T4 §8 hatua 2).")
+    return 0 if pr >= need else 1
+
+
 def cmd_cross_power(args: argparse.Namespace) -> int:
     """T4 — blocs ngapi zinahitajika kupima sheria ya cross-section?
 
@@ -3274,6 +3423,18 @@ def build_parser() -> argparse.ArgumentParser:
              "ujuzi wa WAKATI na utambuzi wa SYMBOL",
     )
     p_plac.set_defaults(func=cmd_placebo)
+
+    p_sel = subparsers.add_parser(
+        "select-symbols",
+        help="T4 — vunja sare ya §3 kwa blocs (bei pekee, hakuna label)",
+        parents=[common],
+    )
+    p_sel.add_argument("--take", type=int, default=5, help="wangapi wa kuchagua")
+    p_sel.add_argument("--rho", type=float, default=0.545)
+    p_sel.add_argument("--tolerance-days", type=int, default=90,
+                       help="kuchelewa kunakovumilika kuanzia `splits.data_start`")
+    p_sel.add_argument("--limit", type=int, default=25)
+    p_sel.set_defaults(func=cmd_select_symbols)
 
     p_cross = subparsers.add_parser(
         "cross-power",

@@ -197,6 +197,37 @@ class MT5TickSource:
                 _time.sleep(self.retry_delay_s)
         raise SourceError(f"{broker_symbol}: copy_ticks_range: {last_error}")
 
+    def fetch_daily_close(self, symbol: str, start: datetime, end: datetime) -> pd.Series:
+        """Bei za kufunga za D1 — kwa ajili ya kupima UHURU kati ya symbols pekee.
+
+        **Si data ya mafunzo.** Hii ni nyepesi mara elfu kuliko ticks, na
+        inatumika kwa kazi moja: kuhesabu correlation ili kujua symbol mpya
+        inaleta bloc au inarudia iliyopo. Kuvuta ticks kwa wagombea 36 ili
+        kupima correlation kungechukua siku; D1 inachukua sekunde.
+
+        Inarudisha Series tupu ikiwa broker hana kina hicho — hilo ni **jibu**
+        (mpaka wa history), si hitilafu.
+        """
+        mt5 = self._module()
+        broker_symbol = self.broker_symbol(symbol)
+        if not mt5.symbol_select(broker_symbol, True):
+            return pd.Series(dtype=float, name=symbol)
+        rates = mt5.copy_rates_range(
+            broker_symbol,
+            mt5.TIMEFRAME_D1,
+            start.astimezone(timezone.utc),
+            end.astimezone(timezone.utc),
+        )
+        if rates is None or len(rates) == 0:
+            return pd.Series(dtype=float, name=symbol)
+        frame = pd.DataFrame(rates)
+        stamps = pd.to_datetime(frame["time"], unit="s", utc=True)
+        return pd.Series(
+            pd.to_numeric(frame["close"], errors="coerce").to_numpy(),
+            index=stamps,
+            name=symbol,
+        ).sort_index()
+
     def _to_canonical(self, raw: pd.DataFrame) -> pd.DataFrame:
         volume = (
             raw["volume_real"]

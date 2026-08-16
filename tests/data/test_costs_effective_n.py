@@ -339,3 +339,31 @@ def test_athari_ndogo_inadai_blocs_nyingi_zaidi():
 
     z = NormalDist().inv_cdf(0.95)
     assert (1.0 + (z / 0.434) ** 2) > (1.0 + (z / 0.545) ** 2) > (1.0 + (z / 0.70) ** 2)
+
+
+def test_participation_ratio_inapendelea_safu_HURU_kuliko_rudufu():
+    """Msingi wa `select-symbols`: bloc mpya si safu mpya.
+
+    Greedy inachagua kwa PR. Ikiwa PR haitofautishi safu huru na nakala,
+    uchaguzi mzima ni wa bahati — na `USDAED` (AED imefungwa kwa USD)
+    ingechaguliwa sawa na `USDMXN`.
+    """
+    import numpy as np
+    import pandas as pd
+
+    from src.data.effective_n import participation_ratio
+
+    rng = np.random.RandomState(0)
+    base = pd.DataFrame(rng.normal(size=(400, 3)), columns=["a", "b", "c"])
+
+    huru = base.copy()
+    huru["d"] = rng.normal(size=400)                      # bloc mpya kabisa
+    rudufu = base.copy()
+    rudufu["d"] = base["a"] + rng.normal(0, 0.01, 400)    # nakala ya `a`
+
+    assert participation_ratio(huru) > participation_ratio(rudufu)
+    # Nakala HAIONGEZI — inashusha PR chini ya msingi wenyewe. Kwa hiyo greedy
+    # ya `select-symbols` (`best_pr > pr`) inaikataa yenyewe, bila sheria ya
+    # ziada: symbol isiyoleta bloc haichaguliwi kabisa.
+    assert participation_ratio(rudufu) < participation_ratio(base)
+    assert participation_ratio(huru) > participation_ratio(base)
