@@ -194,3 +194,32 @@ def test_mwongozo_wa_amri_hautumii_mabano_ya_pembe():
         and re.search(r'<[a-zA-Z ]+>', line)
     ]
     assert not makosa, f"mifano yenye mabano: {makosa}"
+
+
+def test_majina_yasiyo_ya_fx_hayagawanywi_kuwa_sarafu_bandia():
+    """`AUS.IDX` si `AUS`/`IDX`, na `BUND.TR` si `BUN`/`DTR`.
+
+    Kugawanya kwa UREFU badala ya kwa ORODHA kulizalisha sarafu nne mpya
+    zisizokuwepo, na kupandisha vitu visivyo FX juu ya orodha ya wagombea.
+    """
+    from src.data.cli import _is_fx, _underlyings
+
+    for name in ("AUS.IDX", "BUND.TR", "CHE.IDX", "EUS.IDX", "US500", "GER40.cash"):
+        parts = _underlyings(name)
+        assert not _is_fx(parts), f"`{name}` imegawanywa kimakosa: {parts}"
+    for name in ("EURUSD", "XAUUSD", "USDMXN", "AEDCNH"):
+        assert _is_fx(_underlyings(name)), name
+
+
+def test_jozi_bila_usd_au_eur_zinatambuliwa_kama_synthetic():
+    """`AEDCNH` inaleta sarafu mbili mpya — na ndiyo sababu sheria ya 4 pekee ilishindwa.
+
+    Broker anaijenga kutoka `AEDUSD × USDCNH`; spread ni jumla ya mbili, na
+    utambulisho wa gharama unaifanya isiwezekane kwa `n` yoyote.
+    """
+    from src.data.cli import _has_anchor, _underlyings
+
+    assert not _has_anchor(_underlyings("AEDCNH"))
+    assert not _has_anchor(_underlyings("CNHZAR"))
+    assert _has_anchor(_underlyings("USDMXN"))
+    assert _has_anchor(_underlyings("EURSEK"))

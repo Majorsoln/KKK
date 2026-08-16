@@ -59,13 +59,36 @@ kati yao ni kujidanganya.
 Symbols zinachaguliwa kwa **sheria hii pekee**, kwa mpangilio huu, kabla ya kuona `R` ya
 yoyote kati yao:
 
-1. **Broker anaitoa** na ina tick history inayofika `2016-01-04` (`probe-history`).
-2. **Inapita malango ya §3** ya ubora (`check-l1`) kwa kiwango kile kile cha symbols 12.
-3. **Inaongeza UNDERLYING MPYA.** Symbols zinapangwa kwa idadi ya underlyings mpya
-   zinazoletwa: symbol inayoleta sarafu isiyokuwepo inashinda jozi mpya ya sarafu
-   zilizopo.
+0. **FX spot pekee.** Hakuna index, bond wala CFD. Sababu si ladha: labels za L4
+   zinajengwa kwenye **path ya ticks inayoendelea** yenye ATR bands (§5). Vitu vyenye
+   session breaks na gaps za usiku vinavunja dhana hiyo kimya — barrier "iliyoguswa"
+   wakati soko limefungwa si barrier iliyoguswa.
+1. **Lazima iwe na USD au EUR.** Jozi isiyo na moja kati ya hizo (mfano `AEDCNH`) karibu
+   daima ni **synthetic** — broker anaijenga kutoka `AEDUSD × USDCNH`, na spread yake ni
+   **jumla ya mbili**. Kwa utambulisho wa gharama `√n ≤ κ·SR*/cost_R`, symbol kama hiyo
+   haiwezi kubeba setup kwa `n` yoyote.
+2. **Tick history inayofika `2016-01-04`** (`probe-history`).
+3. **Inapita malango ya §3** ya ubora (`check-l1`) kwa kiwango kile kile cha symbols 12.
+4. **Inaongeza UNDERLYING MPYA.** Kati ya zilizobaki, zinapangwa kwa idadi ya underlyings
+   mpya zinazoletwa.
 
-**Sheria ya 3 ndiyo yenye maana yote**, na inatokana na hesabu si ladha:
+### Marekebisho ya 2026-08-16 — na kwa nini yanaruhusiwa
+
+Toleo la kwanza la sheria hii lilikuwa **na sheria ya 4 pekee**. Orodha halisi ya broker
+(Dukascopy, symbols 418) iliifichua kama haitoshi: iliweka `AEDCNH`, `AEDTRY`, `CNHZAR`
+**juu ya orodha**, kwa sababu kila moja inaleta sarafu **mbili** mpya. Zote ni synthetic,
+zenye spread ya kutisha, na hazina historia.
+
+Sheria ya 0 na ya 1 zimeongezwa kwa sababu za **muundo wa chombo** — session structure na
+gharama — **si kwa sababu ya matokeo ya symbol yoyote**. Hakuna `R`, `p_tp` wala trendiness
+iliyotazamwa. Ndiyo maana marekebisho haya ni halali, na ndiyo hasa maana ya kutangaza
+kabla ya kusaini: **dosari inashikwa kabla haijawa uteuzi.**
+
+Pia iligundulika dosari ya kuchambua majina: `AUS.IDX` ilikuwa ikigawanywa `AUS`/`IDX` na
+`BUND.TR` ikigawanywa `BUN`/`DTR`, zikihesabiwa kama sarafu nne mpya zisizokuwepo.
+Sasa jina linagawanywa **ikiwa tu nusu zote mbili ni sarafu za ISO-4217 zinazojulikana**.
+
+**Sheria ya 4 ndiyo yenye maana ya nguvu**, na inatokana na hesabu si ladha:
 
 ```
 symbols 15  ikiwa kila symbol mpya inaleta bloc yake   (underlying MPYA)
@@ -77,7 +100,7 @@ zinazowezekana kati yao zinaongeza **rows**, si **blocs**. Underlyings mpya (SEK
 SGD, MXN, ZAR, PLN, XAG, na kadhalika) ndizo zinazoongeza blocs.
 
 **Kilichokatazwa:** kuchagua symbol kwa sababu `R` yake, `p_tp` yake, au trendiness yake
-inaonekana nzuri. Sheria ya 3 haijui lolote kati ya hivyo.
+inaonekana nzuri. Sheria zote hapo juu hazijui lolote kati ya hivyo.
 
 ### Idadi ya mwisho
 
@@ -87,8 +110,10 @@ Inachaguliwa kwa `cross-power`, si kwa kubahatisha:
 python -m src.data.cli cross-power --rho 0.545 --blocs 7.54 --symbols 12
 ```
 
-Kwa `ρ = 0.545`: **15–17**. **Si 28.** §3.9 ilikadiria 28 kwa hisia; hesabu inasema chini
-ya theluthi mbili yake, na tofauti hiyo ni miezi ya kurekodi.
+Kwa `ρ = 0.545`: **15–17** kwa jumla. Tunazo **12**, kwa hiyo tunahitaji **3–5 mpya pekee**.
+
+**Si 28.** §3.9 ilikadiria 28 kwa hisia. Hesabu inasema tunahitaji symbols **tatu**
+zilizochaguliwa vizuri — na tofauti kati ya 3 na 16 mpya ni **miezi ya kurekodi ticks**.
 
 ---
 

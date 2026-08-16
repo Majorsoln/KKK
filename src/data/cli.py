@@ -341,17 +341,45 @@ def cmd_check_mt5(args: argparse.Namespace) -> int:
         source.shutdown()
 
 
-def _underlyings(name: str) -> tuple[str, ...]:
-    """Sarafu/underlyings ndani ya jina la symbol.
+# Sarafu za ISO-4217 zinazopatikana kwa brokers wa FX, pamoja na metali.
+# Orodha WAZI kwa makusudi: kugawanya jina lolote la herufi 6 kunaharibu
+# vitu visivyo FX. `AUS.IDX` inasafishwa kuwa `AUSIDX` — herufi 6 kamili —
+# na ilikuwa ikigawanywa `AUS`/`IDX`, ikihesabiwa kama sarafu MBILI mpya
+# ambazo hazipo. `BUND.TR` ilikuwa `BUN`/`DTR`. Makosa hayo yalipandisha
+# vitu visivyo FX juu ya orodha (2026-08-16).
+_CURRENCIES = frozenset(
+    """AED ARS AUD BGN BHD BRL CAD CHF CLP CNH CNY COP CZK DKK EGP EUR GBP
+       HKD HRK HUF IDR ILS INR ISK JPY KRW KWD MXN MYR NOK NZD PEN PHP PLN
+       RON RUB SAR SEK SGD THB TRY TWD USD UYU ZAR
+       XAU XAG XPT XPD""".split()
+)
 
-    Jozi ya FX ya herufi 6 inatoa mbili; kitu kingine chochote (index,
-    commodity) kinahesabiwa kama underlying MOJA yenye jina lake. Kukisia
-    zaidi ya hapo kungeleta makosa kimya kwenye majina yasiyo ya kawaida.
+# Sarafu zenye soko la kina kwa jozi yoyote — "anchor". Jozi isiyo na anchor
+# (mfano AEDCNH) karibu daima ni synthetic: broker anaijenga kutoka AEDUSD ×
+# USDCNH, na spread yake ni jumla ya mbili. Kwa utambulisho wa gharama
+# (`√n ≤ κ·SR*/cost_R`), symbol kama hiyo haiwezi kubeba setup kwa `n` yoyote.
+_ANCHORS = frozenset({"USD", "EUR"})
+
+
+def _underlyings(name: str) -> tuple[str, ...]:
+    """Sarafu ndani ya jina la symbol — kwa ORODHA, si kwa urefu.
+
+    Jina linagawanywa **ikiwa tu** nusu zote mbili ni sarafu zinazojulikana.
+    Kitu kingine chochote (index, bond, CFD) kinahesabiwa kama underlying
+    MOJA yenye jina lake, ambayo ndiyo ukweli wake.
     """
     clean = "".join(ch for ch in name.upper() if ch.isalnum())
-    if len(clean) == 6 and clean.isalpha():
+    if len(clean) == 6 and clean[:3] in _CURRENCIES and clean[3:] in _CURRENCIES:
         return (clean[:3], clean[3:])
     return (clean,)
+
+
+def _is_fx(parts: tuple[str, ...]) -> bool:
+    return len(parts) == 2
+
+
+def _has_anchor(parts: tuple[str, ...]) -> bool:
+    return any(p in _ANCHORS for p in parts)
 
 
 def _print_catalogue(cfg, available: list[str], source, args) -> bool:
@@ -375,23 +403,48 @@ def _print_catalogue(cfg, available: list[str], source, args) -> bool:
         bare = name[: -len(suffix)] if suffix and name.endswith(suffix) else name
         parts = _underlyings(bare)
         mpya = [p for p in parts if p not in tuna]
-        rows.append({"symbol": name, "bare": bare, "underlyings": list(parts), "new": mpya})
+        fx, anchor = _is_fx(parts), _has_anchor(parts)
+        if not fx:
+            sababu = "si FX spot"
+        elif not anchor:
+            sababu = "haina USD/EUR — synthetic"
+        elif not mpya:
+            sababu = "hakuna underlying mpya"
+        else:
+            sababu = ""
+        rows.append({
+            "symbol": name, "bare": bare, "underlyings": list(parts),
+            "new": mpya, "fx": fx, "anchor": anchor, "excluded": sababu,
+        })
 
-    rows.sort(key=lambda r: (-len(r["new"]), r["bare"]))
-    zenye_mpya = [r for r in rows if r["new"]]
+    wagombea = [r for r in rows if not r["excluded"]]
+    wagombea.sort(key=lambda r: (-len(r["new"]), r["bare"]))
 
     print(f"\nORODHA YA BROKER — symbols {len(rows)} zinapatikana")
-    print(f"tunazo underlyings {len(tuna)}: {', '.join(sorted(tuna))}\n")
+    print(f"tunazo underlyings {len(tuna)}: {', '.join(sorted(tuna))}")
+
+    kwa_sababu: dict[str, int] = {}
+    for row in rows:
+        if row["excluded"]:
+            kwa_sababu[row["excluded"]] = kwa_sababu.get(row["excluded"], 0) + 1
+    print("\n   zilizotolewa kwa sheria ya §3 ya T4:")
+    for sababu, idadi in sorted(kwa_sababu.items(), key=lambda kv: -kv[1]):
+        print(f"      {idadi:>4}  {sababu}")
+    print(f"\n   WAGOMBEA: {len(wagombea)}\n")
+
     print(f"   {'symbol':<14} {'underlyings':<14} {'MPYA'}")
-    for row in zenye_mpya[: args.catalogue_limit]:
+    for row in wagombea[: args.catalogue_limit]:
         print(f"   {row['symbol']:<14} {'/'.join(row['underlyings']):<14} "
               f"{', '.join(row['new'])}")
-    if len(zenye_mpya) > args.catalogue_limit:
-        print(f"   … na {len(zenye_mpya) - args.catalogue_limit} nyingine "
+    if len(wagombea) > args.catalogue_limit:
+        print(f"   … na {len(wagombea) - args.catalogue_limit} nyingine "
               f"(`--catalogue-limit` kuona zaidi)")
-    print(f"\n   zinazoleta underlying MPYA : {len(zenye_mpya)}")
-    print(f"   zisizoleta lolote jipya    : {len(rows) - len(zenye_mpya)}"
-          "   <- hizi zinaongeza rows, si blocs")
+
+    # Tunahitaji 15-17 kwa jumla, tunazo 12 — kwa hiyo 3-5 pekee.
+    pungufu = max(0, 15 - len(cfg.symbols))
+    print(f"\n   tunazo symbols {len(cfg.symbols)} · lengo 15–17 → "
+          f"tunahitaji {pungufu}–{pungufu + 2} pekee")
+    zenye_mpya = wagombea
 
     out_path = cfg.path_of("storage.reports_root") / "r4" / "broker_catalogue.json"
     out_path.parent.mkdir(parents=True, exist_ok=True)
@@ -401,7 +454,10 @@ def _print_catalogue(cfg, available: list[str], source, args) -> bool:
                 "server": source.source_identity(),
                 "symbol_suffix": suffix,
                 "n_available": len(rows),
+                "n_candidates": len(wagombea),
                 "underlyings_tulizonazo": sorted(tuna),
+                "anchors": sorted(_ANCHORS),
+                "candidates": wagombea,
                 "symbols": rows,
             },
             indent=2,
