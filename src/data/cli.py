@@ -291,6 +291,24 @@ def cmd_check_mt5(args: argparse.Namespace) -> int:
         source.connect()
     except SourceError as exc:
         print(f"muunganisho: IMESHINDIKANA — {exc}", file=sys.stderr)
+        # `Authorization failed` haimaanishi code imevunjika; inamaanisha
+        # terminal haijaingia kwenye akaunti yoyote NA hakuna sifa kwenye
+        # environment. Ujumbe wa MT5 pekee hausemi hilo, na hausemi njia mbili
+        # za kulitatua — kwa hiyo unasemwa hapa.
+        if "uthoriz" in str(exc).lower() or "authoriz" in str(exc).lower():
+            login_var = str(cfg.get("recorder.mt5.login_env", "ELITEFX_MT5_LOGIN"))
+            print(
+                "\n  Sababu: terminal haijaingia kwenye akaunti, na sifa hazipo kwenye\n"
+                "  environment. Njia mbili, chagua MOJA:\n\n"
+                "  1. Fungua MetaTrader 5 kwa mkono, ingia kwenye akaunti, iache wazi.\n"
+                f"     (`{login_var}` haijawekwa, kwa hiyo code inategemea session ya terminal.)\n\n"
+                "  2. Weka sifa kwenye `scripts\\env.local.bat` (HAIPUSHWI — G13):\n"
+                f"       set {login_var}=<namba ya akaunti>\n"
+                f"       set {cfg.get('recorder.mt5.password_env', 'ELITEFX_MT5_PASSWORD')}=<neno la siri>\n"
+                f"       set {cfg.get('recorder.mt5.server_env', 'ELITEFX_MT5_SERVER')}=<jina la server>\n"
+                "     kisha `scripts\\env.local.bat` kabla ya kuendesha amri.",
+                file=sys.stderr,
+            )
         return 1
 
     try:
@@ -312,9 +330,85 @@ def cmd_check_mt5(args: argparse.Namespace) -> int:
         ok = not missing and bool(broker_id)
         if not broker_id:
             print("  `recorder.broker_id` ni LAZIMA kabla ya kurekodi (spec §2.2).", file=sys.stderr)
+
+        if args.catalogue:
+            ok = _print_catalogue(cfg, sorted(available), source, args) and ok
         return 0 if ok else 1
     finally:
         source.shutdown()
+
+
+def _underlyings(name: str) -> tuple[str, ...]:
+    """Sarafu/underlyings ndani ya jina la symbol.
+
+    Jozi ya FX ya herufi 6 inatoa mbili; kitu kingine chochote (index,
+    commodity) kinahesabiwa kama underlying MOJA yenye jina lake. Kukisia
+    zaidi ya hapo kungeleta makosa kimya kwenye majina yasiyo ya kawaida.
+    """
+    clean = "".join(ch for ch in name.upper() if ch.isalnum())
+    if len(clean) == 6 and clean.isalpha():
+        return (clean[:3], clean[3:])
+    return (clean,)
+
+
+def _print_catalogue(cfg, available: list[str], source, args) -> bool:
+    """T4 hatua 1 — orodha ya broker ikipangwa kwa UNDERLYINGS MPYA.
+
+    Sheria ya 3 ya `docs/T4_CROSS_SECTION.md`: symbol inayoleta sarafu
+    isiyokuwepo inashinda jozi mpya ya sarafu zilizopo. Sababu si ladha —
+    blocs ndio kizuizi, si rows, na jozi za sarafu zilezile zinaongeza rows
+    pekee. Upangaji unafanywa HAPA, na jicho, ili usiwe wa kubahatisha.
+
+    **Hakuna kinachochaguliwa kwa `R`, `p_tp` au trendiness.** Jedwali hili
+    halijui lolote kati ya hivyo, na ndiyo maana linaweza kutangazwa kabla.
+    """
+    suffix = str(cfg.get("recorder.mt5.symbol_suffix", "") or "")
+    tuna: set[str] = set()
+    for symbol in cfg.symbols:
+        tuna.update(_underlyings(symbol))
+
+    rows = []
+    for name in available:
+        bare = name[: -len(suffix)] if suffix and name.endswith(suffix) else name
+        parts = _underlyings(bare)
+        mpya = [p for p in parts if p not in tuna]
+        rows.append({"symbol": name, "bare": bare, "underlyings": list(parts), "new": mpya})
+
+    rows.sort(key=lambda r: (-len(r["new"]), r["bare"]))
+    zenye_mpya = [r for r in rows if r["new"]]
+
+    print(f"\nORODHA YA BROKER — symbols {len(rows)} zinapatikana")
+    print(f"tunazo underlyings {len(tuna)}: {', '.join(sorted(tuna))}\n")
+    print(f"   {'symbol':<14} {'underlyings':<14} {'MPYA'}")
+    for row in zenye_mpya[: args.catalogue_limit]:
+        print(f"   {row['symbol']:<14} {'/'.join(row['underlyings']):<14} "
+              f"{', '.join(row['new'])}")
+    if len(zenye_mpya) > args.catalogue_limit:
+        print(f"   … na {len(zenye_mpya) - args.catalogue_limit} nyingine "
+              f"(`--catalogue-limit` kuona zaidi)")
+    print(f"\n   zinazoleta underlying MPYA : {len(zenye_mpya)}")
+    print(f"   zisizoleta lolote jipya    : {len(rows) - len(zenye_mpya)}"
+          "   <- hizi zinaongeza rows, si blocs")
+
+    out_path = cfg.path_of("storage.reports_root") / "r4" / "broker_catalogue.json"
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_path.write_text(
+        json.dumps(
+            {
+                "server": source.source_identity(),
+                "symbol_suffix": suffix,
+                "n_available": len(rows),
+                "underlyings_tulizonazo": sorted(tuna),
+                "symbols": rows,
+            },
+            indent=2,
+        ) + "\n",
+        encoding="utf-8",
+        newline="\n",
+    )
+    print(f"\nushahidi: {out_path}")
+    print("hatua: `probe-history --symbol <JINA> --from 2016-01-01` kwa kila mgombea.")
+    return True
 
 
 def cmd_probe_history(args: argparse.Namespace) -> int:
@@ -2803,6 +2897,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="ukaguzi wa mazingira ya MT5: muunganisho, server, symbols",
         parents=[common],
     )
+    p_mt5.add_argument(
+        "--catalogue",
+        action="store_true",
+        help="T4 — orodha ya symbols zote za broker, zikipangwa kwa UNDERLYING MPYA",
+    )
+    p_mt5.add_argument("--catalogue-limit", type=int, default=40)
     p_mt5.set_defaults(func=cmd_check_mt5)
 
     p_probe = subparsers.add_parser(

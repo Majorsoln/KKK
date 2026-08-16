@@ -132,3 +132,45 @@ def test_hash_ya_sehemu_haijali_maoni_wala_mpangilio(capsys):
 def test_hitilafu_ya_config_inarudisha_exit_2(capsys):
     assert main(["--config", "/haipo/data.yaml", "config-hash"]) == 2
     assert "HITILAFU" in capsys.readouterr().err
+
+
+# ===========================================================================
+# T4 — orodha ya broker
+# ===========================================================================
+
+
+def test_underlyings_zinatolewa_kwenye_jozi_na_si_kwenye_index():
+    """Jozi ya herufi 6 ina sarafu mbili; kitu kingine ni underlying MOJA.
+
+    Kukisia zaidi ya hapo kunaleta makosa kimya kwenye majina yasiyo ya
+    kawaida — na jina lililogawanywa vibaya linahesabiwa kama sarafu mpya
+    ambayo haipo, likipotosha upangaji mzima.
+    """
+    from src.data.cli import _underlyings
+
+    assert _underlyings("EURUSD") == ("EUR", "USD")
+    assert _underlyings("XAUUSD") == ("XAU", "USD")
+    assert _underlyings("US500") == ("US500",)
+    assert _underlyings("GER40.cash") == ("GER40CASH",)
+    # Kiambishi cha broker kinaondolewa kabla, kwa hiyo herufi 6 zinabaki 6.
+    assert _underlyings("eurusd") == ("EUR", "USD")
+
+
+def test_sarafu_mpya_ndiyo_inayopanga_orodha():
+    """Blocs ndio kizuizi, si rows — na jozi za sarafu zilezile hazileti blocs."""
+    from src.data.cli import _underlyings
+
+    tuna = {"EUR", "USD", "JPY", "GBP", "CHF", "CAD", "AUD", "NZD", "XAU"}
+
+    def new_count(name: str) -> int:
+        return len([p for p in _underlyings(name) if p not in tuna])
+
+    assert new_count("EURSEK") == 1        # SEK ni mpya
+    assert new_count("SEKNOK") == 2        # zote mbili mpya
+    assert new_count("EURGBP") == 0        # jozi mpya, sarafu zilezile
+    assert new_count("GBPCHF") == 0
+    # Upangaji: nyingi za mpya kwanza.
+    wagombea = ["EURGBP", "EURSEK", "SEKNOK", "GBPCHF"]
+    wagombea.sort(key=lambda n: (-new_count(n), n))
+    assert wagombea[:2] == ["SEKNOK", "EURSEK"]
+    assert new_count(wagombea[-1]) == 0
