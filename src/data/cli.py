@@ -2774,8 +2774,20 @@ def cmd_select_symbols(args: argparse.Namespace) -> int:
     series: dict[str, pd.Series] = {}
     fupi: list[tuple[str, str]] = []
     try:
-        for symbol in tunazo + wagombea:
+        # Maendeleo yanaonyeshwa kwa KILA symbol, si mwishoni.
+        #
+        # Ombi la kwanza kwa symbol ambayo haijawahi kuwa kwenye Market Watch
+        # linaweza kuanzisha upakuaji kutoka broker, na sekunde chache kwa
+        # symbol × 48 ni dakika kadhaa. Bila mstari kwa kila moja, amri
+        # inaonekana imekwama — na kuiacha ikikimbia kimya ni gharama
+        # tuliyokwisha kuilipa mara moja kwa `setup-effect` (2026-08-14).
+        jumla = len(tunazo) + len(wagombea)
+        anza = time.monotonic()
+        for i, symbol in enumerate(tunazo + wagombea, start=1):
             close = source.fetch_daily_close(symbol, start, end)
+            muda = time.monotonic() - anza
+            kadirio = f" · ~{muda / i * (jumla - i):.0f}s zimebaki" if i >= 3 else ""
+            print(f"   {i:>3}/{jumla}  {symbol:<10} bars {len(close):>6,}{kadirio}", flush=True)
             if close.empty:
                 fupi.append((symbol, "hakuna data"))
                 continue
