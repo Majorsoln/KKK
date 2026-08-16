@@ -244,6 +244,42 @@ def cmd_backfill(args: argparse.Namespace) -> int:
     recorder = TickRecorder(source, cfg, settings=settings)
     started = time.monotonic()
 
+    # UKAGUZI WA KABLA — sekunde moja badala ya nusu saa.
+    #
+    # Ombi la ticks kwa siku isiyokuwepo kwa broker **linazuia** MT5 kwa
+    # ~sekunde 100 wakati inajaribu kupakua, na `copy_ticks_range` haina
+    # timeout ya kila ombi. Circuit breaker inasimamisha baada ya kufeli 5 —
+    # yaani baada ya ~dakika 27 za kusubiri jibu tulilokwisha lijua.
+    #
+    # Bar ya D1 ni **mpaka wa juu** wa kina cha ticks: broker asiye na bar ya
+    # D1 ya tarehe fulani hana ticks za tarehe hiyo. Kuiuliza ni ombi moja
+    # jepesi (2026-08-16: USDMXN 2016-01-04 ilikula 5m26s kisha ikafeli).
+    if not args.dry_run and not args.replay_dir and not args.skip_preflight:
+        from datetime import datetime as _dt, timezone as _tz
+
+        for symbol in settings.symbols:
+            probe = source.fetch_daily_close(
+                symbol,
+                _dt.combine(start, _dt.min.time()).replace(tzinfo=_tz.utc),
+                _dt.combine(start + timedelta(days=14), _dt.min.time()).replace(tzinfo=_tz.utc),
+            )
+            if probe.empty:
+                print(
+                    f"{symbol}: broker hana hata bar ya D1 kati ya {start} na "
+                    f"{start + timedelta(days=14)}.\n"
+                    "  Ticks hazitakuwepo pia — backfill ingeshindwa kwa kila siku,\n"
+                    "  kila kushindwa kukichukua ~sekunde 100.\n\n"
+                    f"  Tafuta mpaka halisi wa history kwanza:\n"
+                    f"    python -m src.data.cli probe-history --symbol {symbol} "
+                    f"--from {start} --to {end}\n\n"
+                    "  (`--skip-preflight` kupuuza ukaguzi huu.)",
+                    file=sys.stderr,
+                )
+                shutdown = getattr(source, "shutdown", None)
+                if callable(shutdown):
+                    shutdown()
+                return 2
+
     def _progress(done: int, total: int, label: str) -> None:
         print(f"  [{done}/{total}] {label}", flush=True)
 
@@ -3105,6 +3141,11 @@ def build_parser() -> argparse.ArgumentParser:
     p_back.add_argument("--dry-run", action="store_true", help="onyesha zinazokosekana bila kuvuta")
     p_back.add_argument("--max-days", type=int, help="kikomo cha siku kwa run moja")
     p_back.add_argument("--replay-dir", help="chanzo cha replay badala ya MT5")
+    p_back.add_argument(
+        "--skip-preflight",
+        action="store_true",
+        help="puuza ukaguzi wa D1 unaozuia backfill isiyowezekana",
+    )
     p_back.add_argument(
         "--max-consecutive-failures",
         type=int,

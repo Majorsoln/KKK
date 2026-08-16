@@ -223,3 +223,17 @@ def test_jozi_bila_usd_au_eur_zinatambuliwa_kama_synthetic():
     assert not _has_anchor(_underlyings("CNHZAR"))
     assert _has_anchor(_underlyings("USDMXN"))
     assert _has_anchor(_underlyings("EURSEK"))
+
+
+def test_backfill_ina_ukaguzi_wa_kabla_wa_d1():
+    """Ombi la ticks zisizokuwepo linazuia MT5 ~sekunde 100, bila timeout.
+
+    Circuit breaker inasimamisha baada ya kufeli 5 — dakika 27 za kusubiri
+    jibu tulilokwisha lijua. Bar ya D1 ni mpaka wa juu wa kina cha ticks, na
+    kuiuliza ni ombi moja jepesi.
+    """
+    source = (REPO_ROOT / "src" / "data" / "cli.py").read_text(encoding="utf-8")
+    assert "fetch_daily_close" in source
+    assert "--skip-preflight" in source
+    # Ukaguzi lazima uwe KABLA ya backfill_missing, la sivyo hauokoi chochote.
+    assert source.index("UKAGUZI WA KABLA") < source.index("outcome = backfill_missing(")
