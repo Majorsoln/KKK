@@ -777,6 +777,63 @@ linaweza kunakiliwa, yaliyomo hayawezi.
 
 Faili la awali linarudishwa kwa `git checkout -- research/reports/r1/cost_audit.json`.
 
+#### CI — 2026-08-14
+
+```
+EV net  +0.0039 R  ·  90% CI [-0.0147, +0.0206]
+pool HAIJATHIBITIKA kulipa
+```
+
+Upana wa 0.0353 unatoa `SE ≈ 0.0107`. Nukta ya **+0.0039 iko 0.36 SE juu ya sifuri** —
+yaani **sifuri**.
+
+Tofautisha vitu viwili, kwa sababu vinachanganywa kwa urahisi:
+
+* **Uboreshaji ni halisi.** Kutoka −0.0163 hadi +0.0039 ni +0.0202 R, na unatokana kabisa
+  na symbols mbili zilizothibitika kupoteza (FWER −0.20, −0.18). Hilo linashikilia.
+* **Kiwango hakijathibitika.** Pool mpya inakaa **sifuri**, si faida.
+
+SETUP-v1 kwenye symbols 10 bora si strategy inayopoteza tena. Wala si inayolipa. Ni
+**sarafu inayopinduliwa**, na model inatakiwa iongeze **+0.0505 R** juu yake.
+
+## 10. Pendekezo la kufunga T3
+
+**Msikike wazi: config 3 isitumike kuendesha meta-labelling kwenye pool ya symbols 10.**
+
+Hoja ni moja na inatosha. Lift ya hatua 3 (`ρ` 0.8182) **ilikuwa kwa sehemu kubwa
+utambuzi wa symbol** — ilianguka hadi 0.5152 base rate za symbols zilipoondolewa. Utambuzi
+huo sasa umegeuzwa kuwa **sheria ya population isiyobadilika**, ambayo ndiyo matumizi
+sahihi yake: ni **ukweli tuli**, si kazi ya model.
+
+Kilichobaki kwa model ni mabaki ya ndani ya symbol: `ρ` 0.5152 (p 0.040) — halisi lakini
+dhaifu — na `top R` p **0.119**, ambayo **haikulipa kwenye symbols 12**. Hakuna sababu ya
+kutarajia ilipe kwenye 10. Bar imeshuka, na chakula cha model kimeshuka nacho.
+
+**Njia tatu zinazobaki, na ninayoipendekeza:**
+
+| | Njia | Gharama | Hoja |
+|---|---|---|---|
+| **A** | Panua symbols 12 → 28 **kwa ajili ya kupima sheria ya trendiness pekee** | kubwa (data + muda) | **Ninaipendekeza** |
+| B | Badilisha SETUP-v1 yenyewe | kubwa (rebuild ya labels + pre-registration mpya) | grid nzima inaonyesha 2.0/3.0 ndiyo dari ya setup hii |
+| C | Simama | sifuri | matokeo yasiyofaa kutumika si hasara ikiwa yamejulikana |
+
+**Kwa nini A.** Ni nadharia pekee tuliyonayo inayo­kidhi vyote vinne:
+
+1. **Ina utaratibu wa kiuchumi** — SETUP-v1 ni bet ya kufuata trend yenye TP:SL 3:2;
+   symbols zinazozunguka zinaiadhibu, zinazotrend zinailipa.
+2. **Haitumii label** — `eff_ratio_24h` na `adx14` zinahesabiwa kutoka bei pekee, kwa hiyo
+   sheria inayotokana nazo **si uteuzi juu ya label**.
+3. **Ina dalili** — ρ +0.545 dhidi ya 0.643 inayohitajika. Imekaribia, haijafika.
+4. **Kizuizi chake kinajulikana na kinatatulika** — si rows (25,314 zinatosha) bali
+   **blocs (7.54)**. Symbols zaidi ni njia pekee ya kuongeza blocs.
+
+Na tofauti muhimu zaidi: sheria ya trendiness inaweza kutumika kwa **symbol yoyote mpya**,
+hata isiyokuwepo kwenye data yetu. Filter model juu ya jozi 12 zilizowekwa haiwezi.
+
+**§3.9 ilikuwa sahihi kuahirisha upanuzi, kwa sababu isiyo sahihi.** Iliahirisha kwa
+kuwa `N_eff` ilitosha — na ilitosha, **kwenye mhimili wa muda**. Mhimili unaobana ni wa
+cross-section, na hilo halikujulikana hadi hatua 4.
+
 
 
 Random-label na shuffled-score. Pipeline ikitoa matokeo chanya pale hakuna signal, **kila kitu
