@@ -2566,6 +2566,80 @@ def cmd_placebo(args: argparse.Namespace) -> int:
     return 0 if verdict_ok else 1
 
 
+def cmd_cross_power(args: argparse.Namespace) -> int:
+    """T4 — blocs ngapi zinahitajika kupima sheria ya cross-section?
+
+    Hatua 4 iliishia hapa: `ρ` ya trendiness ilikuwa +0.545, ikihitaji 0.643,
+    na tofauti hiyo si ya `ρ` bali ya **blocs**. Symbols 12 zilitoa 7.54 huru
+    pekee, kwa hiyo hakuna `ρ` iliyoweza kuhitimisha.
+
+    Utambulisho ni wa Fisher: `ρ_crit = z_α ÷ √(blocs − 1)`, ukigeuzwa
+    `blocs = 1 + (z_α ÷ ρ)²`.
+
+    **Symbols si blocs.** Jozi zinazoshiriki sarafu zinasogea pamoja; kuongeza
+    EURNOK kwenye pool yenye EUR nyingi kunaongeza row, si taarifa. Ndiyo maana
+    amri hii inaripoti mipaka miwili badala ya namba moja: ya chini inadhania
+    urudufu ule ule wa sasa, ya juu inadhania kila symbol mpya inaleta bloc
+    yake. Ukweli uko kati, na uko karibu na upi **inategemea sarafu, si idadi**.
+    """
+    import numpy as np
+    from statistics import NormalDist
+
+    alpha = args.alpha / args.tests if args.tests > 1 else args.alpha
+    z = NormalDist().inv_cdf(1.0 - alpha)
+    need = 1.0 + (z / args.rho) ** 2
+
+    print(f"NGUVU YA CROSS-SECTION — ρ {args.rho:.3f} · α {args.alpha} "
+          f"· vipimo {args.tests}\n")
+    if args.tests > 1:
+        print(f"   Šidák: α kwa kila kipimo = {alpha:.4f}  (z = {z:.3f})")
+    print(f"   blocs zinazohitajika : {need:>6.1f}")
+    print(f"   blocs zilizopo       : {args.blocs:>6.2f}   (symbols {args.symbols})")
+    detectable = z / np.sqrt(max(args.blocs - 1.0, 1e-9))
+    print(f"   ρ inayoweza kupimika kwa blocs zilizopo: {detectable:.3f}")
+
+    if args.blocs >= need:
+        print("\n   INATOSHA — hakuna haja ya symbols zaidi kwa swali hili.")
+        rc = 0
+    else:
+        ratio = args.blocs / max(args.symbols, 1)
+        # Mpaka wa chini: symbols mpya zina urudufu ULE ULE wa zilizopo.
+        # Mpaka wa juu: kila symbol mpya inaleta bloc kamili.
+        pessimistic = int(np.ceil(need / max(ratio, 1e-9)))
+        optimistic = int(np.ceil(args.symbols + (need - args.blocs)))
+        print(f"\n   HAITOSHI — pungufu ya blocs {need - args.blocs:.1f}")
+        print(f"   symbols zinazohitajika: kati ya {optimistic} na {pessimistic}")
+        print(f"      {optimistic:>3} ikiwa kila symbol mpya inaleta bloc yake "
+              "(sarafu MPYA, si jozi mpya za zile zile)")
+        print(f"      {pessimistic:>3} ikiwa urudufu unabaki {ratio:.2f} bloc kwa symbol "
+              "(jozi zaidi za sarafu zile zile)")
+        print("\n   Tofauti kati ya namba hizo mbili ndiyo thamani ya kuchagua "
+              "sarafu\n   mpya badala ya jozi mpya. Si suala la idadi.")
+        rc = 1
+
+    if args.out:
+        Path(args.out).write_text(
+            json.dumps(
+                {
+                    "rho": args.rho,
+                    "alpha": args.alpha,
+                    "tests": args.tests,
+                    "alpha_per_test": alpha,
+                    "blocs_required": need,
+                    "blocs_available": args.blocs,
+                    "symbols_available": args.symbols,
+                    "rho_detectable_now": float(detectable),
+                    "sufficient": bool(args.blocs >= need),
+                },
+                indent=2,
+            ) + "\n",
+            encoding="utf-8",
+            newline="\n",
+        )
+        print(f"\nushahidi: {args.out}")
+    return rc
+
+
 def cmd_splits(args: argparse.Namespace) -> int:
     """DF-14 / lango G2 — mpango wa splits kutoka config PEKEE (spec §7)."""
     cfg = _load(args)
@@ -3040,6 +3114,19 @@ def build_parser() -> argparse.ArgumentParser:
              "ujuzi wa WAKATI na utambuzi wa SYMBOL",
     )
     p_plac.set_defaults(func=cmd_placebo)
+
+    p_cross = subparsers.add_parser(
+        "cross-power",
+        help="T4 — blocs ngapi zinahitajika kupima sheria ya cross-section",
+        parents=[common],
+    )
+    p_cross.add_argument("--rho", type=float, default=0.545, help="athari ya kupimwa")
+    p_cross.add_argument("--blocs", type=float, default=7.54, help="participation ratio ya sasa")
+    p_cross.add_argument("--symbols", type=int, default=12)
+    p_cross.add_argument("--alpha", type=float, default=0.05)
+    p_cross.add_argument("--tests", type=int, default=1, help="vipimo vilivyotangazwa")
+    p_cross.add_argument("--out")
+    p_cross.set_defaults(func=cmd_cross_power)
 
     p_split = subparsers.add_parser(
         "splits", help="DF-14 / G2 — mpango wa splits + holdout guard (§7)", parents=[common]

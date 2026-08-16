@@ -300,3 +300,42 @@ def test_cost_audit_ya_subset_haiandiki_juu_ya_ushahidi_wa_pool_nzima(tmp_path, 
     # Mpangilio wa symbols hauhesabiki — seti ndiyo inayohesabika.
     tena = hashlib.sha256(",".join(sorted(reversed(zote))).encode("utf-8")).hexdigest()[:8]
     assert tena == digest
+
+
+# ===========================================================================
+# T4 — nguvu ya cross-section
+# ===========================================================================
+
+
+def test_blocs_zinazohitajika_ni_kinyume_cha_rho_crit():
+    """`ρ_crit = z/√(blocs−1)` na `blocs = 1 + (z/ρ)²` lazima zilingane.
+
+    Kama hazilingani, kizingiti kinachoripotiwa na idadi inayopendekezwa ni
+    vitu viwili tofauti, na mpango wa T4 unajengwa juu ya mchanga.
+    """
+    import math
+    from statistics import NormalDist
+
+    z = NormalDist().inv_cdf(0.95)
+    for rho in (0.40, 0.50, 0.545, 0.70):
+        blocs = 1.0 + (z / rho) ** 2
+        assert z / math.sqrt(blocs - 1.0) == pytest.approx(rho, rel=1e-9)
+
+
+def test_kipimo_kimoja_kinapunguza_blocs_zinazohitajika():
+    """Kutangaza kipimo KIMOJA badala ya viwili ni uamuzi wa gharama, si mtindo."""
+    from statistics import NormalDist
+
+    dist = NormalDist()
+    kimoja = 1.0 + (dist.inv_cdf(0.95) / 0.545) ** 2
+    viwili = 1.0 + (dist.inv_cdf(1 - 0.05 / 2) / 0.545) ** 2
+    assert kimoja < viwili
+    # Kwa ρ 0.545: 10.1 dhidi ya 13.9 — blocs 3.8 zaidi, yaani symbols 4-6.
+    assert viwili - kimoja == pytest.approx(3.82, abs=0.05)
+
+
+def test_athari_ndogo_inadai_blocs_nyingi_zaidi():
+    from statistics import NormalDist
+
+    z = NormalDist().inv_cdf(0.95)
+    assert (1.0 + (z / 0.434) ** 2) > (1.0 + (z / 0.545) ** 2) > (1.0 + (z / 0.70) ** 2)
