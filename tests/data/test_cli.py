@@ -174,3 +174,23 @@ def test_sarafu_mpya_ndiyo_inayopanga_orodha():
     wagombea.sort(key=lambda n: (-new_count(n), n))
     assert wagombea[:2] == ["SEKNOK", "EURSEK"]
     assert new_count(wagombea[-1]) == 0
+
+
+def test_mwongozo_wa_amri_hautumii_mabano_ya_pembe():
+    """`<...>` kwenye maandishi ya amri ni mtego kwenye cmd ya Windows.
+
+    `set X=<thamani>` na `--symbol <JINA>` zote zinasoma `<` kama redirect ya
+    faili, na PD anapata "The system cannot find the file specified" badala ya
+    kile alichokusudia. Mifano lazima iwe ya kunakiliwa moja kwa moja.
+    """
+    import re
+
+    source = (REPO_ROOT / "src" / "data" / "cli.py").read_text(encoding="utf-8")
+    # Tafuta mabano ndani ya mistari inayoonyeshwa kwa mtumiaji pekee.
+    makosa = [
+        line.strip()
+        for line in source.splitlines()
+        if re.search(r'(set [A-Z_]+=|--symbol |--from )', line)
+        and re.search(r'<[a-zA-Z ]+>', line)
+    ]
+    assert not makosa, f"mifano yenye mabano: {makosa}"

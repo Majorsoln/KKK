@@ -302,10 +302,13 @@ def cmd_check_mt5(args: argparse.Namespace) -> int:
                 "  environment. Njia mbili, chagua MOJA:\n\n"
                 "  1. Fungua MetaTrader 5 kwa mkono, ingia kwenye akaunti, iache wazi.\n"
                 f"     (`{login_var}` haijawekwa, kwa hiyo code inategemea session ya terminal.)\n\n"
-                "  2. Weka sifa kwenye `scripts\\env.local.bat` (HAIPUSHWI — G13):\n"
-                f"       set {login_var}=<namba ya akaunti>\n"
-                f"       set {cfg.get('recorder.mt5.password_env', 'ELITEFX_MT5_PASSWORD')}=<neno la siri>\n"
-                f"       set {cfg.get('recorder.mt5.server_env', 'ELITEFX_MT5_SERVER')}=<jina la server>\n"
+                "  2. Weka sifa kwenye `scripts\\env.local.bat` (HAIPUSHWI — G13).\n"
+                "     ANDIKA THAMANI MOJA KWA MOJA, BILA mabano — cmd ya Windows\n"
+                "     inasoma `<` kama redirect ya faili, si kama mahali pa kujaza:\n\n"
+                f"       set {login_var}=12345678\n"
+                f"       set {cfg.get('recorder.mt5.password_env', 'ELITEFX_MT5_PASSWORD')}=nenoLakoLaSiri\n"
+                f"       set {cfg.get('recorder.mt5.server_env', 'ELITEFX_MT5_SERVER')}=JinaLaServer-Demo\n\n"
+                "     (namba na maneno hapo juu ni MIFANO — badilisha na yako.)\n"
                 "     kisha `scripts\\env.local.bat` kabla ya kuendesha amri.",
                 file=sys.stderr,
             )
@@ -407,7 +410,8 @@ def _print_catalogue(cfg, available: list[str], source, args) -> bool:
         newline="\n",
     )
     print(f"\nushahidi: {out_path}")
-    print("hatua: `probe-history --symbol <JINA> --from 2016-01-01` kwa kila mgombea.")
+    mfano = zenye_mpya[0]["symbol"] if zenye_mpya else "EURUSD"
+    print(f"hatua: `probe-history --symbol {mfano} --from 2016-01-01` kwa kila mgombea.")
     return True
 
 

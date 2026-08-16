@@ -84,7 +84,7 @@ inaonekana nzuri. Sheria ya 3 haijui lolote kati ya hivyo.
 Inachaguliwa kwa `cross-power`, si kwa kubahatisha:
 
 ```
-python -m src.data.cli cross-power --rho 0.545 --blocs <PR ya sasa> --symbols <idadi>
+python -m src.data.cli cross-power --rho 0.545 --blocs 7.54 --symbols 12
 ```
 
 Kwa `ρ = 0.545`: **15–17**. **Si 28.** §3.9 ilikadiria 28 kwa hisia; hesabu inasema chini
