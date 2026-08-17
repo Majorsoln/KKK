@@ -1930,9 +1930,26 @@ def cmd_cost_audit(args: argparse.Namespace) -> int:
         sums = np.array([np.nansum(r_rows[yrs == lv]) for lv in levels])
         counts = np.array([int((yrs == lv).sum()) for lv in levels], dtype=float)
         boot = np.random.RandomState(20260814)
-        pick = boot.randint(0, len(levels), size=(5000, len(levels)))
+        pick = boot.randint(0, len(levels), size=(20000, len(levels)))
         draws = sums[pick].sum(axis=1) / np.maximum(counts[pick].sum(axis=1), 1.0)
         ev_low, ev_high = (float(np.percentile(draws, 5)), float(np.percentile(draws, 95)))
+
+        # MPAKA ULIOREKEBISHWA KWA GRID NZIMA.
+        #
+        # Jedwali hapo juu lina cells 49. Kuangalia zote kisha kuomba CI ya
+        # bora zaidi ni kosa lile lile la jedwali la symbols 12: bora kati ya
+        # 49 karibu daima ina mpaka wa chini chanya kwa bahati.
+        #
+        # Šidák: kwa 5% ya FAMILIA, kila cell inahitaji asilimia
+        # `100·(1 − 0.95^(1/49)) = 0.105`. Ndiyo maana draws ni 20,000 na si
+        # 5,000 — asilimia 0.105 ya 5,000 ni draw ya tano, kelele tupu.
+        #
+        # Mpaka huu ni **mkali kupita kiasi** kwa cell iliyotangazwa kabla
+        # (hiyo ni jaribio MOJA). Ni sahihi kwa cell iliyochaguliwa kwa
+        # kuangalia jedwali. Zote mbili zinaripotiwa, na PD anajua ipi ni ipi.
+        n_cells_grid = int(len(frame))
+        q_fwer = 100.0 * (1.0 - 0.95 ** (1.0 / max(n_cells_grid, 1)))
+        ev_low_fwer = float(np.percentile(draws, q_fwer))
 
         print(f"\nIDENTITIES (cell {want_sl:.2f}/{want_tp:.2f} · SR* {args.sr_target} · κ {args.kappa})")
         print(f"   dEV/dp_tp = 1 + tp/sl = {dev_dp:.2f}")
@@ -1944,6 +1961,13 @@ def cmd_cost_audit(args: argparse.Namespace) -> int:
         print(f"\n   EV net  {ev_net:>+8.4f} R   ·   90% CI [{ev_low:+.4f}, {ev_high:+.4f}]")
         print("   " + ("pool INALIPA (mpaka wa chini juu ya sifuri)" if ev_low > 0
                        else "pool HAIJATHIBITIKA kulipa — mpaka wa chini uko chini ya sifuri"))
+        print(f"   mpaka wa chini ULIOREKEBISHWA kwa cells {n_cells_grid} "
+              f"(Šidák, asilimia {q_fwer:.3f}): {ev_low_fwer:+.4f}")
+        print("   " + (
+            "   ...unashikilia hata cell ikiwa imechaguliwa kwa kuangalia jedwali"
+            if ev_low_fwer > 0 else
+            "   ...cell iliyochaguliwa kwa kuangalia jedwali HAISHIKILII"
+        ))
         print(f"\n   hadi breakeven        {gap_to_breakeven:>8.4f} p_tp")
         print(f"   δ_MER (SR* {args.sr_target})        {delta:>8.4f} p_tp")
         print(f"   ---------------------------------------")
@@ -1990,6 +2014,10 @@ def cmd_cost_audit(args: argparse.Namespace) -> int:
                     "ev_r_net": ev_net,
                     "ev_r_net_ci90": [ev_low, ev_high],
                     "ev_r_net_positive": bool(ev_low > 0),
+                    "ev_r_net_low_fwer": ev_low_fwer,
+                    "ev_r_net_positive_fwer": bool(ev_low_fwer > 0),
+                    "grid_cells": n_cells_grid,
+                    "fwer_percentile": q_fwer,
                     "gap_to_breakeven": gap_to_breakeven,
                     "delta_mer": delta,
                     "total_lift_required": total_lift,

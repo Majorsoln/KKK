@@ -413,3 +413,26 @@ def test_spread_pana_inaua_setup_bila_kujali_kitu_kingine():
     n_pana = n_max_from_cost(0.0271 * 2, sr_target=0.7, kappa=0.5)
     assert n_pana == pytest.approx(n_zetu / 4.0, rel=1e-9)
     assert n_zetu > 150 and n_pana < 50
+
+
+def test_mpaka_wa_grid_nzima_ni_mkali_kuliko_wa_cell_moja():
+    """Cells 49 zikiangaliwa kisha bora ikachaguliwa — CI yake ni ya uongo.
+
+    Ni kosa lile lile la jedwali la symbols 12: bora kati ya wengi karibu
+    daima ina mpaka wa chini chanya kwa bahati. Šidák kwa 49 inadai asilimia
+    0.105, si 5 — tofauti ya mara 48.
+    """
+    import numpy as np
+
+    q5 = 5.0
+    q_fwer = 100.0 * (1.0 - 0.95 ** (1.0 / 49))
+    assert q_fwer < q5 / 40, f"marekebisho ni hafifu: {q_fwer:.4f}"
+
+    rng = np.random.RandomState(0)
+    draws = rng.normal(0.02, 0.012, 20000)
+    low5 = float(np.percentile(draws, q5))
+    low_f = float(np.percentile(draws, q_fwer))
+    assert low_f < low5, "mpaka wa FWER lazima uwe chini"
+    # Kwa athari ya +0.02 na SE 0.012, tofauti ni ya kuamua: p5 chanya,
+    # FWER hasi — hukumu mbili tofauti kabisa kutoka data ile ile.
+    assert low5 > 0 and low_f < 0
