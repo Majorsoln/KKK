@@ -2774,7 +2774,7 @@ def cmd_select_symbols(args: argparse.Namespace) -> int:
     kinaweza kuendeshwa kabla ya sahihi bila kuchafua chochote.
     """
     cfg = _load(args)
-    from datetime import datetime, timezone
+    from datetime import datetime, timedelta, timezone
 
     import numpy as np
     import pandas as pd
@@ -2859,6 +2859,44 @@ def cmd_select_symbols(args: argparse.Namespace) -> int:
             print(f"      {symbol:<10} {sababu}")
         if len(fupi) > args.limit:
             print(f"      … na {len(fupi) - args.limit} nyingine")
+        print()
+
+    # ------------------------------------------------------------------
+    # LANGO LA UKAMILIFU — tarehe ya kuanza haitoshi.
+    #
+    # `EURTRY` inaanza 2016 lakini ina bars 1,729 kati ya siku 2,150 za kazi:
+    # inakosa 421, yaani 20%. `EURNOK` ina 2,415 — bars **265 ZA ZIADA** juu
+    # ya siku za kazi, yaani bars za wikendi. Zote mbili zilipita chujio cha
+    # kwanza kwa sababu kilikuwa kikiangalia tarehe ya kuanza pekee.
+    #
+    # Pande zote mbili ni hatari kwa labels zetu: mashimo yanavunja path ya
+    # ticks, na bars za wikendi zinamaanisha session template tofauti — barrier
+    # "iliyoguswa" wakati soko halisi limefungwa.
+    #
+    # Idadi ya siku za kazi inahesabiwa kutoka KALENDA, si kutoka symbol
+    # nyingine: symbols zetu 12 zina D1 zilizopakuliwa nusu (USDJPY 1,677
+    # ilhali tuna bars 50,276 za H1 kwenye L2), kwa hiyo hazifai kuwa rejeleo.
+    siku_kazi = sum(
+        1 for i in range((end.date() - start.date()).days)
+        if (start.date() + timedelta(days=i)).weekday() < 5
+    )
+    mabaya: list[tuple[str, str]] = []
+    for symbol in list(series):
+        if symbol in tunazo:
+            continue  # zetu zimekwisha pita malango ya §3 kwenye ticks HALISI
+        sehemu = len(series[symbol]) / max(siku_kazi, 1)
+        if sehemu < args.coverage_min:
+            mabaya.append((symbol, f"bars {len(series[symbol]):,} = {sehemu:.0%} — mashimo"))
+            series.pop(symbol)
+        elif sehemu > args.coverage_max:
+            mabaya.append((symbol, f"bars {len(series[symbol]):,} = {sehemu:.0%} — bars za wikendi"))
+            series.pop(symbol)
+    if mabaya:
+        print(f"   zilizotolewa kwa ukamilifu (siku za kazi {siku_kazi:,}):")
+        for symbol, sababu in mabaya[: args.limit]:
+            print(f"      {symbol:<10} {sababu}")
+        if len(mabaya) > args.limit:
+            print(f"      … na {len(mabaya) - args.limit} nyingine")
         print()
 
     hai = [s for s in wagombea if s in series]
@@ -2977,6 +3015,8 @@ def cmd_select_symbols(args: argparse.Namespace) -> int:
                 "blocs_r_panel_estimate": kadirio,
                 "blocs_required": need,
                 "rho_target": args.rho,
+                "weekdays_in_window": siku_kazi,
+                "excluded_coverage": [{"symbol": s, "reason": r} for s, r in mabaya],
                 "vol_floor": sakafu,
                 "excluded_low_vol": dhaifu,
                 "annual_vol": {k: float(v) for k, v in vol.items()},
@@ -3569,6 +3609,10 @@ def build_parser() -> argparse.ArgumentParser:
                        help="majaribio kwa symbol wakati upakuaji unaendelea")
     p_sel.add_argument("--vol-floor-frac", type=float, default=0.5,
                        help="sakafu ya volatility kama sehemu ya ndogo kati ya zetu")
+    p_sel.add_argument("--coverage-min", type=float, default=0.90,
+                       help="bars ndogo kuliko hii ya siku za kazi = mashimo")
+    p_sel.add_argument("--coverage-max", type=float, default=1.02,
+                       help="bars kubwa kuliko hii = bars za wikendi (session tofauti)")
     p_sel.set_defaults(func=cmd_select_symbols)
 
     p_cross = subparsers.add_parser(

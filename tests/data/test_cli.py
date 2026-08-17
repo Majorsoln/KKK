@@ -237,3 +237,51 @@ def test_backfill_ina_ukaguzi_wa_kabla_wa_d1():
     assert "--skip-preflight" in source
     # Ukaguzi lazima uwe KABLA ya backfill_missing, la sivyo hauokoi chochote.
     assert source.index("UKAGUZI WA KABLA") < source.index("outcome = backfill_missing(")
+
+
+def test_ukamilifu_unakamata_pande_zote_mbili():
+    """Mashimo NA bars za ziada — zote mbili ni hatari, kwa sababu tofauti.
+
+    `EURTRY` ilipita chujio cha tarehe ya kuanza ikiwa na bars 1,729 kati ya
+    siku 2,150 za kazi (inakosa 421). `EURNOK` ilipita ikiwa na 2,415 — bars
+    265 ZA ZIADA juu ya siku za kazi, yaani bars za wikendi.
+
+    Mashimo yanavunja path ya ticks; bars za wikendi zinamaanisha barrier
+    "iliyoguswa" wakati soko halisi limefungwa.
+    """
+    from datetime import date, timedelta
+
+    a, b = date(2016, 1, 4), date(2024, 4, 1)
+    siku_kazi = sum(
+        1 for i in range((b - a).days) if (a + timedelta(days=i)).weekday() < 5
+    )
+    assert siku_kazi == 2150
+
+    def hukumu(bars: int, lo: float = 0.90, hi: float = 1.02) -> str:
+        sehemu = bars / siku_kazi
+        if sehemu < lo:
+            return "mashimo"
+        if sehemu > hi:
+            return "wikendi"
+        return "sawa"
+
+    assert hukumu(2146) == "sawa"      # EURUSD — rejeleo halisi
+    assert hukumu(2175) == "sawa"      # EURZAR
+    assert hukumu(2047) == "sawa"      # EURCZK
+    assert hukumu(1729) == "mashimo"   # EURTRY
+    assert hukumu(1627) == "mashimo"   # USDMXN
+    assert hukumu(2415) == "wikendi"   # EURNOK
+    assert hukumu(2433) == "wikendi"   # USDCZK
+
+
+def test_symbols_zetu_hazipimwi_kwa_d1_ya_broker():
+    """D1 za symbols zetu zinapakuliwa nusu — hazifai kuwa rejeleo wala mashtaka.
+
+    `USDJPY` inaonyesha bars 1,677 kwenye D1 ya terminal, ilhali tuna bars
+    50,276 za H1 kwenye L2 zilizotoka kwa broker huyu huyu. Kupima symbols
+    zetu kwa D1 kungezitoa kwenye pool zenyewe.
+    """
+    source = (REPO_ROOT / "src" / "data" / "cli.py").read_text(encoding="utf-8")
+    i = source.index("LANGO LA UKAMILIFU")
+    j = source.index("hai = [s for s in wagombea if s in series]", i)
+    assert "if symbol in tunazo:" in source[i:j], "zetu hazijaachwa nje ya lango"
