@@ -78,6 +78,17 @@ Kwa mpangilio, kutoka pana kwenda nyembamba: `4.0/6.0`, `4.0/4.0`, `3.0/6.0`, `3
 `4.0/3.0`, `3.0/3.0`, … Ya kwanza yenye `timeout_frac ≤ 0.35` **na** `n ≥ 200`
 (`min_labels_per_cell`) ndiyo cell.
 
+**Ufafanuzi wa lazima:** `max_timeout_frac` ya config inapimwa kwa **JUMLA ya cells zote**
+(`r1.py`: `(barriers["outcome"] == TIMEOUT).mean()`), si kwa cell moja moja. Sheria hapa
+inatumia **namba ile ile kwa cell MOJA MOJA** — ni matumizi tofauti ya kizingiti kile
+kile, na yanatangazwa hapa ili yasionekane kama nilikuwa nikitaja lango la config
+lisilokuwepo kwenye kiwango cha cell.
+
+Kumbuka pia: lango la jumla **linapoteza maana grid inapopanuka**. Cells 49 zikiwa na
+nyembamba nyingi (timeout ~0%) na pana chache (timeout kubwa), wastani unaficha zote mbili.
+Kwa EURUSD, jumla ni **14.1%** — namba ambayo haisemi lolote kuhusu `4.0/6.0`. Hukumu ya
+cell inatoka kwenye `timeout_frac` ya cell hiyo, si kwenye jumla.
+
 **Sheria hii haijui EV ya cell yoyote.** Inatokana na utambulisho wa gharama pamoja na
 kizuizi cha timeout kilichokwisha kutangazwa kwenye config. Hiyo ndiyo tofauti kati ya
 ubashiri unaopimwa na uteuzi juu ya label.
