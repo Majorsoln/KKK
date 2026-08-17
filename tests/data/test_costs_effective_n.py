@@ -398,3 +398,18 @@ def test_jozi_iliyofungwa_inaonekana_huru_kwa_pr_lakini_haitembei():
     vol = peg.std() * np.sqrt(252.0)
     sakafu = float(vol[["a", "b", "c"]].min()) * 0.5
     assert vol["d"] < sakafu
+
+
+def test_spread_pana_inaua_setup_bila_kujali_kitu_kingine():
+    """Kwa nini `select-symbols` inaripoti gharama kabla ya kurekodi ticks.
+
+    Utambulisho `√n ≤ κ·SR*/cost_R`: gharama ikiongezeka mara mbili, `n_max`
+    inashuka mara nne. Symbol yenye spread pana kuliko zetu inaingiza gharama
+    hiyo kwenye pool NZIMA, si kwake peke yake.
+    """
+    from src.data.costs import n_max_from_cost
+
+    n_zetu = n_max_from_cost(0.0271, sr_target=0.7, kappa=0.5)
+    n_pana = n_max_from_cost(0.0271 * 2, sr_target=0.7, kappa=0.5)
+    assert n_pana == pytest.approx(n_zetu / 4.0, rel=1e-9)
+    assert n_zetu > 150 and n_pana < 50

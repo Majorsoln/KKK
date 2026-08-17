@@ -2827,6 +2827,7 @@ def cmd_select_symbols(args: argparse.Namespace) -> int:
         # inasubiri upakuaji WAKE peke yake; kuziweka zote kwanza kunamaanisha
         # broker anapakua kwa sambamba wakati tunasubiri mara moja.
         n_hai = source.warm_up(tunazo + wagombea)
+        source_spread = {s: source.spread_now(s) for s in tunazo + wagombea}
         print(f"   Market Watch: {n_hai}/{jumla} · inasubiri sekunde "
               f"{args.warmup_s} upakuaji uanze…", flush=True)
         time.sleep(args.warmup_s)
@@ -2999,6 +3000,35 @@ def cmd_select_symbols(args: argparse.Namespace) -> int:
     print(f"\n   ORODHA INAYOPENDEKEZWA: {', '.join(chosen)}")
     print("   (imechaguliwa kwa bei pekee — hakuna label iliyoguswa)")
 
+    # ------------------------------------------------------------------
+    # GHARAMA — kipimo cha mwisho, na ndicho kilichotuua mara ya kwanza.
+    #
+    # `cost_R` 0.0294 ilishusha `n_max` hadi 142/mwaka na ikafanya lift ya
+    # +0.0751 R ihitajike. Symbol yenye spread pana kuliko zetu inaingiza
+    # gharama hiyo hiyo kwenye pool nzima.
+    #
+    # Kipimo ni **spread ÷ mwendo wa siku** — scale-free, kama `spread_atr`
+    # ya §6.1. Spread ya sasa si ya kihistoria, kwa hiyo hii ni **onyo**, si
+    # lango: hukumu halisi itatoka `cost-audit` baada ya ticks. Lakini onyo
+    # la sekunde moja linaweza kuzuia wiki za kurekodi.
+    vol_siku = returns.std()
+    gharama: dict[str, float] = {}
+    for symbol in msingi + chosen:
+        spread, bei = source_spread.get(symbol, (float("nan"), float("nan")))
+        if np.isfinite(spread) and np.isfinite(bei) and bei > 0 and vol_siku.get(symbol, 0) > 0:
+            gharama[symbol] = (spread / bei) / float(vol_siku[symbol])
+    if gharama:
+        zetu = [v for k, v in gharama.items() if k in msingi]
+        mbaya_zetu = max(zetu) if zetu else float("nan")
+        print(f"\n   GHARAMA (spread ÷ mwendo wa siku) — mbaya kati ya zetu: {mbaya_zetu:.3f}")
+        for symbol in chosen:
+            thamani = gharama.get(symbol)
+            if thamani is None:
+                continue
+            alama = "  <-- PANA KULIKO ZETU ZOTE" if thamani > mbaya_zetu else ""
+            print(f"      {symbol:<10} {thamani:>7.3f}{alama}")
+        print("   Onyo, si lango: `cost-audit` baada ya ticks ndiyo hukumu.")
+
     out_path = cfg.path_of("storage.reports_root") / "r4" / "symbol_selection.json"
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(
@@ -3020,6 +3050,7 @@ def cmd_select_symbols(args: argparse.Namespace) -> int:
                 "vol_floor": sakafu,
                 "excluded_low_vol": dhaifu,
                 "annual_vol": {k: float(v) for k, v in vol.items()},
+                "spread_per_daily_move": gharama,
                 "sufficient": bool(tosha),
                 "chosen": chosen,
             },

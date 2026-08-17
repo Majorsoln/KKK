@@ -197,6 +197,23 @@ class MT5TickSource:
                 _time.sleep(self.retry_delay_s)
         raise SourceError(f"{broker_symbol}: copy_ticks_range: {last_error}")
 
+    def spread_now(self, symbol: str) -> tuple[float, float]:
+        """Spread ya sasa (bei) na bei ya sasa — kwa ukaguzi wa gharama pekee.
+
+        **Si spread ya kihistoria**, na haipaswi kutumika kama hiyo. Lakini
+        symbol yenye spread ya kutisha leo ilikuwa nayo jana pia, na
+        utambulisho `√n ≤ κ·SR*/cost_R` unaifanya isiwezekane bila kujali
+        kitu kingine chochote. Ni ombi moja, na linazuia wiki za kurekodi
+        ticks za symbol isiyoweza kubeba setup.
+        """
+        mt5 = self._module()
+        info = mt5.symbol_info(self.broker_symbol(symbol))
+        if info is None:
+            return (float("nan"), float("nan"))
+        point = float(getattr(info, "point", 0.0) or 0.0)
+        bei = float(getattr(info, "bid", 0.0) or 0.0)
+        return (float(getattr(info, "spread", 0) or 0) * point, bei)
+
     def warm_up(self, symbols: list[str]) -> int:
         """Weka symbols zote kwenye Market Watch KWA PAMOJA.
 
