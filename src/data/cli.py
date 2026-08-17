@@ -2870,11 +2870,34 @@ def cmd_select_symbols(args: argparse.Namespace) -> int:
     panel = pd.DataFrame({k: v for k, v in series.items()}).sort_index()
     returns = np.log(panel / panel.shift()).dropna(how="all")
 
+    # ------------------------------------------------------------------
+    # SAKAFU YA VOLATILITY — bila hii, PR inachezewa na jozi zilizofungwa.
+    #
+    # `EURDKK` ilichaguliwa KWANZA na toleo la kwanza. DKK imefungwa kwa EUR:
+    # returns zake ni karibu kelele ya kupima tu, kwa hiyo hazihusiani na kitu
+    # chochote na PR inapanda. Lakini SETUP-v1 ina lango la ATR band — jozi
+    # isiyotembea haitoi setups, na `R` yake haipo. "Bloc" isiyo na trades si
+    # bloc.
+    #
+    # Sakafu ni **nusu ya volatility ndogo kuliko zote kati ya symbols 12
+    # tulizonazo**. Ni ya bei pekee, na inatokana na ufafanuzi wa setup yenyewe
+    # (2026-08-17).
+    vol = returns.std() * np.sqrt(252.0)
+    sakafu = float(vol[msingi].min()) * args.vol_floor_frac
+    dhaifu = [s for s in wagombea if s in vol.index and vol[s] < sakafu]
+    hai = [s for s in hai if s not in dhaifu]
+    print(f"   volatility ya mwaka: ndogo kati ya zetu {vol[msingi].min():.3%} "
+          f"→ sakafu {sakafu:.3%}")
+    if dhaifu:
+        print(f"   zilizotolewa kwa kutotembea ({len(dhaifu)}): "
+              + ", ".join(f"{s} {vol[s]:.2%}" for s in dhaifu[:10]))
+    print()
+
     def _pr(names: list[str]) -> float:
         return participation_ratio(returns[names])
 
     base_pr = _pr(msingi)
-    print(f"   blocs za sasa: {base_pr:.2f} (symbols {len(msingi)})")
+    print(f"   blocs za sasa (returns za D1): {base_pr:.2f} (symbols {len(msingi)})")
 
     chosen: list[str] = []
     current = list(msingi)
@@ -2896,10 +2919,45 @@ def cmd_select_symbols(args: argparse.Namespace) -> int:
               f"(+{best_pr - pr:.2f})")
         pr = best_pr
 
+    # ------------------------------------------------------------------
+    # MIZANI MBILI — na kuzilinganisha moja kwa moja ni kosa.
+    #
+    # `cross-power` inadai blocs 10.1, na hizo zinapimwa kwenye panel ya **`R`
+    # kwa symbol** (`effective_n.json`: 7.54 kwa symbols zetu 12). Hapa
+    # tunapima kwenye **returns za D1**, ambazo zinatoa 4.20 kwa symbols ZILE
+    # ZILE. Uwiano 1.79 si bahati: returns za kila siku zinatawaliwa na factor
+    # ya USD, wakati `R` inabeba tabia ya kila symbol kwenye setup.
+    #
+    # Toleo la kwanza lililinganisha 7.05 na 10.1 na kutangaza HAITOSHI. Hiyo
+    # ilikuwa kupima kwa mizani moja na kuhukumu kwa nyingine (2026-08-17).
+    #
+    # Returns za D1 zinabaki sahihi kwa **kupanga** wagombea — hilo ni swali la
+    # uhuru wa jamaa. Kwa **kiwango**, zinarekebishwa kwa uwiano uliopimwa
+    # kwenye idadi ile ile ambayo tuna vipimo vyote viwili.
+    neff_path = cfg.path_of("storage.reports_root") / "r1" / "effective_n.json"
+    pr_r_panel = None
+    if neff_path.exists():
+        pr_r_panel = float(json.loads(neff_path.read_text(encoding="utf-8"))
+                           .get("participation_ratio") or 0.0) or None
+    factor = (pr_r_panel / base_pr) if (pr_r_panel and base_pr > 0) else None
+
     need = 1.0 + (1.645 / args.rho) ** 2
-    print(f"\n   blocs baada ya kuchagua: {pr:.2f}   ·   zinazohitajika {need:.1f}")
-    print("   " + ("INATOSHA" if pr >= need else
-                   f"HAITOSHI — pungufu ya {need - pr:.2f}"))
+    print(f"\n   blocs (returns za D1): {base_pr:.2f} → {pr:.2f}")
+    if factor:
+        kadirio = pr * factor
+        print(f"   uwiano wa mizani: panel ya R {pr_r_panel:.2f} ÷ D1 {base_pr:.2f} "
+              f"= {factor:.2f}")
+        print(f"   KADIRIO kwenye mizani ya R: {kadirio:.2f}   ·   "
+              f"zinazohitajika {need:.1f}")
+        tosha = kadirio >= need
+        print("   " + ("INATOSHA (kwa kadirio)" if tosha
+                       else f"HAITOSHI — pungufu ya {need - kadirio:.2f}"))
+        print("   Dhana: uwiano unabaki ule ule kwa symbols mpya. Hautathibitika\n"
+              "   hadi labels zijengwe; `placebo` ndiyo itakayopima blocs HALISI.")
+    else:
+        kadirio, tosha = pr, pr >= need
+        print(f"   (`effective_n.json` haipo — hakuna uwiano wa kurekebisha mizani)")
+
     print(f"\n   ORODHA INAYOPENDEKEZWA: {', '.join(chosen)}")
     print("   (imechaguliwa kwa bei pekee — hakuna label iliyoguswa)")
 
@@ -2913,11 +2971,16 @@ def cmd_select_symbols(args: argparse.Namespace) -> int:
                 "existing": msingi,
                 "candidates_live": hai,
                 "rejected": [{"symbol": s, "reason": r} for s, r in fupi],
-                "blocs_before": base_pr,
-                "blocs_after": pr,
+                "blocs_d1_before": base_pr,
+                "blocs_d1_after": pr,
+                "scale_factor": factor,
+                "blocs_r_panel_estimate": kadirio,
                 "blocs_required": need,
                 "rho_target": args.rho,
-                "sufficient": bool(pr >= need),
+                "vol_floor": sakafu,
+                "excluded_low_vol": dhaifu,
+                "annual_vol": {k: float(v) for k, v in vol.items()},
+                "sufficient": bool(tosha),
                 "chosen": chosen,
             },
             indent=2,
@@ -2927,7 +2990,7 @@ def cmd_select_symbols(args: argparse.Namespace) -> int:
     )
     print(f"\nushahidi: {out_path}")
     print("hatua: `probe-history` kwa kila moja, kisha SAHIHI ya PD (T4 §8 hatua 2).")
-    return 0 if pr >= need else 1
+    return 0 if tosha else 1
 
 
 def cmd_cross_power(args: argparse.Namespace) -> int:
@@ -3504,6 +3567,8 @@ def build_parser() -> argparse.ArgumentParser:
                        help="kusubiri baada ya kuweka symbols kwenye Market Watch")
     p_sel.add_argument("--retries", type=int, default=4,
                        help="majaribio kwa symbol wakati upakuaji unaendelea")
+    p_sel.add_argument("--vol-floor-frac", type=float, default=0.5,
+                       help="sakafu ya volatility kama sehemu ya ndogo kati ya zetu")
     p_sel.set_defaults(func=cmd_select_symbols)
 
     p_cross = subparsers.add_parser(

@@ -367,3 +367,34 @@ def test_participation_ratio_inapendelea_safu_HURU_kuliko_rudufu():
     # ziada: symbol isiyoleta bloc haichaguliwi kabisa.
     assert participation_ratio(rudufu) < participation_ratio(base)
     assert participation_ratio(huru) > participation_ratio(base)
+
+
+def test_jozi_iliyofungwa_inaonekana_huru_kwa_pr_lakini_haitembei():
+    """Kwa nini `select-symbols` inahitaji sakafu ya volatility.
+
+    `EURDKK` (DKK imefungwa kwa EUR) ilichaguliwa KWANZA na toleo la kwanza.
+    Returns zake ni karibu kelele ya kupima tu — hazihusiani na kitu chochote,
+    kwa hiyo PR inapanda. Lakini SETUP-v1 ina lango la ATR band: jozi
+    isiyotembea haitoi setups, na `R` yake haipo. Bloc isiyo na trades si bloc.
+    """
+    import numpy as np
+    import pandas as pd
+
+    from src.data.effective_n import participation_ratio
+
+    rng = np.random.RandomState(1)
+    soko = rng.normal(0, 0.006, 800)
+    frame = pd.DataFrame({
+        "a": soko + rng.normal(0, 0.002, 800),
+        "b": soko + rng.normal(0, 0.002, 800),
+        "c": soko + rng.normal(0, 0.002, 800),
+    })
+    peg = frame.copy()
+    peg["d"] = rng.normal(0, 0.00008, 800)      # imefungwa: haitembei
+
+    # PR inapanda — ndiyo tatizo lenyewe.
+    assert participation_ratio(peg) > participation_ratio(frame)
+    # Sakafu ndiyo inayoikataa: volatility yake ni chini ya nusu ya ndogo zetu.
+    vol = peg.std() * np.sqrt(252.0)
+    sakafu = float(vol[["a", "b", "c"]].min()) * 0.5
+    assert vol["d"] < sakafu
