@@ -2799,6 +2799,157 @@ def cmd_placebo(args: argparse.Namespace) -> int:
     return 0 if verdict_ok else 1
 
 
+def cmd_exit_audit(args: argparse.Namespace) -> int:
+    """Je madarasa matatu ya matokeo yanapimwa kwa MSINGI MMOJA?
+
+    `labels.py` inahesabu:
+
+        terminal_atr     = direction × (terminal_MID − entry_MID) ÷ atr_price
+        timeout_return_r = terminal_atr ÷ sl_atr
+
+    **Mid kwa mid — spread haipo.** Lakini TP na SL zinatatuliwa kwenye path ya
+    TRADE (`entry = ask`, `exit = bid`), kwa hiyo spread ipo ndani yao.
+
+    Kwa hiyo darasa la timeout limesamehewa **round-trip spread nzima**, wakati
+    madarasa mengine mawili yameitozwa. Kila `EV` tuliyoiripoti kwenye T5 ina
+    kasoro hiyo ndani yake, na ukubwa wake unategemea sehemu ya timeout — ambayo
+    kwenye cell bora (`3.0/6.0`) ni **61.8%**.
+
+    Amri hii inafanya vitu viwili, vyote kwa data iliyopo:
+
+    1. **Inatoza timeout spread ile ile** ambayo TP/SL zimetozwa, kwa kila point,
+       kwa usahihi — si kwa wastani.
+    2. Inapima **kutoka kwa MUDA pekee** (bila barrier yoyote), ambayo ndiyo
+       strategy inayotokana na `terminal_atr` yenyewe, ikitozwa spread na
+       commission ipasavyo.
+
+    Ni **kipimo cha uhasibu**, si tathmini ya strategy mpya: hakuna parameter
+    inayotunwa, hakuna uteuzi, na jibu ni namba moja kwa kila cell iliyokwisha
+    kuwepo. Hata hivyo (2) ni sheria mpya ya kutoka, na inarekodiwa hivyo.
+    """
+    cfg = _load(args)
+    import numpy as np
+    import pandas as pd
+
+    from .costs import realized_r
+    from .labels import TIMEOUT
+    from .r1 import load_labels
+
+    labels_root = cfg.research_root / "data" / "L4_labels" / "labels"
+    points, barriers = load_labels(labels_root, _symbol_list(args))
+    if barriers.empty or points.empty:
+        print(f"hakuna labels chini ya {labels_root}", file=sys.stderr)
+        return 2
+
+    need = {"spread_entry_pips", "spread_exit_pips", "atr_pips", "terminal_atr"}
+    missing = need - set(points.columns)
+    if missing:
+        print(f"points hazina safu: {sorted(missing)} — jenga upya labels", file=sys.stderr)
+        return 2
+
+    keys = points[points["is_setup"].fillna(False)][
+        ["symbol", "decision_time", "spread_entry_pips", "spread_exit_pips",
+         "atr_pips", "terminal_atr"]
+    ].copy()
+    # Round-trip: nusu ya spread kuingia + nusu kutoka.
+    keys["spread_rt_pips"] = (keys["spread_entry_pips"] + keys["spread_exit_pips"]) / 2.0
+
+    cells = barriers.merge(keys, on=["symbol", "decision_time"], how="inner")
+    if cells.empty:
+        print("join ya barriers na points imetoa sifuri", file=sys.stderr)
+        return 2
+
+    comm = float(args.commission_pips)
+    gross = realized_r(cells, commission_pips=0.0)
+    # Spread ya round-trip kwa R = pips ÷ sl_pips. Inatozwa kwa TIMEOUT PEKEE —
+    # TP na SL tayari zimeilipa ndani ya path.
+    spread_r = cells["spread_rt_pips"].to_numpy(dtype=float) / cells["sl_pips"].to_numpy(dtype=float)
+    is_to = (cells["outcome"] == TIMEOUT).to_numpy()
+    comm_r = comm / cells["sl_pips"].to_numpy(dtype=float)
+
+    cells["ev_kabla"] = gross - comm_r
+    cells["ev_baada"] = gross - comm_r - np.where(is_to, spread_r, 0.0)
+
+    print(f"UKAGUZI WA UHASIBU WA KUTOKA — commission {comm} pips\n")
+    print("Darasa la timeout linapimwa MID-kwa-MID; TP/SL zinapimwa kwenye path ya TRADE.")
+    print("Hapa timeout inatozwa round-trip spread ILE ILE.\n")
+
+    table = cells.groupby(["sl_atr", "tp_atr"]).agg(
+        n=("ev_kabla", "size"),
+        timeout=("outcome", lambda s: float((s == TIMEOUT).mean())),
+        ev_kabla=("ev_kabla", "mean"),
+        ev_baada=("ev_baada", "mean"),
+    ).reset_index()
+    table["tofauti"] = table["ev_baada"] - table["ev_kabla"]
+    table = table.sort_values("ev_baada", ascending=False)
+
+    print(f"   {'sl':>5} {'tp':>5} {'timeout':>8} {'EV kabla':>10} {'EV baada':>10} {'tofauti':>9}")
+    for _, r in table.head(args.top).iterrows():
+        print(f"   {r['sl_atr']:>5.2f} {r['tp_atr']:>5.2f} {r['timeout']:>7.1%} "
+              f"{r['ev_kabla']:>+10.4f} {r['ev_baada']:>+10.4f} {r['tofauti']:>+9.4f}")
+    chanya = int((table["ev_baada"] > 0).sum())
+    print(f"\n   cells zenye EV chanya: {chanya}/{len(table)} "
+          f"(kabla ya marekebisho: {int((table['ev_kabla'] > 0).sum())}/{len(table)})")
+
+    # ------------------------------------------------------------------
+    # Kutoka kwa MUDA pekee — hakuna barrier
+    #
+    # Hii ndiyo strategy ambayo `terminal_atr` inaipima moja kwa moja. Sharpe
+    # yake HAITEGEMEI `sl_ref`: ni scaling ya kuripoti pekee, kwa sababu hakuna
+    # stop. Inaripotiwa kwa ATR na kwa R ili ilinganishwe na jedwali hapo juu.
+    uniq = keys.drop_duplicates(["symbol", "decision_time"]).copy()
+    net_atr = (
+        uniq["terminal_atr"].to_numpy(dtype=float)
+        - (uniq["spread_rt_pips"].to_numpy(dtype=float) + comm)
+        / uniq["atr_pips"].to_numpy(dtype=float)
+    )
+    net_atr = net_atr[np.isfinite(net_atr)]
+    mu, sd = float(np.mean(net_atr)), float(np.std(net_atr, ddof=1))
+
+    years = float(
+        (pd.to_datetime(uniq["decision_time"]).max()
+         - pd.to_datetime(uniq["decision_time"]).min()).days / 365.25
+    )
+    # `N_eff` inatoka `effective-n`; hapa inakadiriwa kwa uwiano ule ule.
+    n_eff = len(net_atr) * args.uniqueness
+    sharpe = mu / sd * np.sqrt(n_eff / years) if sd > 0 and years > 0 else float("nan")
+
+    print(f"\nKUTOKA KWA MUDA PEKEE (bars {int(cfg.get('labels.horizon_bars'))}, hakuna barrier)")
+    print(f"   points {len(net_atr):,} · miaka {years:.2f}")
+    print(f"   EV  {mu:>+8.4f} ATR  ·  sd {sd:.4f} ATR")
+    print(f"   Sharpe ya mwaka (N_eff = {args.uniqueness:.0%} ya raw): {sharpe:+.3f}")
+    for sl_ref in (2.0, 3.0, 4.0):
+        print(f"   ...kwa R ya stop {sl_ref} ATR: EV {mu/sl_ref:+.4f} R")
+
+    out_path = cfg.path_of("storage.reports_root") / "r1" / "exit_audit.json"
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_path.write_text(
+        json.dumps(
+            {
+                "commission_pips": comm,
+                "symbols": sorted(_symbol_list(args)) if _symbol_list(args) else "zote",
+                "cells": table.to_dict(orient="records"),
+                "cells_positive_before": int((table["ev_kabla"] > 0).sum()),
+                "cells_positive_after": int((table["ev_baada"] > 0).sum()),
+                "time_exit": {
+                    "n": int(len(net_atr)),
+                    "years": years,
+                    "ev_atr": mu,
+                    "sd_atr": sd,
+                    "sharpe": sharpe,
+                    "uniqueness_assumed": args.uniqueness,
+                },
+            },
+            indent=2,
+            default=str,
+        ) + "\n",
+        encoding="utf-8",
+        newline="\n",
+    )
+    print(f"\nushahidi: {out_path}")
+    return 0
+
+
 def cmd_select_symbols(args: argparse.Namespace) -> int:
     """T4 hatua 1b — vunja sare ya §3 kwa LENGO, si kwa ladha.
 
@@ -3666,6 +3817,18 @@ def build_parser() -> argparse.ArgumentParser:
              "ujuzi wa WAKATI na utambuzi wa SYMBOL",
     )
     p_plac.set_defaults(func=cmd_placebo)
+
+    p_exit = subparsers.add_parser(
+        "exit-audit",
+        help="je madarasa matatu ya matokeo yanapimwa kwa msingi mmoja? + kutoka kwa muda",
+        parents=[common],
+    )
+    p_exit.add_argument("--symbols")
+    p_exit.add_argument("--commission-pips", type=float, default=0.7)
+    p_exit.add_argument("--top", type=int, default=12)
+    p_exit.add_argument("--uniqueness", type=float, default=0.402,
+                        help="N_eff / n_raw kutoka `effective-n` (10,168 / 25,314)")
+    p_exit.set_defaults(func=cmd_exit_audit)
 
     p_sel = subparsers.add_parser(
         "select-symbols",

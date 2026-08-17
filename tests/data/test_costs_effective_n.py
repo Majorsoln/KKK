@@ -436,3 +436,49 @@ def test_mpaka_wa_grid_nzima_ni_mkali_kuliko_wa_cell_moja():
     # Kwa athari ya +0.02 na SE 0.012, tofauti ni ya kuamua: p5 chanya,
     # FWER hasi — hukumu mbili tofauti kabisa kutoka data ile ile.
     assert low5 > 0 and low_f < 0
+
+
+def test_timeout_haipimwi_kwa_msingi_mmoja_na_tp_sl():
+    """Kasoro ya uhasibu iliyogunduliwa 2026-08-17 kwa mapitio ya nje.
+
+    `labels.resolve_point`:
+        terminal_atr     = direction x (terminal_MID - entry_MID) / atr_price
+        timeout_return_r = terminal_atr / sl_atr
+
+    Mid kwa mid — spread haipo. Lakini TP na SL zinatatuliwa kwenye path ya
+    TRADE (entry = ask, exit = bid), kwa hiyo spread ipo ndani yao. Darasa la
+    timeout limesamehewa round-trip spread nzima.
+
+    Test hii inaonyesha ukubwa wake: timeout ikiwa 61.8% na stop 3 ATR,
+    marekebisho ni makubwa kuliko EV yenyewe.
+    """
+    import inspect
+
+    from src.data import labels
+
+    src = inspect.getsource(labels.resolve_arrays)
+    assert "terminal_mid - entry_mid" in src, "muundo umebadilika — hakiki upya"
+    assert "timeout_return_r=float(terminal_atr / sl_atr)" in src
+
+    half_spread_atr = 0.0666          # wastani wa r1 sehemu 4 kwa symbols 12
+    round_trip = 2 * half_spread_atr
+    for sl, p_timeout, ev_net in [(3.0, 0.618, 0.0205), (2.0, 0.227, 0.0039)]:
+        correction = p_timeout * round_trip / sl
+        assert correction > 0
+        # Kwenye cells zote mbili tulizoripoti, marekebisho yanazidi EV.
+        assert correction > ev_net, (
+            f"sl {sl}: marekebisho {correction:.4f} dhidi ya EV {ev_net:.4f}"
+        )
+
+
+def test_spread_ya_round_trip_ni_nusu_mbili_si_moja():
+    """Ingia kwa ask, toka kwa bid: nusu ya spread kila upande.
+
+    Kutumia spread nzima ya upande mmoja kungetoza mara mbili; kutumia nusu
+    moja pekee kungetoza nusu ya kile kinachotakiwa.
+    """
+    spread_entry, spread_exit = 1.2, 0.8
+    rt = (spread_entry + spread_exit) / 2.0
+    assert rt == pytest.approx(1.0)
+    assert rt < spread_entry + spread_exit
+    assert rt > min(spread_entry, spread_exit) / 2.0
