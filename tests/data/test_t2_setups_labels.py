@@ -771,3 +771,27 @@ def test_seek_inaruka_partitions_bila_kuzisoma(cfg, tmp_path):
     assert daily is not None and daily >= pd.Timestamp("2024-01-16", tz="UTC")
     monthly = _partition_end(Path("provenance=aggregator/symbol=XAUUSD/year=2020/month=03/ticks-2020-03.parquet"))
     assert monthly is not None and monthly >= pd.Timestamp("2020-04-01", tz="UTC")
+
+
+def test_grid_mpya_ni_superset_ya_ya_awali(cfg):
+    """Cells 25 za awali lazima zibaki ndani ya 49 — hakuna ushahidi unaopotea.
+
+    `research/data/` haipushwi (G11), kwa hiyo labels za awali zipo kwenye disk
+    ya PD pekee, na `build-labels` inaziandika juu. Kama grid mpya ingekuwa
+    imebadilisha thamani badala ya kuziongeza, matokeo ya T2/T3 yasingeweza
+    kuthibitishwa tena.
+
+    Kwa sababu ni superset, cell `2.0/3.0` inarudi — na inakuwa **ukaguzi wa
+    regression**: `EV net` yake ikitofautiana na +0.0039 iliyorekodiwa, kitu
+    kimeharibika kwenye ujenzi, si kwenye nadharia.
+    """
+    sl = [float(x) for x in cfg.get("labels.barrier.sl_atr")]
+    tp = [float(x) for x in cfg.get("labels.barrier.tp_atr")]
+
+    awali_sl = {0.5, 0.75, 1.0, 1.5, 2.0}
+    awali_tp = {0.5, 1.0, 1.5, 2.0, 3.0}
+    assert awali_sl <= set(sl), f"sl zilizopotea: {awali_sl - set(sl)}"
+    assert awali_tp <= set(tp), f"tp zilizopotea: {awali_tp - set(tp)}"
+    assert 2.0 in sl and 3.0 in tp, "cell iliyosainiwa 2.0/3.0 lazima ibaki"
+    # Grid iliyopanuliwa PEKEE — mpangilio unaopanda, bila kurudia.
+    assert sl == sorted(set(sl)) and tp == sorted(set(tp))
