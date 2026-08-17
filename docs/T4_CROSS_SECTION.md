@@ -196,3 +196,97 @@ Bila masharti hayo manne, T4 ingekuwa T3 ikirudiwa kwa symbols zaidi.
 
 Hatua ya 2 ndiyo lango. Orodha ikishasainiwa, haibadiliki; symbol ikishindwa malango ya
 §3, inatolewa na **haibadilishwi na nyingine iliyochaguliwa baadaye**.
+
+---
+
+## 9. MATOKEO YA HATUA 1 — 2026-08-17
+
+Malango matano yamefanya kazi. Kutoka symbols 418 za Dukascopy:
+
+| Lango | Zilizotolewa |
+|---|---|
+| haina USD/EUR (synthetic) | 300 |
+| si FX spot | 67 |
+| hakuna underlying mpya | 15 |
+| kina hadi 2016 | 13 |
+| ukamilifu (mashimo au bars za wikendi) | 13 |
+| volatility (imefungwa) | 2 |
+
+Orodha: **EURZAR, EURCZK, EURSEK, EURMXN** · blocs 4.19 → 6.14 (D1) → **kadirio 11.04**
+kwenye mizani ya `R`, dhidi ya 10.1 zinazohitajika. Symbols **4 zinatosha**; ya tano
+(`USDTHB`) iliongeza +0.16 pekee.
+
+### Lakini gharama imesimamisha kila kitu
+
+Kipimo cha `spread ÷ mwendo wa siku`, mbaya kati ya symbols zetu 12 ni **0.028**:
+
+| symbol | kipimo | mara ngapi ya zetu | athari kwa `n_max` |
+|---|---|---|---|
+| EURSEK | 0.040 | 1.4× | ÷2 |
+| EURCZK | 0.090 | 3.2× | ÷10 |
+| EURMXN | 0.123 | 4.4× | ÷19 |
+| EURZAR | 0.131 | 4.7× | **÷22** |
+
+Zote nne ni pana kuliko **zote** zetu. Kwa pool ya 16 ikiwa nne zina gharama ~3.5×:
+
+```
+cost_R  0.0271 → 0.0441        n_max  167 → 63 /mwaka
+```
+
+**Kuongeza symbols hizi kunaharibu uchumi wa pool, hakuiboreshi.** Na kwa mtihani wenyewe
+ni mbaya zaidi: `R` yao itakuwa hasi **kwa sababu ya spread, si kwa sababu ya trendiness**.
+Gharama na "exotic-ness" zinaenda pamoja, kwa hiyo confound inaingia moja kwa moja kwenye
+kitu tunachokipima. Jibu lolote lingekuwa gumu kutafsiri.
+
+Njia mbadala ya jozi za USD (`USDZAR`, `USDSEK`, `USDSGD`) ina gharama ndogo lakini
+inaongeza blocs chache — pool yetu tayari imejaa USD. Greedy iliziacha nje ya tano bora,
+kwa hiyo makadirio yao yako ~9.5–10.1: **ukingoni au pungufu**.
+
+## 10. Kile jedwali la gharama linaloonyesha, na hatukuliona
+
+Angalia `cost-audit` ya symbols 10 tena, safu ya `EV net`, kwa `sl` inayopanda:
+
+| `sl_atr` | `comm R` | `EV net` (tp bora) |
+|---|---|---|
+| 0.50 | 0.0800 | −0.2006 |
+| 0.75 | 0.0533 | −0.1023 |
+| 1.00 | 0.0400 | −0.0589 |
+| 1.50 | 0.0267 | −0.0062 |
+| **2.00** | **0.0200** | **+0.0039** |
+
+Na kwa `sl = 2.0`, `tp` inayopanda: −0.0329 · −0.0210 · −0.0162 · −0.0050 · **+0.0039**.
+
+**Mihimili yote miwili ni monotone hadi ukingo wa grid, na hakuna hata mmoja umegeuka.**
+
+`sl_atr` yetu inaishia **2.0**; `tp_atr` inaishia **3.0**. Hizo ni thamani kubwa kuliko
+zote kwenye `config/data.yaml`. Cell bora tuliyoipata ni **cell ya pembeni ya grid**, kwa
+mihimili yote miwili.
+
+Utambulisho unaeleza kwa nini: `commission_R = commission_pips ÷ sl_pips`. Stop pana
+inagawanya gharama ile ile kwa `R` kubwa zaidi. Overshoot pia inapungua kwa `R`
+(`overshoot ÷ sl_pips`). **Gharama ni kizuizi, na stop pana ndiyo dawa yake ya moja kwa
+moja.**
+
+Hatukuwahi kuona optimum kwa sababu **hatukuwahi kutazama nje ya 2.0**.
+
+### Kwa nini hii ni njia bora kuliko symbols
+
+| | Symbols mpya | Grid pana |
+|---|---|---|
+| Data mpya inahitajika | ticks za miaka 8 × 4 | **hakuna** |
+| Muda | siku hadi wiki | labels zilichukua **dakika 37** |
+| Kizuizi cha broker | ndiyo | hapana |
+| Inagusa kizuizi halisi (gharama) | **inaifanya mbaya** | **inaishughulikia** |
+| Confound | spread ↔ exotic-ness | hakuna |
+
+### Muundo unaozuia uteuzi
+
+Kuchagua cell bora baada ya kuona EV ya grid iliyopanuliwa ni uteuzi juu ya label —
+kosa lile lile. Kwa hiyo sheria inatangazwa **kabla**:
+
+1. Grid inapanuliwa hadi `sl_atr ∈ {3.0, 4.0}` na `tp_atr ∈ {4.0, 6.0}`.
+2. **Cell inayotangazwa ni PANA KULIKO ZOTE** kwenye grid mpya — imechaguliwa kwa
+   **utambulisho wa gharama**, si kwa EV yake. Nadharia inatabiri kwamba pana ni bora;
+   ubashiri huo unapimwa, hauchaguliwi baada ya matokeo.
+3. Ikiwa monotone inageuka kabla ya ukingo, **hilo lenyewe ni jibu**: gharama haikuwa
+   kizuizi kinachotawala, na nadharia imekanushwa.
