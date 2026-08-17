@@ -1619,13 +1619,28 @@ def cmd_r1_summary(args: argparse.Namespace) -> int:
 
     print("1. JIOMETRI (RS-04) — p_tp BILA timeout dhidi ya sl/(sl+tp)")
     rates = pd.DataFrame(p["base_rates"])
-    print(f"   {'sl':>5} {'tp':>5} {'n':>8} {'timeout':>8} {'p_tp':>7} {'jiometri':>9} {'diff':>7} {'z':>7}")
+    print(f"   {'sl':>5} {'tp':>5} {'n':>8} {'timeout':>8} {'p_tp':>7} {'jiometri':>9} "
+          f"{'diff':>7} {'z':>7}  jiometri?")
     for _, r in rates.iterrows():
+        # Alama ya `diff` INAYOPOTOSHA. `z = +23.5` kwenye cell 4.0/2.0
+        # inaonekana kama edge ya kutisha; ni **truncation**. `sl/(sl+tp)` ni
+        # uwezekano wa horizon isiyo na mwisho, na kuchuja "zilizofika mahali"
+        # kunapendelea barrier iliyo karibu. Timeout ikiwa 32.7%, upendeleo huo
+        # ni mkubwa kuliko athari yoyote halisi.
+        #
+        # Bila safu hii, mtu anayesoma jedwali anaona z kubwa na anahitimisha
+        # edge. Jedwali linalohitaji maelezo ya nje ili lisipotoshe si jedwali
+        # (2026-08-17).
+        alama = "ndiyo" if r.get("geometry_reliable") else f"HAPANA→{r.get('geometry_bias', '?')}"
         print(
             f"   {r['sl_atr']:>5.2f} {r['tp_atr']:>5.2f} {int(r['n']):>8,} "
             f"{r['timeout_frac']:>7.1%} {r['p_tp']:>7.3f} {r['geometry']:>9.3f} "
-            f"{r['diff']:>+7.3f} {r['z']:>+7.1f}"
+            f"{r['diff']:>+7.3f} {r['z']:>+7.1f}  {alama}"
         )
+    n_hapana = int((~rates["geometry_reliable"]).sum()) if "geometry_reliable" in rates else 0
+    if n_hapana:
+        print(f"   cells {n_hapana}/{len(rates)} zina timeout > 5% — `diff` yao ni "
+              "jiometri ya truncation,\n   si edge. Upendeleo unaelekea barrier ILIYO KARIBU.")
     kikomo = int(cfg.get("labels.barrier.min_labels_per_cell"))
     print(f"   cells ndogo kuliko zote (pooled): {t['min_labels_per_cell']:,} (kikomo {kikomo})")
 

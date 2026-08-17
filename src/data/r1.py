@@ -483,8 +483,8 @@ def build_report(
     else:
         report.notes.append(
             f"`min_labels_per_cell` juu ya data yote ({int(rates['n'].min()):,}) inapita kwa "
-            "MUUNDO: kila point inapata cells 25, kwa hiyo cells zote zina idadi ile ile "
-            "daima. Kigezo halisi ni cha cell x fold (1b) — mizani ya mafunzo."
+            f"MUUNDO: kila point inapata cells {len(rates)}, kwa hiyo cells zote zina idadi "
+            "ile ile daima. Kigezo halisi ni cha cell x fold (1b) — mizani ya mafunzo."
         )
 
     coverage = cell_coverage(trainable, folds or [])
