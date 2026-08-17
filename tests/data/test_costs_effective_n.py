@@ -438,37 +438,29 @@ def test_mpaka_wa_grid_nzima_ni_mkali_kuliko_wa_cell_moja():
     assert low5 > 0 and low_f < 0
 
 
-def test_timeout_haipimwi_kwa_msingi_mmoja_na_tp_sl():
-    """Kasoro ya uhasibu iliyogunduliwa 2026-08-17 kwa mapitio ya nje.
+def test_timeout_inapimwa_kwa_msingi_mmoja_na_tp_sl():
+    """Kasoro iliyogunduliwa 2026-08-17 kwa mapitio ya nje, na marekebisho yake.
 
-    `labels.resolve_point`:
-        terminal_atr     = direction x (terminal_MID - entry_MID) / atr_price
-        timeout_return_r = terminal_atr / sl_atr
+    Ilikuwa:
+        timeout_return_r = terminal_atr / sl_atr        # MID kwa MID
 
-    Mid kwa mid — spread haipo. Lakini TP na SL zinatatuliwa kwenye path ya
-    TRADE (entry = ask, exit = bid), kwa hiyo spread ipo ndani yao. Darasa la
-    timeout limesamehewa round-trip spread nzima.
+    Lakini TP na SL zinatatuliwa kwenye path ya TRADE (ingia ask, toka bid),
+    kwa hiyo spread ipo ndani yao. Timeout ilikuwa imesamehewa round-trip
+    spread nzima.
 
-    Test hii inaonyesha ukubwa wake: timeout ikiwa 61.8% na stop 3 ATR,
-    marekebisho ni makubwa kuliko EV yenyewe.
+    Ukubwa uliopimwa kwa symbols 10: cells chanya zilishuka **13/49 → 6/49**,
+    cell bora `3.0/6.0` +0.0205 → **+0.0081**, na cell iliyosainiwa `2.0/3.0`
+    ilikwenda **hasi** (−0.0029).
     """
     import inspect
 
     from src.data import labels
 
     src = inspect.getsource(labels.resolve_arrays)
-    assert "terminal_mid - entry_mid" in src, "muundo umebadilika — hakiki upya"
-    assert "timeout_return_r=float(terminal_atr / sl_atr)" in src
-
-    half_spread_atr = 0.0666          # wastani wa r1 sehemu 4 kwa symbols 12
-    round_trip = 2 * half_spread_atr
-    for sl, p_timeout, ev_net in [(3.0, 0.618, 0.0205), (2.0, 0.227, 0.0039)]:
-        correction = p_timeout * round_trip / sl
-        assert correction > 0
-        # Kwenye cells zote mbili tulizoripoti, marekebisho yanazidi EV.
-        assert correction > ev_net, (
-            f"sl {sl}: marekebisho {correction:.4f} dhidi ya EV {ev_net:.4f}"
-        )
+    assert "terminal_atr_trade = direction * (terminal_trade - entry_trade)" in src
+    assert "timeout_return_r=float(terminal_atr_trade / sl_atr)" in src, "bado inatumia MID"
+    # `terminal_atr` ya MID inabaki — quantile inaihitaji (§5.1).
+    assert "terminal_atr = direction * (terminal_mid - entry_mid)" in src
 
 
 def test_spread_ya_round_trip_ni_nusu_mbili_si_moja():

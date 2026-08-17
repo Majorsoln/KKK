@@ -231,13 +231,17 @@ def test_gap_honest_touch_kwenye_bei_ya_kwanza_baada_ya_gap():
 
 
 def test_timeout_ni_darasa_lenye_terminal_return():
-    """Timeout haitupwi kimya (§5.5) — inabeba E[R|timeout] ya cell yake."""
+    """Timeout haitupwi kimya (§5.5) — inabeba E[R|timeout] ya cell yake.
+
+    Rejea ni `terminal_atr_trade`, si `terminal_atr`: TP na SL zinatatuliwa
+    kwenye path ya trade, kwa hiyo timeout lazima ipimwe hapo hapo (2026-08-17).
+    """
     bid = np.full(600, 1.1000)
     bid += np.linspace(0, 0.0002, 600)  # mwendo mdogo — hakuna barrier inayoguswa
     point = resolve_point(_ticks(600, bid), pd.Timestamp(T0), HORIZON, 1, ATR, [1.0, 2.0], [3.0])
     for cell in point.cells:
         assert cell.outcome == TIMEOUT
-        assert cell.timeout_return_r == pytest.approx(point.terminal_atr / cell.sl_atr)
+        assert cell.timeout_return_r == pytest.approx(point.terminal_atr_trade / cell.sl_atr)
     # R units: sl kubwa mara mbili → R ndogo mara mbili kwa mwendo ule ule.
     r1, r2 = (c.timeout_return_r for c in point.cells)
     assert r1 == pytest.approx(2 * r2)
@@ -795,3 +799,51 @@ def test_grid_mpya_ni_superset_ya_ya_awali(cfg):
     assert 2.0 in sl and 3.0 in tp, "cell iliyosainiwa 2.0/3.0 lazima ibaki"
     # Grid iliyopanuliwa PEKEE — mpangilio unaopanda, bila kurudia.
     assert sl == sorted(set(sl)) and tp == sorted(set(tp))
+
+
+def test_timeout_inapimwa_kwenye_path_ya_trade_kama_tp_na_sl():
+    """Madarasa matatu lazima yapimwe kwa MSINGI MMOJA.
+
+    TP na SL zinatatuliwa kwenye path ya trade (ingia kwa ask, toka kwa bid),
+    kwa hiyo spread ipo ndani yao. Toleo la awali lilipima timeout MID kwa MID,
+    likiisamehe round-trip spread nzima. Kwa cell `3.0/6.0` (timeout 62%) hiyo
+    ilikuwa +0.0124 R ya EV isiyokuwepo — zaidi ya nusu ya EV iliyoripotiwa
+    (2026-08-17).
+    """
+    spread = 0.0010          # pana kwa makusudi ili tofauti ionekane
+    bid = np.linspace(1.1000, 1.1005, 400)   # inapanda kidogo — hakuna barrier inayoguswa
+    point = resolve_point(
+        _ticks(400, bid, spread=spread), pd.Timestamp(T0), HORIZON, 1, ATR,
+        [3.0], [6.0],
+    )
+    assert point is not None
+    cell = point.cells[0]
+    assert cell.outcome == TIMEOUT, "sampuli hii haipaswi kugusa barrier"
+
+    # Mid inapanda 0.0005; trade (ingia ask, toka bid) inapanda 0.0005 - spread.
+    kwa_mid = point.terminal_atr
+    kwa_trade = point.terminal_atr_trade
+    assert kwa_trade == pytest.approx(kwa_mid - spread / ATR, abs=1e-9)
+    assert kwa_trade < kwa_mid, "trade lazima iwe mbaya kuliko mid kwa spread"
+
+    # `timeout_return_r` LAZIMA itoke kwenye ya trade.
+    assert cell.timeout_return_r == pytest.approx(kwa_trade / 3.0, abs=1e-12)
+    assert cell.timeout_return_r != pytest.approx(kwa_mid / 3.0, abs=1e-9)
+
+
+def test_quantile_inabaki_kwenye_mid_kama_pd_alivyoamua():
+    """§5.1 — quantile ni mid kwa mid; spread inaingia kwenye path na RCE.
+
+    Marekebisho ya timeout hayapaswi kuigusa: ni maamuzi mawili tofauti kwa
+    sababu tofauti.
+    """
+    bid = np.linspace(1.1000, 1.1005, 400)
+    point = resolve_point(
+        _ticks(400, bid, spread=0.0010), pd.Timestamp(T0), HORIZON, 1, ATR, [3.0], [6.0]
+    )
+    assert point.quantile_y is not None and point.quantile_y_trade is not None
+    assert point.quantile_y != point.quantile_y_trade, "zote mbili bado zinarekodiwa"
+    # `quantile_y` ni ya MID — haipaswi kubadilika na marekebisho ya timeout.
+    assert point.terminal_atr == pytest.approx(
+        (point.terminal_mid - point.entry_mid) / ATR, abs=1e-12
+    )

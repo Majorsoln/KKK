@@ -35,7 +35,8 @@ SL_FIRST = 0
 TIMEOUT = 2
 
 # Muundo wa matokeo ya labels — unaingia dataset_id (§8).
-LABEL_SCHEMA_VERSION = 2   # 2: touch_price (L-C), terminal_trade (mid-vs-trade)
+LABEL_SCHEMA_VERSION = 3   # 3: timeout_return_r inatoka kwenye bei ya TRADE, si MID
+                           # 2: touch_price (L-C), terminal_trade (mid-vs-trade)
 
 
 @dataclass
@@ -79,7 +80,8 @@ class PointLabels:
     terminal_trade: float | None      # bei ya KUFUNGIA ya mwisho (BUY: bid)
     quantile_y: float | None          # L-A: log(midH/mid0) ÷ (ATR/mid0) — MID
     quantile_y_trade: float | None    # ILE ILE kwa bei ya trade — §5.1 inaitaka
-    terminal_atr: float | None        # mwendo wa horizon kwa ATR, ISHARA ya trade
+    terminal_atr: float | None        # mwendo wa horizon kwa ATR, MID kwa MID
+    terminal_atr_trade: float | None  # ...ULE ULE kwa bei ya TRADE (spread ndani)
     cells: list[BarrierCell] = field(default_factory=list)
     ticks_seen: int = 0
 
@@ -94,6 +96,7 @@ class PointLabels:
             "quantile_y": self.quantile_y,
             "quantile_y_trade": self.quantile_y_trade,
             "terminal_atr": self.terminal_atr,
+            "terminal_atr_trade": self.terminal_atr_trade,
             "ticks_seen": self.ticks_seen,
             "cells": [c.to_json() for c in self.cells],
         }
@@ -195,7 +198,22 @@ def resolve_arrays(
 
     cells: list[BarrierCell] = []
     # Mwendo wa mwisho kwa ATR, ukiwa na ISHARA ya trade: +1 = trade ilishinda.
+    #
+    # MBILI, kwa makusudi, kwa sababu zinatumika kwa mambo mawili tofauti:
+    #
+    # * `terminal_atr` ni MID kwa MID. Inatumiwa na label ya quantile, ambapo
+    #   PD aliamua (§5.1) entry na exit ziwe mid — spread inaingia kwenye path
+    #   na kwenye RCE, si mara tatu.
+    # * `terminal_atr_trade` ni TRADE kwa TRADE (ingia kwa ask, toka kwa bid).
+    #   Hii ndiyo inayolisha `timeout_return_r`, kwa sababu TP na SL zinatatuliwa
+    #   kwenye path ya trade — spread ipo ndani yao.
+    #
+    # Toleo la awali lilitumia ya MID kwa timeout. Matokeo: madarasa matatu
+    # hayakupimwa kwa msingi mmoja, na timeout ilisamehewa round-trip spread
+    # nzima. Kwa cell `3.0/6.0` (timeout 62%) hiyo ilikuwa +0.0124 R ya EV
+    # isiyokuwepo — zaidi ya nusu ya EV iliyoripotiwa (2026-08-17).
     terminal_atr = direction * (terminal_mid - entry_mid) / atr_price
+    terminal_atr_trade = direction * (terminal_trade - entry_trade) / atr_price
     n = len(path)
     for sl_atr in sl_grid:
         if direction == 1:
@@ -212,7 +230,7 @@ def resolve_arrays(
                 cells.append(
                     BarrierCell(
                         sl_atr, tp_atr, TIMEOUT,
-                        timeout_return_r=float(terminal_atr / sl_atr),
+                        timeout_return_r=float(terminal_atr_trade / sl_atr),
                     )
                 )
             elif tp_idx < sl_idx:
@@ -260,6 +278,7 @@ def resolve_arrays(
         quantile_y=quantile_y,
         quantile_y_trade=quantile_y_trade,
         terminal_atr=float(terminal_atr),
+        terminal_atr_trade=float(terminal_atr_trade),
         cells=cells,
         ticks_seen=hi - lo,
     )

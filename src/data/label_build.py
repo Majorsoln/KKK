@@ -43,7 +43,7 @@ ProgressFn = Callable[[int, int, str], None]
 #     `quantile_y_trade` (§5.1 mid-dhidi-ya-trade), na ukaguzi wa M1-dhidi-ya-tick
 #     kwa sampuli. Vipimo vitatu vya R1 ambavyo toleo 1 halikurekodi; kuvipima
 #     baadaye kungehitaji kupita kwenye ticks mara ya pili.
-LABEL_BUILD_VERSION = 2
+LABEL_BUILD_VERSION = 3
 
 
 class TickWindow:
@@ -306,6 +306,7 @@ def build_labels_for_symbol(
                 "quantile_y": result.quantile_y,
                 "quantile_y_trade": result.quantile_y_trade,
                 "terminal_atr": result.terminal_atr,
+                "terminal_atr_trade": result.terminal_atr_trade,
                 "ticks_seen": result.ticks_seen,
                 "m1_disagree": m1_disagree_here,
             }
