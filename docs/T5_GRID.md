@@ -89,6 +89,47 @@ nyembamba nyingi (timeout ~0%) na pana chache (timeout kubwa), wastani unaficha 
 Kwa EURUSD, jumla ni **14.1%** — namba ambayo haisemi lolote kuhusu `4.0/6.0`. Hukumu ya
 cell inatoka kwenye `timeout_frac` ya cell hiyo, si kwenye jumla.
 
+### DOSARI YA TANGAZO HILI, na jinsi imetatuliwa — 2026-08-17
+
+Mpangilio niliouandika hapo juu (`4.0/6.0`, `4.0/4.0`, `3.0/6.0`, `3.0/4.0`, `4.0/3.0`,
+`3.0/3.0`, …) ulikuwa **orodha ya mfano, si mpangilio kamili**. Haukuwa monotone kwa
+`sl`, wala kwa `tp`, wala kwa jumla yao (`4.0/4.0` = 8 ilikuwa kabla ya `3.0/6.0` = 9).
+Cells sita za kwanza zote zimefeli timeout, kwa hiyo `…` ndiyo inayoamua jibu — na `…`
+haikuwa imetafsiriwa.
+
+**Hiyo ni dosari halisi kwenye tangazo, na ndiyo hasa aina ya nafasi ambayo tangazo
+lilipaswa kuifunga.** Nikiichagua sasa kwa kuangalia EV, kila kitu kingekuwa kimeharibika.
+
+Inatatuliwa kwa **sababu ya sheria, si kwa matokeo**: utambulisho wa gharama ni
+`commission_R = commission_pips ÷ sl_pips`. Unahusu **`sl` PEKEE**. `tp` haiingii kwenye
+gharama hata kidogo — inaathiri malipo, si bei ya kuingia.
+
+> **Mpangilio kamili: `sl_atr` kubwa kwanza; kati ya zenye `sl` ile ile, `tp_atr` kubwa.**
+
+Hilo linatokana na kile nadharia inasema, si kile jedwali linaonyesha. Kwa timeout
+zilizopimwa:
+
+| cell | timeout | |
+|---|---|---|
+| 4.0/6.0 | 74.0% | ✗ |
+| 4.0/4.0 | 61.5% | ✗ |
+| 4.0/3.0 | 49.5% | ✗ |
+| **4.0/2.0** | **32.7%** | **✓ ← cell** |
+
+**Cell iliyotangazwa: `sl 4.0 / tp 2.0`.**
+
+**Tafsiri mbadala, iliyoandikwa ili isifichwe:** kama mpangilio ulingekuwa
+"hifadhi uwiano `tp/sl = 1.5` wa cell iliyosainiwa", jibu lingekuwa **`2.0/3.0` ile ile**
+(`4.0/6.0` inafeli timeout; `3.0/4.5` haipo kwenye grid). Nimechagua ya `sl`-kwanza kwa
+sababu ni **hoja ya nadharia**, wakati kuhifadhi uwiano ni hoja ya kufuata sheria ya jana.
+Cell `2.0/3.0` inapimwa vyovyote — ilikwisha tangazwa kama benchmark hapo juu, kwa hiyo
+hakuna kuangalia kwa ziada kunakoongezwa.
+
+**Onyo la sura:** `4.0/2.0` ina `tp/sl = 0.5`, `p_tp` 0.745 na `dev_dp = 1.5`. Ni umbo
+**kinyume** cha `2.0/3.0` (`p_tp` 0.377, malipo makubwa). Kushinda mara nyingi kwa kidogo
+si strategy ile ile iliyofanyiwa T3 — na `δ_MER`, `N_req` na tabia ya drawdown zote
+zinabadilika. Hilo litahesabiwa, halitadhaniwa.
+
 **Sheria hii haijui EV ya cell yoyote.** Inatokana na utambulisho wa gharama pamoja na
 kizuizi cha timeout kilichokwisha kutangazwa kwenye config. Hiyo ndiyo tofauti kati ya
 ubashiri unaopimwa na uteuzi juu ya label.
