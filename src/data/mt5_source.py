@@ -197,7 +197,20 @@ class MT5TickSource:
                 _time.sleep(self.retry_delay_s)
         raise SourceError(f"{broker_symbol}: copy_ticks_range: {last_error}")
 
-    def fetch_daily_close(self, symbol: str, start: datetime, end: datetime) -> pd.Series:
+    def warm_up(self, symbols: list[str]) -> int:
+        """Weka symbols zote kwenye Market Watch KWA PAMOJA.
+
+        `symbol_select` ni ya papo hapo, lakini ndiyo inayoanzisha usawazishaji
+        wa history. Kuziita zote kwanza kunafanya broker apakue kwa **sambamba**
+        wakati tunasubiri, badala ya symbol moja kwa wakati — tofauti kati ya
+        dakika chache na saa mbili kwa symbols 48.
+        """
+        mt5 = self._module()
+        return sum(1 for s in symbols if mt5.symbol_select(self.broker_symbol(s), True))
+
+    def fetch_daily_close(
+        self, symbol: str, start: datetime, end: datetime, retries: int = 0
+    ) -> pd.Series:
         """Bei za kufunga za D1 — kwa ajili ya kupima UHURU kati ya symbols pekee.
 
         **Si data ya mafunzo.** Hii ni nyepesi mara elfu kuliko ticks, na
@@ -207,17 +220,33 @@ class MT5TickSource:
 
         Inarudisha Series tupu ikiwa broker hana kina hicho — hilo ni **jibu**
         (mpaka wa history), si hitilafu.
+
+        **Inajaribu tena, kama `fetch_ticks`.** Toleo la kwanza halikufanya
+        hivyo, na matokeo yalikuwa ya kupotosha kabisa: EURUSD ilitoa bars
+        2,146 na symbols 45 zilizofuata zikatoa **sifuri**, zikionekana kama
+        broker hana data — wakati tunazo bars 50,263 za USDCHF kwenye L2 yetu
+        wenyewe. Sababu ni ile ile iliyoandikwa kwenye `fetch_ticks`: ombi la
+        kwanza linaanzisha upakuaji na linarudi tupu (2026-08-16).
         """
+        import time as _time
+
         mt5 = self._module()
         broker_symbol = self.broker_symbol(symbol)
         if not mt5.symbol_select(broker_symbol, True):
             return pd.Series(dtype=float, name=symbol)
-        rates = mt5.copy_rates_range(
-            broker_symbol,
-            mt5.TIMEFRAME_D1,
-            start.astimezone(timezone.utc),
-            end.astimezone(timezone.utc),
-        )
+
+        rates = None
+        for attempt in range(max(retries, self.fetch_retries) + 1):
+            rates = mt5.copy_rates_range(
+                broker_symbol,
+                mt5.TIMEFRAME_D1,
+                start.astimezone(timezone.utc),
+                end.astimezone(timezone.utc),
+            )
+            if rates is not None and len(rates) > 0:
+                break
+            if attempt < max(retries, self.fetch_retries):
+                _time.sleep(self.retry_delay_s)
         if rates is None or len(rates) == 0:
             return pd.Series(dtype=float, name=symbol)
         frame = pd.DataFrame(rates)

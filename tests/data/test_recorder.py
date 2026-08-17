@@ -474,3 +474,45 @@ def test_probe_history_hairuki_wikendi(cfg, l0_root):
     assert all(d.weekday() < 5 for d in source.asked), "probe haipaswi kupima wikendi"
     assert report["earliest_available"] == have_from.isoformat()
     assert all("weekday" in p for p in report["probes"])
+
+
+def test_fetch_daily_close_inajaribu_tena_kama_fetch_ticks():
+    """Ombi la kwanza linaanzisha upakuaji na linarudi tupu — si "hakuna data".
+
+    Toleo la kwanza halikujaribu tena, na matokeo yalikuwa ya kupotosha
+    kabisa: EURUSD bars 2,146, symbols 45 zilizofuata **sifuri**, zikionekana
+    kama broker hana history — wakati tuna bars 50,263 za USDCHF kwenye L2
+    yetu wenyewe (2026-08-16).
+    """
+    import inspect
+
+    from src.data.mt5_source import MT5TickSource
+
+    src = inspect.getsource(MT5TickSource.fetch_daily_close)
+    assert "for attempt in range" in src, "hakuna kujaribu tena"
+    assert "sleep" in src, "kujaribu tena bila kusubiri hakusaidii"
+    assert "retries" in inspect.signature(MT5TickSource.fetch_daily_close).parameters
+
+
+def test_warm_up_inaweka_symbols_zote_kabla_ya_kuvuta():
+    """Kuomba moja baada ya nyingine = kila moja inasubiri upakuaji WAKE.
+
+    Kuziweka zote kwenye Market Watch kwanza kunafanya broker apakue kwa
+    sambamba — tofauti kati ya dakika chache na saa mbili kwa symbols 48.
+    """
+
+    class FakeMT5:
+        def __init__(self):
+            self.selected = []
+
+        def symbol_select(self, name, enable):
+            self.selected.append(name)
+            return True
+
+    from src.data.mt5_source import MT5TickSource
+
+    source = MT5TickSource()
+    fake = FakeMT5()
+    source._mt5 = fake
+    assert source.warm_up(["EURUSD", "USDMXN", "USDSEK"]) == 3
+    assert fake.selected == ["EURUSD", "USDMXN", "USDSEK"]

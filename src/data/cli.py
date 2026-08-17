@@ -2798,6 +2798,8 @@ def cmd_select_symbols(args: argparse.Namespace) -> int:
         credentials=MT5Credentials.from_env(cfg),
         symbol_suffix=str(cfg.get("recorder.mt5.symbol_suffix", "")),
         timeout_ms=int(cfg.get("recorder.mt5.timeout_ms", 15000)),
+        fetch_retries=int(cfg.get("recorder.mt5.fetch_retries", 2)),
+        retry_delay_s=float(cfg.get("recorder.mt5.retry_delay_s", 3)),
     )
     try:
         source.connect()
@@ -2818,9 +2820,20 @@ def cmd_select_symbols(args: argparse.Namespace) -> int:
         # inaonekana imekwama — na kuiacha ikikimbia kimya ni gharama
         # tuliyokwisha kuilipa mara moja kwa `setup-effect` (2026-08-14).
         jumla = len(tunazo) + len(wagombea)
+        # Warm-up: weka ZOTE kwenye Market Watch kwanza, kisha subiri.
+        #
+        # MT5 inaanzisha upakuaji wa history pale symbol inapoingia Market
+        # Watch. Kuziomba moja baada ya nyingine kunamaanisha kila moja
+        # inasubiri upakuaji WAKE peke yake; kuziweka zote kwanza kunamaanisha
+        # broker anapakua kwa sambamba wakati tunasubiri mara moja.
+        n_hai = source.warm_up(tunazo + wagombea)
+        print(f"   Market Watch: {n_hai}/{jumla} · inasubiri sekunde "
+              f"{args.warmup_s} upakuaji uanze…", flush=True)
+        time.sleep(args.warmup_s)
+
         anza = time.monotonic()
         for i, symbol in enumerate(tunazo + wagombea, start=1):
-            close = source.fetch_daily_close(symbol, start, end)
+            close = source.fetch_daily_close(symbol, start, end, retries=args.retries)
             muda = time.monotonic() - anza
             kadirio = f" · ~{muda / i * (jumla - i):.0f}s zimebaki" if i >= 3 else ""
             print(f"   {i:>3}/{jumla}  {symbol:<10} bars {len(close):>6,}{kadirio}", flush=True)
@@ -3487,6 +3500,10 @@ def build_parser() -> argparse.ArgumentParser:
     p_sel.add_argument("--tolerance-days", type=int, default=90,
                        help="kuchelewa kunakovumilika kuanzia `splits.data_start`")
     p_sel.add_argument("--limit", type=int, default=25)
+    p_sel.add_argument("--warmup-s", type=float, default=45.0,
+                       help="kusubiri baada ya kuweka symbols kwenye Market Watch")
+    p_sel.add_argument("--retries", type=int, default=4,
+                       help="majaribio kwa symbol wakati upakuaji unaendelea")
     p_sel.set_defaults(func=cmd_select_symbols)
 
     p_cross = subparsers.add_parser(
