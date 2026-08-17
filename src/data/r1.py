@@ -104,6 +104,22 @@ def base_rates(barriers: pd.DataFrame) -> pd.DataFrame:
     Timeout haitupwi — inaripotiwa kama darasa lake (§5.5). Lakini swali la
     jiometri ni "kati ya zilizofika mahali, ngapi zilifika TP", na timeout
     haikufika popote. Kuijumuisha ni kulinganisha vitu viwili tofauti.
+
+    ## `diff` INAAMINIKA TU TIMEOUT IKIWA NDOGO
+
+    `sl/(sl+tp)` ni uwezekano wa kugusa kwa **horizon isiyo na mwisho**. Kwa
+    horizon ya bars 24, kuchuja "zilizofika mahali" kunaleta upendeleo:
+    **barrier ILIYO KARIBU inaguswa mapema, kwa hiyo inashinda kwa uwiano
+    mkubwa kati ya zilizofika**. Upendeleo huo unakua na timeout.
+
+    Kwa hiyo `diff > 0` kwenye cell yenye `tp < sl` **si edge** — inaweza kuwa
+    truncation pekee. Grid ilipopanuliwa hadi `sl 3.0 / tp 0.5` (T5), cell hiyo
+    ilitoa `p_tp` 0.916 dhidi ya jiometri 0.857 — SE 3.2 juu — ikiwa na timeout
+    kubwa. Kwenye grid ya awali (`sl ≤ 2.0`) hakuna cell iliyofikia hali hiyo,
+    kwa hiyo dosari haikuonekana (2026-08-17).
+
+    Safu `geometry_reliable` na `geometry_bias` zinasema hilo kwa kila cell,
+    ili `diff` isisomwe kama edge pale ambapo ni jiometri ya truncation.
     """
     if barriers.empty:
         return pd.DataFrame()
@@ -129,6 +145,11 @@ def base_rates(barriers: pd.DataFrame) -> pd.DataFrame:
                 "p_tp": p_tp,
                 "geometry": geometry,
                 "diff": p_tp - geometry,
+                # Upendeleo wa truncation unaelekea barrier ILIYO KARIBU.
+                "geometry_reliable": bool(n and (n_to / n) <= 0.05),
+                "geometry_bias": (
+                    "none" if tp_atr == sl_atr else ("tp" if tp_atr < sl_atr else "sl")
+                ),
                 # Kosa la kawaida la uwiano — "tofauti" ndogo kuliko hili si tofauti.
                 "se": float(np.sqrt(p_tp * (1 - p_tp) / resolved)) if resolved else float("nan"),
                 "ev_r": expected_r(chunk),

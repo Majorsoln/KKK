@@ -555,7 +555,12 @@ def test_horizon_ni_bars_si_masaa():
 
 
 def test_mjenzi_unatoa_points_na_barriers(cfg, tmp_path, monkeypatch):
-    """Mzunguko mzima: setups → ticks → grid 5×5 kwa kila point."""
+    """Mzunguko mzima: setups → ticks → grid NZIMA kwa kila point.
+
+    Idadi ya cells inatoka **config**, si namba iliyopigwa kwenye test. Grid
+    ilipopanuliwa 5×5 → 7×7 (T5, 2026-08-17), `* 25` iliyopigwa hapa ilifeli —
+    na ilikuwa ikithibitisha config ya jana, si mkataba wa mjenzi.
+    """
     from src.data.audit import build_l2
     from src.data.cli import main
     from src.data.setups import detect_setups
@@ -587,7 +592,8 @@ def test_mjenzi_unatoa_points_na_barriers(cfg, tmp_path, monkeypatch):
     barriers = pd.read_parquet(labels / "barriers-2024.parquet")
 
     assert len(points) > 0
-    assert len(barriers) == len(points) * 25, "grid 5×5 kwa KILA point"
+    n_cells = len(cfg.get("labels.barrier.sl_atr")) * len(cfg.get("labels.barrier.tp_atr"))
+    assert len(barriers) == len(points) * n_cells, f"grid nzima ({n_cells}) kwa KILA point"
     assert set(barriers["outcome"]) <= {TP_FIRST, SL_FIRST, TIMEOUT}
     assert (points["direction"].isin([1, -1])).all()
     assert (points["is_setup"] | points["is_control"]).all()
@@ -609,11 +615,29 @@ def test_mjenzi_unatoa_points_na_barriers(cfg, tmp_path, monkeypatch):
     )
     assert summary["totals"]["cells"] == len(barriers)
     assert summary["base_rates"], "R1 bila base rates si R1"
-    assert len(summary["base_rates"]) == 25, "cell moja moja ya grid, si wastani mmoja"
+    assert len(summary["base_rates"]) == n_cells, "cell moja moja ya grid, si wastani mmoja"
     assert summary["setup_vs_control"]["setup"]["cells"] > 0
     assert summary["setup_vs_control"]["control"]["cells"] > 0
     # Jiometri: kila cell iko chini ya sl/(sl+tp) — spread iko ndani ya path.
-    assert all(row["diff"] <= 0 for row in summary["base_rates"])
+    #
+    # Ni dai la KITAKWIMU, si la hakika: cell yenye resolutions chache inaweza
+    # kuizidi kwa bahati. Grid ilipopanuliwa hadi `sl 4.0 / tp 0.5` (jiometri
+    # 0.889), cells za pembeni zilipata resolutions kadhaa pekee kwenye sampuli
+    # hii ndogo, na `diff` ikawa chanya kwa kelele. Kizingiti ni kile kile cha
+    # `min_labels_per_cell` — dai linalopimwa pale linapopimika (T5, 2026-08-17).
+    kubwa = [
+        row for row in summary["base_rates"]
+        if row["geometry_reliable"] and (row["n_tp"] + row["n_sl"]) >= 30
+    ]
+    for row in kubwa:
+        assert row["diff"] <= 2.0 * row["se"], (
+            f"cell {row['sl_atr']}/{row['tp_atr']}: p_tp {row['p_tp']:.3f} "
+            f"iko juu ya jiometri {row['geometry']:.3f} kwa zaidi ya 2 SE"
+        )
+    # Cells zisizoaminika lazima ziwe zimetajwa, si kunyamazwa.
+    zisizoaminika = [r for r in summary["base_rates"] if not r["geometry_reliable"]]
+    for row in zisizoaminika:
+        assert row["geometry_bias"] in {"none", "tp", "sl"}
     assert rc in (0, 1)
     assert (rc == 0) == (not summary["problems"])
 

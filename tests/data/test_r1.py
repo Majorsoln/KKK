@@ -466,3 +466,46 @@ def test_holdout_violations_inahesabu_si_kudhani():
         {"decision_time": pd.to_datetime(["2024-03-31", "2024-04-01", "2025-01-01"], utc=True)}
     )
     assert holdout_violations(points, date(2024, 4, 1)) == 2
+
+
+def test_jiometri_haiaminiki_timeout_ikiwa_kubwa():
+    """`sl/(sl+tp)` ni uwezekano wa horizon ISIYO NA MWISHO.
+
+    Kwa horizon yenye mwisho, kuchuja "zilizofika mahali" kunapendelea barrier
+    ILIYO KARIBU: inaguswa mapema, kwa hiyo inashinda kwa uwiano mkubwa kati ya
+    zilizofika. Kwa hiyo `diff > 0` kwenye cell yenye `tp < sl` inaweza kuwa
+    truncation pekee, si edge.
+
+    Grid ilipopanuliwa hadi `sl 3.0 / tp 0.5` (T5), cell hiyo ilitoa `p_tp`
+    0.916 dhidi ya jiometri 0.857 — SE 3.2 juu. Kwenye grid ya awali
+    (`sl ≤ 2.0`) hakuna cell iliyofikia hali hiyo, kwa hiyo dosari haikuonekana.
+    """
+    import numpy as np
+    import pandas as pd
+
+    from src.data.labels import SL_FIRST, TIMEOUT, TP_FIRST
+    from src.data.r1 import base_rates
+
+    def cell(sl, tp, n_tp, n_sl, n_to):
+        return pd.DataFrame({
+            "sl_atr": sl, "tp_atr": tp,
+            "outcome": [TP_FIRST] * n_tp + [SL_FIRST] * n_sl + [TIMEOUT] * n_to,
+            "sl_pips": 30.0, "tp_pips": 30.0 * tp / sl,
+            "timeout_return_r": 0.0,
+        })
+
+    frame = pd.concat([
+        cell(3.0, 0.5, 230, 21, 200),   # timeout kubwa — jiometri haiaminiki
+        cell(1.0, 1.0, 100, 100, 5),    # timeout ndogo — inaaminika
+    ], ignore_index=True)
+
+    rows = base_rates(frame).set_index(["sl_atr", "tp_atr"])
+    pana = rows.loc[(3.0, 0.5)]
+    nyembamba = rows.loc[(1.0, 1.0)]
+
+    assert not pana["geometry_reliable"], "timeout 44% haiwezi kuaminika"
+    assert pana["geometry_bias"] == "tp", "tp iko karibu → upendeleo kwake"
+    assert pana["diff"] > 0, "truncation inaonekana kama edge — ndilo hatari"
+
+    assert nyembamba["geometry_reliable"]
+    assert nyembamba["geometry_bias"] == "none"

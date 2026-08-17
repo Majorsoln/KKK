@@ -197,8 +197,19 @@ labels:
     entry_price:       "mid"            # §5.1 (PD 2026-08-07): L-A inapendekeza, haihukumu (S1);
     exit_price:        "mid"            # spread inaingia path (§5.2) na RCE — si mara tatu
   barrier:
-    sl_atr:            [0.5, 0.75, 1.0, 1.5, 2.0]   # GRID = input ya model, si derived (anti-S1)
-    tp_atr:            [0.5, 1.0, 1.5, 2.0, 3.0]
+    # GRID = input ya model, si derived (anti-S1).
+    #
+    # IMEPANULIWA 2026-08-17 (T5, docs/T5_GRID.md). Grid ya awali iliishia
+    # `sl 2.0 / tp 3.0`, na `cost-audit` ilionyesha `EV net` ikiwa **monotone
+    # hadi ukingo kwenye mihimili YOTE MIWILI**, bila kugeuka:
+    #   sl:  -0.2006  -0.1023  -0.0589  -0.0062  +0.0039
+    #   tp:  -0.0329  -0.0210  -0.0162  -0.0050  +0.0039
+    # Cell bora tuliyoipata ilikuwa cell ya PEMBENI. Utambulisho unaeleza kwa
+    # nini: `commission_R = commission_pips / sl_pips`, kwa hiyo stop pana
+    # inagawanya gharama ile ile kwa `R` kubwa zaidi, na overshoot pia
+    # inapungua. Optimum haikuonekana kwa sababu HAIKUTAZAMWA.
+    sl_atr:            [0.5, 0.75, 1.0, 1.5, 2.0, 3.0, 4.0]
+    tp_atr:            [0.5, 1.0, 1.5, 2.0, 3.0, 4.0, 6.0]
     tie_break:         "sl_first"       # §5.2 (PD 2026-08-07): gap ikifunika zote mbili -> SL;
                                         # live stop inatekelezwa upande mbaya kwanza. R1 inaripoti
                                         # mzunguko; > 1% ya labels -> inapanda kwa PD
