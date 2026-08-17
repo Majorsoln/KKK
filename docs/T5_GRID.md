@@ -181,3 +181,117 @@ inatajwa `T5`.
 | 7 | T3 ikirudiwa juu ya cell mpya | `meta-label` | **config 1** |
 
 Hatua ya 2 ndiyo lango. Bila sahihi, hatua ya 3 haianzi.
+
+---
+
+## 11. MATOKEO — 2026-08-17
+
+**Ukaguzi wa regression umepita.** Cell `2.0/3.0` imetoa `EV net +0.0039`, CI
+`[−0.0147, +0.0206]` — sawasawa na kabla ya kujengwa upya. Cells 49 ni sahihi.
+
+### Nadharia ya gharama: IMETHIBITIKA
+
+| | `2.0/3.0` | `4.0/2.0` | `3.0/6.0` |
+|---|---|---|---|
+| `cost_R` | 0.0271 | **0.0117** | 0.0167 |
+| `n_max`/mwaka | 166 | **902** | 441 |
+| overshoot inaongeza | +36% | +16% | +25% |
+
+`commission_R = commission_pips ÷ sl_pips` imefanya kazi kama ilivyotabiri: `sl` mara mbili
+pana imeshusha gharama karibu nusu, na `n_max` imepanda mara 5.4.
+
+### Ubashiri wa monotone: UMEKANUSHWA
+
+`EV net` kwenye mhimili wa `sl`, `tp` imefungwa:
+
+| tp | sl 2.0 | sl 3.0 | sl 4.0 | kilele |
+|---|---|---|---|---|
+| 1.0 | −0.0210 | −0.0070 | −0.0087 | 3.0 |
+| 2.0 | −0.0050 | +0.0057 | +0.0007 | 3.0 |
+| 3.0 | +0.0039 | +0.0121 | +0.0060 | 3.0 |
+| 4.0 | +0.0075 | +0.0137 | +0.0067 | 3.0 |
+| 6.0 | +0.0177 | **+0.0205** | +0.0123 | 3.0 |
+
+**Kilele kiko `sl 3.0` kwenye safu 6 kati ya 7.** Si bahati — ni muundo, na ni hasa
+mgongano niliouandika §3: gharama inashuka na `sl`, timeout inapanda, na optimum ni ya
+ndani. Cell iliyotangazwa `4.0/2.0` iko **nyuma ya kilele**: `+0.0007`, CI
+`[−0.0116, +0.0112]`.
+
+Kwa jedwali la §6: *monotone ikigeuka kabla ya cell iliyotangazwa ⇒ nadharia imekanushwa;
+gharama haikuwa kizuizi kinachotawala.* Ndicho kilichotokea. Mechanism ni kweli;
+utawala wake si kweli.
+
+### Cell bora: HAISHIKILII
+
+`3.0/6.0` · `EV net +0.0205`
+
+| Mpaka | Thamani | |
+|---|---|---|
+| 90% CI (jaribio moja) | `[−0.0015, +0.0404]` | ukingoni |
+| **Šidák kwa cells 49** | **−0.0212** | **haishikilii** |
+
+Ni **argmax ya cells 49**. Mpaka wa 5% ni wa cell iliyotangazwa **kabla**; huu
+haukutangazwa. Kwa asilimia 0.105 inayohitajika kwa familia, jibu ni hasi.
+
+**Hakuna cell kwenye grid nzima inayothibitika kulipa.**
+
+## 12. Kitu kilichofungua mlango na kuufunga kwa wakati mmoja
+
+Angalia namba mbili za mwisho kwa kila cell:
+
+| cell | `cost_R` | lift inayohitajika | **`N_req`** |
+|---|---|---|---|
+| 2.0/3.0 | 0.0271 | 0.0202 p_tp | 4,175 |
+| 4.0/2.0 | 0.0117 | 0.0151 p_tp | 8,063 |
+| **3.0/6.0** | 0.0167 | **0.0043 p_tp** | **15,831** |
+
+`N_eff` iliyopimwa: **10,168**.
+
+Lift inayohitajika imeanguka **mara 7** (0.0300 → 0.0043). Lakini `N_req` imepanda
+**mara 3.8**, na imepita `N_eff` yetu.
+
+Utambulisho unaeleza kwa nini, na hakuna njia ya kuizunguka:
+
+```
+δ_MER = SR* ÷ (dev_dp · √n_max)        N_req ∝ 1 ÷ δ²
+```
+
+Gharama nafuu inaruhusu trades nyingi (`n_max` ↑), ambayo inashusha edge inayohitajika kwa
+kila trade (`δ_MER` ↓) — na edge ndogo inahitaji **data nyingi zaidi** kuithibitisha.
+**Levers mbili zinapigana.**
+
+### Milango yote inafunga kwenye mahali pamoja
+
+| Kupunguza edge inayohitajika | → panua barriers | → **N_req inapanda juu ya N_eff** |
+| Kuongeza data | → ongeza symbols | → **gharama inapanda** (T4: 1.4×–4.7×) |
+
+T4 ilishaonyesha lango la pili: symbols zote 36 zilizowezekana ni ghali kuliko zetu, na
+kuziongeza kunapandisha `cost_R` ya pool kutoka 0.0271 hadi 0.0441.
+
+**Vizuizi viwili vinakutana chini ya data tulizonazo.** Hilo si kushindwa kwa uchambuzi —
+ni matokeo, na linatuambia hasa nini kingebadilisha jibu.
+
+## 13. Kile kingebadilisha jibu — na hakuna kati yake ni model
+
+| Lever | Kwa nini inafanya kazi | Athari |
+|---|---|---|
+| **Commission ndogo** | `commission_R = pips ÷ sl_pips`. 0.7 → 0.3 inaongeza `n_max` mara 5.4 kwenye cell YOYOTE, **bila kugharimu data** | inavunja mgongano wa §12 |
+| **Entry rule yenye nguvu** | edge kubwa kwa trade ⇒ `δ` kubwa ⇒ `N_req` ndogo. SETUP-v1 inaleta +0.0251 p_tp dhidi ya control | inavunja mgongano kutoka upande wa pili |
+| **Data ya kina kwa jozi ZENYE UKWASI** | `N_eff` ↑ bila `cost_R` ↑ — Dukascopy exotics zinashindwa hapa, vendor mwingine anaweza asishindwe | inaondoa kizuizi cha T4 |
+
+**Model haiko kwenye orodha.** T3 imepima: `top R` p 0.119 (12 symbols), na baada ya
+kuondoa utambuzi wa symbol, `ρ` 0.5152 p 0.040 — ujuzi upo, hauzai pesa. Kwenye cell mpya
+bar ni ndogo zaidi (0.0043 p_tp) lakini `N_req` ni 15,831 dhidi ya `N_eff` 10,168:
+**jaribio lolote litakuwa INCONCLUSIVE kwa muundo**, bila kujali matokeo. Kifungu cha nguvu
+cha `metalabel.evaluate` kitalikataa lenyewe.
+
+Kutumia config kwenye jaribio ambalo hesabu inasema haliwezi kuhitimisha ni kupoteza
+config.
+
+## 14. Bajeti
+
+Zilizobaki: **5.5**. T5 haijatumia hata moja — `build-labels`, `r1-summary` na `cost-audit`
+zote ni vipimo, na `cost-audit` inakataa kuhesabu identities bila `--cell` iliyotajwa.
+
+Ushahidi: `research/reports/r1/cost_audit_10sym_c15043ae.json` ·
+`research/reports/r1/r1_summary.json` · `research/reports/r1/label_build.json`
