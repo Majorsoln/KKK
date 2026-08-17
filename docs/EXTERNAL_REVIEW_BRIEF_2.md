@@ -121,7 +121,21 @@ single most solid positive result in the project.
   per R (`commission_R = commission_pips ÷ sl_pips`) but raise timeout share, and beyond
   3.0 the dilution wins.
 * Along `tp` the surface is **still rising at the grid edge (6.0)** in 7 of 7 rows, but
-  timeout at `sl 3.0 / tp 6.0` is already 30.6%.
+  timeout at `sl 3.0 / tp 6.0` is **61.8%**. (An earlier version of this brief said 30.6%;
+  that was the *stop-hit* rate misread from a different table. Corrected 2026-08-17.)
+
+**Consequence of that correction, which we had missed.** Decomposing EV at the two cells we
+examined:
+
+| | timeout share | barriers contribute | timeouts contribute | E[R \| timeout] |
+|---|---|---|---|---|
+| `3.0/6.0` | 61.8% | **−0.187 R** | **+0.221 R** | +0.357 |
+| `2.0/3.0` | 22.7% | **−0.060 R** | **+0.084 R** | +0.369 |
+
+At **both** cells the barrier outcomes are net negative and **all** of the expected value
+comes from positions that reached neither barrier and were closed at the 24-bar horizon.
+The double barrier is not harvesting the edge; it is taxing it. This also explains why EV
+rises monotonically in `tp`: a wider target simply converts barrier outcomes into timeouts.
 
 Best cell `sl 3.0 / tp 6.0`:
 
@@ -249,9 +263,20 @@ other. And the way out of the sample constraint — more instruments — raises 
 The two constraints meet **below** the data we have.
 
 A separate structural point from the same identity: we currently generate **3,068 setups
-per year** against `n_max` = **441**. We are 7× over the cost budget. A filter that keeps
-roughly the best 14% is therefore **structurally required**, independent of any claim about
-machine learning.
+per year** against `n_max` = **441**.
+
+**Correction, 2026-08-17.** An earlier version of this section concluded that we are "7×
+over budget" and that a filter keeping the best ~14% is "structurally required". **That is
+wrong, and the error is ours.** Net Sharpe = `μ_net · √G / σ_R`, which is *increasing* in
+trade count for as long as per-trade net EV is positive — and ours is (+0.0205). There is
+no `n_max`; κ bounds cost as a *share of a target*, which is an accounting preference, not
+an optimum.
+
+The honest rule is the opposite one: a filter that keeps fraction `f` must raise per-trade
+net EV by **1/√f** merely to be Sharpe-neutral. At `f = 0.14` that is **2.67×**, from
+0.0205 to 0.055 R. Cutting to 441/yr at unchanged per-trade EV would take net Sharpe from
+**0.56 to 0.21**. We are leaving `n_max` in the table above because every other number in
+this brief was derived while it was assumed, and readers need to see what was assumed.
 
 ### 3.1 Sensitivity — which lever actually matters
 
@@ -362,7 +387,9 @@ power for the effect we have actually measured (+0.0348 R matched)?
 roughly zero, is the correct diagnosis "the entry rule is close and needs strengthening" or
 "the level is set by cost and the entry rule is irrelevant at this cost structure"?
 
-**Q3.** We are 7× over the cost-implied trade budget (3,068/yr vs 441/yr). Should the
+**Q3.** *(Superseded by the correction in §3 — the trade budget is not a constraint. Kept
+as asked, because the answer to "is the budget the wrong constraint" is now yes and we would
+like to know what replaces it.)* We are 7× over the cost-implied trade budget. Should the
 reduction come from (a) a stricter entry rule, (b) a filter model, (c) a wider stop, or
 (d) is the budget itself the wrong constraint?
 
