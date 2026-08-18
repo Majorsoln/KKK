@@ -364,3 +364,78 @@ Nadharia ya gharama **imethibitika** (cost_R 0.0271 → 0.0117 kwa `sl` 4.0). Ut
 
 Na sasa, kwa nyongeza: **`t = 0.64`**. Hakuna cell iliyo karibu na kuthibitika, na tofauti
 kati ya "karibu" na "mbali" ilikuwa **kasoro ya uhasibu ya mstari mmoja**.
+
+---
+
+## 16. UTEUZI ULIOTOZWA — 2026-08-18, pool nzima ya symbols 12
+
+Mtaalamu wa pili aliita kuondolewa kwa EURCHF/EURGBP **"uteuzi mkubwa zaidi usiotozwa
+kwenye document"**. Kabla ya kupokea jibu lake la maswali ya kurudi, tumepima. Amri moja,
+haitumii config budget (`cost-audit` ni takwimu ya population, si uteuzi):
+
+```
+python -m src.data.cli cost-audit --cell 3.0/6.0
+```
+
+### Matokeo
+
+| | pool ya 10 (iliyoteuliwa) | **pool ya 12 (kamili)** |
+|---|---|---|
+| `EV net` kwa cell 3.0/6.0 | +0.0081 | **−0.0109** |
+| 90% CI | [−0.0138, +0.0278] | **[−0.0322, +0.0078]** |
+| Šidák (cells 49) | −0.0332 | **−0.0507** |
+| `t` | +0.64 | **−0.90** |
+| `cost_R` | 0.0167 | 0.0186 |
+| gross Sharpe (convention ya mtaalamu 2) | 0.68 | **0.22** |
+| cost drag | −0.46 | **−0.53** |
+| **net Sharpe** | **+0.22** | **−0.31** |
+| **cells zenye EV chanya** | **6 / 49** | **0 / 49** |
+
+**Hakuna cell hata moja kati ya 49 iliyo chanya kwenye pool kamili.** Bora ni
+`sl 3.0 / tp 2.0` kwa **−0.0107 R**.
+
+Uteuzi ulisogeza EV kwa **+0.0190 R** — mara **2.3** ya makadirio yote yaliyobaki
+baada ya marekebisho ya labelling. Ni **uteuzi mkubwa kuliko dosari ya labelling**
+(0.0124), na mkubwa kuliko athari nzima ya SETUP-v1 dhidi ya control (0.0056).
+
+### Kinachoanguka
+
+* **Eneo chanya lote la grid lilikuwa tokeo la uteuzi.** Si la barriers, si la muundo, si
+  la trigger.
+* **Kilele cha ndani kwa `sl` 3.0 kimekuwa uwanda.** Kwa pool kamili: `sl` 3.0 bora
+  −0.0107, `sl` 4.0 bora −0.0111. Tofauti 0.0004 — hakuna kilele hapo. Dai la §15
+  ("kimesalimika") lilikuwa la pool iliyoteuliwa, na sasa linabanwa: mekanizimu ya
+  gharama bado inaonekana kwenye mwelekeo (`sl` 0.5 → 3.0 inaboresha kwa 0.21 R), lakini
+  eneo la juu ni tambarare kati ya 3.0 na 4.0.
+
+### Kinachosimama
+
+Mwelekeo wa `sl` bado ni mkali sana na wa mpangilio kamili (−0.2229 → −0.0107 kutoka
+`sl` 0.5 hadi 3.0). Nadharia ya gharama haijaguswa; kilichoguswa ni dai kwamba ina kilele.
+
+### Jaribio ambalo hoja ya gharama inashindwa
+
+Mtaalamu wa pili anasema tatizo letu ni **gharama ya utekelezaji**, si kukosa edge. Kwa
+pool kamili, tumepima hoja yake mwenyewe hadi mwisho wake — tier ya juu kabisa ya
+Dukascopy aliyoitaja (0.15 pips round turn badala ya 0.7):
+
+> `commission_R` 0.0146 → 0.0031 · `cost_R` 0.0186 → 0.0071
+> **`EV net` → +0.0006 R · Sharpe → 0.02 · `t` → 0.05**
+
+**Hata kwa commission ya bure kabisa, pool kamili haizalishi chochote.** gross Sharpe ni
+0.22; gharama ya aina yoyote halisi inaila yote. Hoja ya "tuna edge, gharama inaila" ni
+kweli kwa pool iliyoteuliwa **pekee**.
+
+### Njia halali iliyobaki kwa EURCHF/EURGBP
+
+Kuondoa symbols mbili baada ya kuona EV yao ni cherry-picking. Kuondoa symbols mbili kwa
+**sheria iliyotangazwa juu ya sifa zisizo na label** — spread-per-daily-move, volatility
+floor — si cherry-picking; ndilo jibu la mtaalamu wa pili kwa Q5. Sheria hiyo lazima
+itangazwe kwanza, kisha ianguke pale inapoanguka, hata kama itaacha EURCHF ndani.
+
+Hatujafanya hivyo. Hadi tufanye, **namba ya kuripoti ni −0.0109, si +0.0081**.
+
+### Hukumu ya T5, toleo la tatu
+
+T5 ilitangaza kupima kama kupanua grid kunafungua cell inayolipa. Jibu la mwisho, kwa
+data ambayo hatujaichagua: **hapana, na hakuna karibu.** `t = −0.90`.

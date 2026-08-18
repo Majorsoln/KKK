@@ -165,3 +165,16 @@ haitegemei kiwango?**
 
 Upatanisho na mtaalamu wa 1 (aliyechagua **A** — shambulia effect size, horizon kwanza)
 utafanyika **baada** ya jibu lake, si kabla.
+
+---
+
+## 7. Kipimo kilichofungwa — 2026-08-18
+
+Kabla ya jibu lake, tumepima kile nilichoahidi kwenye Q5: pool kamili ya symbols 12 kwa
+labels zilizosahihishwa. Matokeo: **EV net −0.0109 R, `t` −0.90, cells 0/49 chanya.**
+Uteuzi ulikuwa na thamani ya **+0.0190 R**. Tazama `docs/T5_GRID.md` §16.
+
+**Namba haitumwi kwake hadi ajibu Q5.** Nilimwomba ajitangazie tafsiri **kabla** ya
+kuiona; kumtumia sasa kunaharibu kitu pekee ambacho swali lile lilikuwa nalo. Jibu
+limeandaliwa na kufungwa: `docs/ADDENDUM_EXPERT_2_SEALED.md`. Tarehe ya kipimo iko
+kwenye git, kwa hiyo mpangilio unathibitika.

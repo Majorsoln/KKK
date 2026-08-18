@@ -173,6 +173,34 @@ commission charged: **−0.0062 ATR, SE 0.0353, t = −0.18.** Indistinguishable
 momentum trigger produces no measurable 24-hour drift; whatever small edge exists is
 produced by the barriers, not despite them.
 
+> ### ⚠⚠ SUPERSEDED A SECOND TIME — the 10-symbol pool is an outcome-driven selection
+>
+> **Measured 2026-08-18. Withheld from reviewer 2 until he answers Q5 of the follow-up
+> letter, because we asked him to pre-commit to a reading of this number before seeing it.
+> Do not circulate this block to him before that.**
+>
+> Every EV figure in §2.2 — before *and* after the labelling fix — is computed on a
+> 10-symbol pool created by dropping EURCHF and EURGBP **after seeing their EV**. On the
+> full, pre-registered 12-symbol universe, at the same corrected labels and the same
+> argmax cell `sl` 3.0 / `tp` 6.0:
+>
+> | | 10-symbol (selected) | **12-symbol (full)** |
+> |---|---|---|
+> | `EV net` | +0.0081 | **−0.0109** |
+> | 90% CI | [−0.0138, +0.0278] | **[−0.0322, +0.0078]** |
+> | `t` | +0.64 | **−0.90** |
+> | gross Sharpe | 0.68 | **0.22** |
+> | net Sharpe | +0.22 | **−0.31** |
+> | **positive cells** | 6 / 49 | **0 / 49** |
+>
+> **No cell in the 49-cell grid has positive net EV on the unselected pool.** The
+> selection was worth **+0.0190 R** — 2.3× the entire remaining point estimate, and larger
+> than the labelling defect that preceded it. Detail in `docs/T5_GRID.md` §16.
+>
+> At the top Dukascopy commission tier (0.15 pips round turn), the unselected pool gives
+> `EV net` +0.0006 R, `t` = 0.05. **Even at effectively zero commission there is nothing
+> there.** The "execution-cost result" reading holds for the selected pool only.
+
 ### 2.3 The ML filter does not add measurable economic value
 
 Meta-labelling (SETUP-v1 fixes the side; a secondary model decides take/skip). Logistic
