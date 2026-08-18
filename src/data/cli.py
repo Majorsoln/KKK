@@ -1901,6 +1901,78 @@ def cmd_cost_audit(args: argparse.Namespace) -> int:
             print(f"cell {args.cell} haipo kwenye grid", file=sys.stderr)
             return 2
         row = match.iloc[0]
+
+        # --- MGAWANYO KWA SYMBOL: gharama dhidi ya gross -------------------
+        #
+        # Swali ambalo linaamua kama kuondoa symbol ni sheria au ni uteuzi.
+        # Symbol ikiwa hasi kwa sababu ya `cost_R` yake, basi kuiondoa ni
+        # SHERIA YA GHARAMA — inaweza kutangazwa bila label ("ondoa symbol
+        # yoyote yenye spread-kwa-ATR juu ya X") na kutumika sawasawa kwa
+        # symbols zote na za baadaye. Symbol ikiwa hasi kwa sababu ya gross
+        # yake, kuiondoa ni UTEUZI JUU YA MATOKEO, na hakuna sheria isiyo na
+        # label inayoweza kuizalisha.
+        #
+        # Tofauti hiyo haiwezi kuonekana kwenye `EV net` pekee — ndiyo maana
+        # safu ya `gross` ipo hapa.
+        if args.by_symbol:
+            print(f"\nMGAWANYO KWA SYMBOL — cell {want_sl}/{want_tp}")
+            print("   gross = EV net + cost_R. Ni edge kabla ya gharama ya utekelezaji.")
+            print(f"\n   {'symbol':<8} {'n':>6} {'comm R':>8} {'cost R':>8} "
+                  f"{'gross':>9} {'EV net':>9} {'spread/ATR':>11}")
+            per_symbol_rows: list[dict[str, Any]] = []
+            for sym in sorted(barriers["symbol"].unique()):
+                sub = barriers[
+                    (barriers["symbol"] == sym)
+                    & np.isclose(barriers["sl_atr"], want_sl)
+                    & np.isclose(barriers["tp_atr"], want_tp)
+                ]
+                if sub.empty:
+                    continue
+                one = audit(sub, commission_pips=args.commission_pips)
+                if not one.cells:
+                    continue
+                cc = one.cells[0]
+                gross = cc.ev_r_net + cc.cost_r_total
+                spread_atr = float("nan")
+                if not points.empty and {"spread_entry_pips", "spread_exit_pips",
+                                         "atr_pips"} <= set(points.columns):
+                    pp = points[(points["symbol"] == sym)
+                                & points["is_setup"].fillna(False)]
+                    if not pp.empty:
+                        spread_atr = float(np.nanmean(
+                            (pp["spread_entry_pips"].to_numpy(dtype=float)
+                             + pp["spread_exit_pips"].to_numpy(dtype=float)) / 2.0
+                            / pp["atr_pips"].to_numpy(dtype=float)
+                        ))
+                print(f"   {sym:<8} {cc.n:>6,} {cc.commission_r:>8.4f} "
+                      f"{cc.cost_r_total:>8.4f} {gross:>+9.4f} {cc.ev_r_net:>+9.4f} "
+                      f"{spread_atr:>11.4f}")
+                per_symbol_rows.append({
+                    "symbol": sym, "n": cc.n, "commission_r": cc.commission_r,
+                    "cost_r": cc.cost_r_total, "gross_r": gross,
+                    "ev_r_net": cc.ev_r_net, "spread_per_atr": spread_atr,
+                })
+            if per_symbol_rows:
+                gr = np.array([r["gross_r"] for r in per_symbol_rows])
+                cr = np.array([r["cost_r"] for r in per_symbol_rows])
+                sp = np.array([r["spread_per_atr"] for r in per_symbol_rows])
+                if len(per_symbol_rows) > 1:
+                    print(f"\n   mtawanyiko wa gross (sd) {gr.std(ddof=1):.4f} · "
+                          f"wa cost_R (sd) {cr.std(ddof=1):.4f}")
+                neg = [r["symbol"] for r in per_symbol_rows if r["ev_r_net"] < 0]
+                neg_gross = [r["symbol"] for r in per_symbol_rows if r["gross_r"] < 0]
+                print(f"   hasi kwa EV net : {', '.join(neg) if neg else '—'}")
+                print(f"   hasi kwa GROSS  : {', '.join(neg_gross) if neg_gross else '—'}")
+                if np.isfinite(sp).sum() >= 3:
+                    ok = np.isfinite(sp) & np.isfinite(gr)
+                    rho = float(pd.Series(sp[ok]).corr(pd.Series(gr[ok]), method="spearman"))
+                    print(f"   ρ(spread/ATR, gross) = {rho:+.3f}  "
+                          f"— karibu na 0 ⇒ gross haitegemei gharama, kwa hiyo "
+                          f"mtawanyiko si wa gharama tu")
+                print("\n   SOMA HIVI: symbol iliyo hasi kwa EV net LAKINI chanya kwa gross\n"
+                      "   inaweza kuondolewa kwa sheria ya gharama isiyo na label.\n"
+                      "   Iliyo hasi kwa GROSS haiwezi — kuiondoa ni uteuzi juu ya matokeo.")
+
         cost_r = float(row["cost_r_total"])
         naive_cost = float(row["commission_r"])
         # `dEV/dp_tp = 1 + tp/sl` — SI 2.0 daima. Kwa cell 2.0/3.0 ni 2.5, na
@@ -2950,6 +3022,220 @@ def cmd_exit_audit(args: argparse.Namespace) -> int:
     return 0
 
 
+def _year_block_ci(values: np.ndarray, years: np.ndarray, seed: int, draws: int = 20000):
+    """CI 90% kwa wastani, kwa kuchagua MIAKA upya (si rows).
+
+    Rows ndani ya mwaka mmoja zinahusiana — setups zinakusanyika kwenye regimes.
+    Kuchagua rows upya kunadhani uhuru ambao haupo, na kunatoa CI nyembamba
+    kuliko ukweli. Hii ndiyo njia ile ile inayotumika na `cost-audit`.
+    """
+    import numpy as np
+
+    levels = np.unique(years)
+    if len(levels) < 3:
+        return float("nan"), float("nan")
+    sums = np.array([np.nansum(values[years == lv]) for lv in levels], dtype=float)
+    counts = np.array([int(np.isfinite(values[years == lv]).sum()) for lv in levels], dtype=float)
+    rng = np.random.RandomState(seed)
+    pick = rng.randint(0, len(levels), size=(draws, len(levels)))
+    boot = sums[pick].sum(axis=1) / np.maximum(counts[pick].sum(axis=1), 1.0)
+    return float(np.percentile(boot, 5)), float(np.percentile(boot, 95))
+
+
+def cmd_drift_curve(args: argparse.Namespace) -> int:
+    """Muundo wa MUDA wa drift — kuna drift kabisa, na iko wapi?
+
+    Mtaalamu wa pili ameleta identity ambayo hoja zetu zote za T5 zinapaswa
+    kuiheshimu: **sheria ya kusimama yenye mpaka, juu ya process isiyo na
+    drift, ina EV sifuri.** Barriers haziwezi kutengeneza return. Kwa hiyo
+    vipimo vyetu viwili lazima vipatane:
+
+    * kutoka kwa MUDA pekee (bars 24, bila barrier) → −0.0062 ATR
+    * cell bora `3.0/6.0`, EV net → +0.0081 R = +0.0243 ATR
+
+    Kama havipatani, kuna moja kati ya mawili: **drift ya kweli iliyojikita
+    mbele** (barriers zinaikamata mapema, muda wa mwisho umeirudisha), au
+    **kasoro ya pili ya uhasibu**. Tumeshapata ya kwanza wiki hii; prior ya
+    ya pili si ndogo.
+
+    Amri hii inapima **umbo**, si nukta moja: wastani wa mwendo kutoka kwenye
+    trigger, kwa ATR, kwa horizons kadhaa, setup na control kando, gross na
+    net, kwa year-block bootstrap.
+
+    Ni **maelezo**, si uteuzi: hakuna parameter inayotunwa, hakuna cell
+    inayochaguliwa, na jibu ni jedwali moja. Kwa hiyo **haitumii config
+    budget** (TRIAL_BUDGET §2 — uteuzi ndio unaotozwa, si kuangalia).
+
+    Uhakiki uliojengwa ndani: kwa `h` = horizon ya labels, wastani wa gross
+    lazima ulingane na wastani wa `terminal_atr` uliorekodiwa na labeller
+    kutoka kwenye TICKS. Njia mbili tofauti kabisa za kufika namba ile ile.
+    Zisipolingana, mojawapo ina kasoro — na hiyo ndiyo hoja nzima.
+    """
+    cfg = _load(args)
+    import numpy as np
+    import pandas as pd
+
+    from .bars import read_bars
+    from .r1 import load_labels
+
+    labels_root = cfg.research_root / "data" / "L4_labels" / "labels"
+    symbols = _symbol_list(args) or list(cfg.symbols)
+    points, _ = load_labels(labels_root, _symbol_list(args))
+    if points.empty:
+        print(f"hakuna points chini ya {labels_root}", file=sys.stderr)
+        return 2
+
+    horizons = sorted({int(h) for h in args.horizons.split(",") if h.strip()})
+    if not horizons:
+        print("--horizons haina kitu", file=sys.stderr)
+        return 2
+    comm = float(args.commission_pips)
+    label_h = int(cfg.get("labels.horizon_bars"))
+
+    rows: list[dict[str, Any]] = []
+    recon: list[dict[str, float]] = []
+    for symbol in sorted(set(points["symbol"].unique()) & set(symbols)):
+        try:
+            bars = read_bars(cfg.l2_root, symbol, "H1")
+        except FileNotFoundError:
+            print(f"{symbol}: bars za H1 hazipo — `build-l2` kwanza", file=sys.stderr)
+            return 2
+        close = bars["close"].to_numpy(dtype=float)
+        index = bars.index
+
+        mine = points[points["symbol"] == symbol].copy()
+        anchor = pd.to_datetime(mine["bar_open"] if "bar_open" in mine else mine["decision_time"])
+        pos = index.get_indexer(anchor)
+        ok = pos >= 0
+        if not ok.any():
+            print(f"{symbol}: hakuna point iliyolingana na bar — inarukwa", file=sys.stderr)
+            continue
+        mine, pos = mine[ok], pos[ok]
+
+        direction = mine["direction"].to_numpy(dtype=float)
+        entry_mid = mine["entry_mid"].to_numpy(dtype=float)
+        atr_price = mine["atr_price"].to_numpy(dtype=float)
+        atr_pips = mine["atr_pips"].to_numpy(dtype=float)
+        spread_rt = (
+            mine["spread_entry_pips"].to_numpy(dtype=float)
+            + mine["spread_exit_pips"].to_numpy(dtype=float)
+        ) / 2.0
+        # Gharama ya round-trip inatozwa MARA MOJA, haitegemei horizon: ni
+        # trade moja. Ndiyo maana horizon ndefu inapunguza gharama kwa ATR.
+        cost_atr = (spread_rt + comm) / atr_pips
+        year = pd.to_datetime(mine["decision_time"]).dt.year.to_numpy()
+        is_setup = mine["is_setup"].fillna(False).to_numpy()
+
+        for h in horizons:
+            for shift, tag in ((h, "pos+h"), (h - 1, "pos+h-1")):
+                tgt = pos + shift
+                inside = tgt < len(close)
+                if h == label_h and "terminal_atr" in mine:
+                    g = np.where(
+                        inside, direction * (close[np.minimum(tgt, len(close) - 1)] - entry_mid)
+                        / atr_price, np.nan)
+                    rec = mine["terminal_atr"].to_numpy(dtype=float)
+                    both = np.isfinite(g) & np.isfinite(rec)
+                    if both.any():
+                        recon.append({
+                            "symbol": symbol, "tag": tag, "n": int(both.sum()),
+                            "bars": float(np.nanmean(g[both])),
+                            "ticks": float(np.nanmean(rec[both])),
+                        })
+                if tag != "pos+h":
+                    continue
+                gross = np.where(
+                    inside,
+                    direction * (close[np.minimum(tgt, len(close) - 1)] - entry_mid) / atr_price,
+                    np.nan,
+                )
+                rows.append({
+                    "symbol": symbol, "h": h, "gross": gross, "net": gross - cost_atr,
+                    "year": year, "is_setup": is_setup, "cost": cost_atr,
+                })
+
+    if not rows:
+        print("hakuna kitu cha kupima", file=sys.stderr)
+        return 2
+
+    print(f"MUUNDO WA MUDA WA DRIFT — commission {comm} pips · symbols "
+          f"{len(set(r['symbol'] for r in rows))}")
+    print("Mwendo kutoka kwenye trigger, kwa ATR. Bila barrier yoyote.")
+    print("Gharama ya round-trip inatozwa mara moja kwa kila horizon.\n")
+
+    # --- uhakiki: bars dhidi ya ticks kwa horizon ya labels -----------------
+    if recon:
+        best = {}
+        for tag in ("pos+h", "pos+h-1"):
+            part = [r for r in recon if r["tag"] == tag]
+            if not part:
+                continue
+            n = sum(r["n"] for r in part)
+            b = sum(r["bars"] * r["n"] for r in part) / n
+            t = sum(r["ticks"] * r["n"] for r in part) / n
+            best[tag] = (b, t, abs(b - t))
+        print(f"UHAKIKI kwa h = {label_h}: bars (H1 close) dhidi ya ticks (`terminal_atr`)")
+        for tag, (b, t, d) in sorted(best.items(), key=lambda kv: kv[1][2]):
+            print(f"   {tag:>9}  bars {b:+.4f} ATR · ticks {t:+.4f} ATR · tofauti {d:.4f}")
+        pick = min(best.items(), key=lambda kv: kv[1][2])
+        print(f"   → mpangilio `{pick[0]}` ndio unaolingana; jedwali hapa chini linautumia.\n"
+              if pick[0] == "pos+h" else
+              f"   → ONYO: `{pick[0]}` unalingana vizuri zaidi kuliko `pos+h` "
+              f"unaotumika hapa chini — mpangilio wa bar una kosa la bar moja.\n")
+
+    header = (f"   {'h':>4} {'trades':>7} {'gross':>9} {'net':>9} "
+              f"{'CI90 net':>20} {'t':>6} {'gharama':>8} | {'control':>9} {'tofauti':>9}")
+    print(header)
+    out: list[dict[str, Any]] = []
+    for h in horizons:
+        part = [r for r in rows if r["h"] == h]
+        g = np.concatenate([r["gross"] for r in part])
+        net = np.concatenate([r["net"] for r in part])
+        yr = np.concatenate([r["year"] for r in part])
+        su = np.concatenate([r["is_setup"] for r in part])
+        cost = np.concatenate([r["cost"] for r in part])
+        fin = np.isfinite(net)
+        s, c = fin & su, fin & ~su
+        if not s.any():
+            continue
+        mu = float(np.mean(net[s]))
+        sd = float(np.std(net[s], ddof=1))
+        n = int(s.sum())
+        lo, hi = _year_block_ci(net[s], yr[s], seed=20260818 + h)
+        t_stat = mu / (sd / np.sqrt(max(n, 1))) if sd > 0 else float("nan")
+        mu_c = float(np.mean(net[c])) if c.any() else float("nan")
+        print(f"   {h:>4} {n:>7,} {np.mean(g[s]):>+9.4f} {mu:>+9.4f} "
+              f"[{lo:>+8.4f},{hi:>+8.4f}] {t_stat:>+6.2f} {np.mean(cost[s]):>8.4f} | "
+              f"{mu_c:>+9.4f} {mu - mu_c:>+9.4f}")
+        out.append({
+            "h": h, "n_setup": n, "gross_atr": float(np.mean(g[s])), "net_atr": mu,
+            "net_ci90": [lo, hi], "t": t_stat, "cost_atr": float(np.mean(cost[s])),
+            "control_net_atr": mu_c, "setup_minus_control": mu - mu_c,
+            "sd_atr": sd,
+        })
+
+    print("\nJINSI YA KUISOMA")
+    print("   drift ikiwa halisi na imejikita MBELE : gross inapanda mapema kisha inatuama")
+    print("   drift ikiwa imejikita NYUMA           : gross inaendelea kupanda hadi mwisho")
+    print("   drift ikiwa HAIPO                     : gross inabaki karibu na sifuri kila mahali")
+    print("   sifuri kila mahali PAMOJA na grid chanya ⇒ kasoro ya uhasibu, si drift")
+
+    out_path = cfg.path_of("storage.reports_root") / "r1" / "drift_curve.json"
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_path.write_text(
+        json.dumps({
+            "commission_pips": comm,
+            "label_horizon_bars": label_h,
+            "symbols": sorted(set(r["symbol"] for r in rows)),
+            "reconciliation": recon,
+            "curve": out,
+        }, indent=2, default=str) + "\n",
+        encoding="utf-8", newline="\n",
+    )
+    print(f"\nushahidi: {out_path}")
+    return 0
+
+
 def cmd_select_symbols(args: argparse.Namespace) -> int:
     """T4 hatua 1b — vunja sare ya §3 kwa LENGO, si kwa ladha.
 
@@ -3737,6 +4023,10 @@ def build_parser() -> argparse.ArgumentParser:
         help="cell ya identities, mf. 2.0/3.0. LAZIMA itangazwe — kuichagua kwa "
         "kuangalia jedwali ni uteuzi juu ya label (§4.3)",
     )
+    p_cost.add_argument(
+        "--by-symbol", action="store_true",
+        help="gawa cell kwa symbol: gharama dhidi ya gross. Inahitaji --cell",
+    )
     p_cost.set_defaults(func=cmd_cost_audit)
 
     p_neff = subparsers.add_parser(
@@ -3829,6 +4119,17 @@ def build_parser() -> argparse.ArgumentParser:
     p_exit.add_argument("--uniqueness", type=float, default=0.402,
                         help="N_eff / n_raw kutoka `effective-n` (10,168 / 25,314)")
     p_exit.set_defaults(func=cmd_exit_audit)
+
+    p_drift = subparsers.add_parser(
+        "drift-curve",
+        help="muundo wa muda wa drift — kuna drift kabisa, na iko wapi? (haitumii budget)",
+        parents=[common],
+    )
+    p_drift.add_argument("--symbols")
+    p_drift.add_argument("--commission-pips", type=float, default=0.7)
+    p_drift.add_argument("--horizons", default="3,6,12,24,48,120,240",
+                         help="horizons kwa bars za H1, zikitenganishwa kwa koma")
+    p_drift.set_defaults(func=cmd_drift_curve)
 
     p_sel = subparsers.add_parser(
         "select-symbols",

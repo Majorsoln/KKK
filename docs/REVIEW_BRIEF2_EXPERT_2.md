@@ -178,3 +178,54 @@ Uteuzi ulikuwa na thamani ya **+0.0190 R**. Tazama `docs/T5_GRID.md` §16.
 kuiona; kumtumia sasa kunaharibu kitu pekee ambacho swali lile lilikuwa nalo. Jibu
 limeandaliwa na kufungwa: `docs/ADDENDUM_EXPERT_2_SEALED.md`. Tarehe ya kipimo iko
 kwenye git, kwa hiyo mpangilio unathibitika.
+
+**Muhuri ulishikilia.** Amejibu Q5 kwa kujitangazia tafsiri bila kuiona namba
+(`97c89fc` ilikuwa imeshasukumwa, bila kutumwa). Faili sasa ni
+`docs/REPLY_EXPERT_2_ROUND2.md`.
+
+---
+
+## 8. Jibu lake la pili — 2026-08-18, chaguo limebadilika C → D
+
+**Alichokitoa mwenyewe, bila kuombwa mara ya pili:**
+
+* *"That is not a 'no edge' result. That is an execution-cost result."* — **ameifuta
+  kabisa.** Gross EV +0.0248 dhidi ya SE 0.0126 ni `t` ≈ 1.97 **gross**, kabla ya
+  marekebisho yoyote ya multiplicity, juu ya argmax ya cells 49. Edge iliyo ukingoni
+  hata **gross** si edge inayofichwa na gharama.
+* *"The model reproduces your table exactly, so the decomposition is yours."* — ameifuta
+  kama **hoja ya kimbinu juu ya mapitio yake mwenyewe**: alichukua ✓ zake kama zinazothibitisha
+  namba zetu, wakati zilithibitisha tu kwamba algebra yake inalingana na yetu. **Vyote
+  vilikuwa chini ya labeller ile ile.** Ni kosa alilolitaja kama linalostahili kutajwa
+  zaidi, "kwa sababu ni aina inayomfanya mtathmini asikike na uhakika kuliko ushahidi
+  unavyoruhusu".
+* Scaling ya `1/√h`: sahihi ni **`1/√h` hadi `1/h`**. Alipunguza faida ya horizon, hakuiongeza.
+
+**Hoja mpya, na ndiyo yenye thamani kubwa kuliko zote:** *sheria ya kusimama yenye mpaka,
+juu ya process isiyo na drift, ina EV sifuri.* Barriers haziwezi kutengeneza return. Kwa
+hiyo vipimo vyetu viwili lazima vipatane — na kwa mtazamo wa kwanza havipatani.
+
+**Chaguo jipya: D** — badilisha tatizo, shikilia miundombinu. Si C, kwa sababu **C
+tumeshaifanya** (vitu sita vya §6 vya barua yetu ndivyo worklist yake). Si E, kwa sababu E
+inatupa mali ambayo *sasa* ni nzuri: labeller iliyo sahihi kwa madarasa matatu, tick base,
+purged CV inayopita placebo, RCE, na — muhimu kuliko zote — **constant ya gharama ya
+0.46 Sharpe kwa H1 ya bars 24 kwa bei ya retail**, ambayo ni chujio la hypothesis
+linalotumika kwenye karatasi kabla ya kujenga chochote.
+
+**D imefungwa kwa kitu kimoja:** muundo wa muda wa drift. Ikitokea gap ya 0.030 ATR ni
+kasoro ya pili ya uhasibu, **D inaanguka kuwa E ndani ya wiki** — andika ripoti, na
+ripoti ni bora zaidi kwa kuwa imepata kasoro mbili. Ikitokea ni drift iliyojikita mbele,
+ushauri wake wa horizon ndefu ulikuwa **kinyume**, na hypothesis inayofuata ni ya horizon
+FUPI yenye malengo membamba.
+
+**Kosa lake la hesabu nililolipata:** gap yake ya "0.07 ATR" ni **0.030 ATR**. Alilinganisha
+time exit **net** (spread + commission zimetolewa) dhidi ya cell **net + commission**. Lakini
+sitadai hilo linatatua chochote: gap ni tofauti ya **paired** juu ya trades zile zile, kwa
+hiyo SE yake si 0.0353 na pengine ni ndogo zaidi. Kurekebisha units kunapunguza gap;
+kurekebisha test pengine kunaifanya iwe na maana ZAIDI. Identity yake bado inadai jibu.
+
+**Shtaka lake la overshoot nimelipima kwenye code, si kwa hoja:** `realized_r()` inaweka
+stop kuwa `−(1 + overshoot_R)` — overshoot IKO ndani ya path, kama alivyodhani inapaswa
+kuwa. `ev_r_net = mean(realized) − commission_R`; **haitolewi mara ya pili.**
+`cost_r_total` ni ya kuripoti pekee. **Shtaka limefungwa.** Mawili yake mengine
+(granularity ya tie-break, mkanganyiko wa spread convention) hayajafungwa.
