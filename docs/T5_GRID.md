@@ -295,3 +295,72 @@ zote ni vipimo, na `cost-audit` inakataa kuhesabu identities bila `--cell` iliyo
 
 Ushahidi: `research/reports/r1/cost_audit_10sym_c15043ae.json` ·
 `research/reports/r1/r1_summary.json` · `research/reports/r1/label_build.json`
+
+---
+
+## 15. MAREKEBISHO — 2026-08-17, baada ya mapitio ya nje
+
+Mapitio ya nje yalinifanya nifuatilie ujenzi wa `σ_R` kutoka `SE` na `N_eff`. Nikifanya
+hivyo nilikuta kasoro **ndani ya labeller wetu**, si ndani ya hoja.
+
+```
+terminal_atr     = direction × (terminal_MID − entry_MID) ÷ atr_price
+timeout_return_r = terminal_atr ÷ sl_atr
+```
+
+**Mid kwa mid.** Lakini TP na SL zinatatuliwa kwenye path ya **trade** (ingia kwa ask, toka
+kwa bid). Darasa la timeout lilikuwa **limesamehewa round-trip spread nzima** wakati
+madarasa mengine mawili yameitozwa. Athari inakua na sehemu ya timeout — ambayo kwenye
+cells pana inazidi 60%.
+
+Imerekebishwa (`LABEL_SCHEMA_VERSION 3`), labels zimejengwa upya, kila kitu kimepimwa upya.
+
+### Kilichobadilika
+
+| | kabla | **baada** |
+|---|---|---|
+| cells chanya | 13/49 | **6/49** |
+| `3.0/6.0` `EV net` | +0.0205 | **+0.0081** |
+| 90% CI | [−0.0015, +0.0404] | **[−0.0138, +0.0278]** |
+| Šidák (cells 49) | −0.0212 | **−0.0332** |
+| `t` | 1.62 | **0.64** |
+| gross Sharpe | 0.93 | **0.59** |
+| net Sharpe | 0.56 | **0.22** |
+| commission ÷ gross Sharpe | 39% | **62%** |
+| **`2.0/3.0` (iliyosainiwa)** | +0.0039 | **−0.0029** |
+
+`E[R]` ya setups: −0.0290 → **−0.0335**. Ya control: −0.0846 → **−0.0896**. Tofauti
+kati yao **haijabadilika**: +0.0556 → +0.0560 R. Kasoro iliathiri **kiwango**, si
+**athari ya entry rule** — kwa sababu ilitoza pande zote mbili sawasawa.
+
+### Kilichosalimika
+
+**Kilele cha ndani cha `sl` = 3.0 kimesalimika** — ni kilele kwenye safu 5 kati ya 5.
+Ugunduzi huo wa kimuundo ni imara dhidi ya marekebisho.
+
+### Kilichoanguka
+
+**Mhimili wa `tp` si monotone tena.** Kwa `sl` 3.0: `+0.0045 → +0.0037 → +0.0081`. Dai la
+"bado inapanda kwenye ukingo" ni dhaifu zaidi kuliko tulivyolisema.
+
+### Dai langu la kati lililokanushwa na kipimo
+
+Baada ya kugundua kasoro, nilidai kwamba **barriers zinatoza edge** na faida yote iko
+kwenye timeouts. Kipimo cha `exit-audit` kimeikanusha:
+
+> **Kutoka kwa MUDA pekee** — hakuna barrier, ingia kwenye signal, funga baada ya bars 24,
+> spread na commission zimetozwa:
+>
+> **`EV −0.0062 ATR · SE 0.0353 · t −0.18`** — **sifuri.**
+
+Bila barriers hakuna edge kabisa. Barriers si tatizo; ndiko kidogo kilichopo kinakotoka.
+Nilikuwa nikitafsiri **mgawanyo wa uhasibu** kama **mekanizimu** — `E[R|timeout]` ni chanya
+kwa sehemu **kwa muundo**, kwa sababu timeout inachuja paths zilizogusa stop.
+
+### Hukumu ya T5, iliyoandikwa upya
+
+Nadharia ya gharama **imethibitika** (cost_R 0.0271 → 0.0117 kwa `sl` 4.0). Utawala wake
+**umekanushwa** (kilele cha ndani kwa `sl` 3.0). Cell bora **haishikilii** (Šidák −0.0332).
+
+Na sasa, kwa nyongeza: **`t = 0.64`**. Hakuna cell iliyo karibu na kuthibitika, na tofauti
+kati ya "karibu" na "mbali" ilikuwa **kasoro ya uhasibu ya mstari mmoja**.

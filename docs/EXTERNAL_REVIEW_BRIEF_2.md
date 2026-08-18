@@ -117,38 +117,61 @@ single most solid positive result in the project.
 | 4.0 | +0.0075 | +0.0137 | +0.0067 |
 | 6.0 | +0.0177 | **+0.0205** | +0.0123 |
 
-* Along `sl` there is an **interior maximum at 3.0**, in 6 of 7 rows. Wider stops cut cost
-  per R (`commission_R = commission_pips ÷ sl_pips`) but raise timeout share, and beyond
-  3.0 the dilution wins.
-* Along `tp` the surface is **still rising at the grid edge (6.0)** in 7 of 7 rows, but
-  timeout at `sl 3.0 / tp 6.0` is **61.8%**. (An earlier version of this brief said 30.6%;
-  that was the *stop-hit* rate misread from a different table. Corrected 2026-08-17.)
+> ### ⚠ THE TABLE ABOVE IS SUPERSEDED — labelling defect found and fixed 2026-08-17
+>
+> Reviewing this brief exposed an accounting defect in our own labeller, which had inflated
+> every EV in it. `timeout_return_r` was computed **mid-to-mid**, while the take-profit and
+> stop outcomes were resolved on the **trade path** (enter at ask, exit at bid). The timeout
+> class was therefore forgiven an entire round-trip spread while the other two classes paid
+> it. The effect scales with timeout share, which at the widest cells exceeds 60%.
+>
+> Fixed (`LABEL_SCHEMA_VERSION 3`), all labels rebuilt, everything below re-measured.
+> The corrected surface:
 
-**Consequence of that correction, which we had missed.** Decomposing EV at the two cells we
-examined:
-
-| | timeout share | barriers contribute | timeouts contribute | E[R \| timeout] |
+| `tp` ↓ / `sl` → | 1.5 | 2.0 | 3.0 | 4.0 |
 |---|---|---|---|---|
-| `3.0/6.0` | 61.8% | **−0.187 R** | **+0.221 R** | +0.357 |
-| `2.0/3.0` | 22.7% | **−0.060 R** | **+0.084 R** | +0.369 |
+| 1.0 | −0.0369 | −0.0217 | −0.0087 | −0.0109 |
+| 2.0 | −0.0209 | −0.0082 | **+0.0011** | −0.0042 |
+| 3.0 | −0.0118 | −0.0029 | **+0.0045** | −0.0014 |
+| 4.0 | −0.0081 | −0.0023 | **+0.0037** | −0.0025 |
+| 6.0 | −0.0006 | +0.0045 | **+0.0081** | +0.0012 |
 
-At **both** cells the barrier outcomes are net negative and **all** of the expected value
-comes from positions that reached neither barrier and were closed at the 24-bar horizon.
-The double barrier is not harvesting the edge; it is taxing it. This also explains why EV
-rises monotonically in `tp`: a wider target simply converts barrier outcomes into timeouts.
+**Positive cells: 6 of 49** (before the fix: 13 of 49). The previously signed cell `2.0/3.0`
+is now **negative** (−0.0029).
 
-Best cell `sl 3.0 / tp 6.0`:
+* The **interior maximum at `sl` = 3.0 survives** — it is the peak in 5 of 5 rows shown.
+  That structural finding is robust to the correction.
+* Along `tp` the surface is **no longer monotone** (at `sl` 3.0: +0.0045 → +0.0037 → +0.0081),
+  so "still rising at the grid edge" is now a weaker claim than we made.
+* Timeout at `sl 3.0 / tp 6.0` is **61.8%**, not the 30.6% an earlier draft stated; 30.6%
+  is the stop-hit rate, misread from a different table.
 
-| | |
-|---|---|
-| `EV net` | **+0.0205 R** |
-| 90% CI (block bootstrap by year) | [−0.0015, +0.0404] |
-| **Šidák lower bound over 49 cells** | **−0.0212** |
-| `cost_R` | 0.0167 (commission 0.0133 + stop overshoot 0.0034) |
-| implied max trades/yr (see §3) | 441 |
+Best cell `sl 3.0 / tp 6.0`, corrected:
+
+| | before fix | **after fix** |
+|---|---|---|
+| `EV net` | +0.0205 R | **+0.0081 R** |
+| 90% CI (year-block bootstrap) | [−0.0015, +0.0404] | **[−0.0138, +0.0278]** |
+| Šidák lower bound over 49 cells | −0.0212 | **−0.0332** |
+| `t` | 1.62 | **0.64** |
+| gross Sharpe | 0.93 | **0.59** |
+| net Sharpe | 0.56 | **0.22** |
+| commission as share of gross Sharpe | 39% | **62%** |
 
 It is the **argmax of 49 cells**. Corrected for that, it does not clear zero.
 **No cell in the grid is demonstrably profitable.**
+
+**We flag this prominently because it cuts against a reading a reviewer might otherwise
+reach.** One could argue from the pre-fix numbers that a ~1.0 gross Sharpe exists and is
+merely being taxed by cost and hidden by conservative governance. On the corrected numbers
+the gross Sharpe is **0.59** and `t` is **0.64**. The result is weaker than our own brief
+originally claimed, not stronger.
+
+**Related null result.** With the same corrected accounting we measured a **pure time exit**
+— no barriers at all, enter on the signal and close at the 24-bar horizon, spread and
+commission charged: **−0.0062 ATR, SE 0.0353, t = −0.18.** Indistinguishable from zero. The
+momentum trigger produces no measurable 24-hour drift; whatever small edge exists is
+produced by the barriers, not despite them.
 
 ### 2.3 The ML filter does not add measurable economic value
 
@@ -162,7 +185,7 @@ declared before the run.
 | Discrimination (Spearman on deciles) | ≥ 0.70 | 0.8182 | PASS |
 | Economic (fitted top-decile p) | ≥ breakeven + δ_MER | 0.3159 vs 0.3212 | **FAIL** |
 
-Top decile realised **+0.0656 R** vs pool −0.0163 R.
+Top decile realised **+0.0656 R** vs pool −0.0163 R. (Pre-fix figures; the fix lowers both, and we have not re-run the filter.)
 
 **Then the placebo phase invalidated most of that.** We re-ran the identical pipeline on
 corrupted labels, three ways:
