@@ -148,12 +148,148 @@ neither consumes trial budget:
   turns on: a symbol negative through `cost_R` can be excluded by a label-free rule; a
   symbol negative through gross cannot.
 
-> **[RESULTS PENDING — the two runs go here before this letter is sent.]**
+### 4.1 Before the table — we made your error, in the other direction
 
-We will report what the table says, including if it says the dispersion is mostly `cost_R`
-dispersion — which, as you noted, would mean §2.4 is our cost finding in another coordinate
-system rather than a separate cross-sectional result. We would rather publish that than
-keep §2.4 as an asset.
+In §4 of our previous letter we told you *"the momentum trigger produces no measurable
+24-hour drift."* The number behind it was **−0.0062 ATR, `t` −0.18** — which is **net** of
+spread and commission. **Drift is a gross quantity.** We took a net number and drew a gross
+conclusion, on the same day we corrected you for comparing a net figure against a gross one.
+Retracted.
+
+### 4.2 Drift exists. It was hidden behind the net figure.
+
+Full 12-symbol pool, mean move from the trigger, no barriers, ATR units:
+
+| `h` (bars) | gross | net | 90% CI net | control net | setup − control |
+|---|---|---|---|---|---|
+| 3 | +0.0189 | −0.0905 | [−0.1033, −0.0782] | −0.1477 | +0.0572 |
+| 6 | +0.0328 | −0.0766 | [−0.0982, −0.0553] | −0.1635 | +0.0869 |
+| 12 | +0.0501 | −0.0594 | [−0.1022, −0.0186] | −0.1586 | +0.0992 |
+| **24** | **+0.0593** | −0.0501 | [−0.1355, +0.0253] | −0.1493 | **+0.0992** |
+| 48 | −0.0546 | −0.1640 | [−0.3164, −0.0303] | −0.0806 | −0.0835 |
+| 120 | −0.0497 | −0.1591 | [−0.3309, +0.0005] | −0.1004 | −0.0587 |
+| 240 | **−0.2651** | −0.3746 | [−0.5841, −0.1885] | −0.1696 | −0.2049 |
+
+The 10-symbol pool — the one on which the time-exit test was run — has the same shape,
+larger: +0.0316 → +0.0521 → +0.0756 → **+0.0952** → −0.0027 → −0.0167 → −0.2188.
+
+| gross at `h` = 24 | 12-symbol | 10-symbol |
+|---|---|---|
+| estimate | +0.0593 ATR | +0.0952 ATR |
+| `t` on `N_eff` | +1.84 | **+2.63** |
+| two-sided `p` | 0.066 | **0.0085** |
+
+**Your identity is satisfied, and the answer is your branch (a): real drift.** No second
+accounting asymmetry is needed to explain the gap. The barriers were not manufacturing
+return; they were capturing something that was there. Your prior on a second defect was
+reasonable and it did not pay out.
+
+The reconciliation check passed exactly: at `h` = 24 the H1-close path gives +0.0266 ATR
+and the tick path gives +0.0266 ATR, difference 0.0000, while the one-bar-offset
+alternative differs by 0.0150. The bar convention is established by data rather than
+assumed.
+
+### 4.3 But the drift is smaller than the cost, and that is the whole verdict
+
+| | 12-symbol | 10-symbol |
+|---|---|---|
+| gross drift over 24 bars | +0.0593 ATR | +0.0952 ATR |
+| round-trip cost | 0.1094 ATR | 0.1013 ATR |
+| **cost ÷ gross** | **1.84×** | **1.06×** |
+
+On the pool we did not choose, cost is **1.84× the entire edge that exists**. On the pool
+we chose, it is 1.06× — we miss by 6% of the cost.
+
+This is a sharper statement than "no edge", and it is the one we will publish:
+
+> There is real momentum continuation of roughly **0.06–0.10 ATR over 24 hours**. The
+> round-trip cost of taking it at retail is **0.10–0.11 ATR**. We lose by the width of the
+> spread.
+
+### 4.4 The cost split — and 60% of it is not commission
+
+`drift-curve` charges spread explicitly, unlike the grid where spread hides inside the
+path. Split at `h` = 24, full pool:
+
+| | ATR | share |
+|---|---|---|
+| round-trip spread | **0.0656** | **60%** |
+| commission (0.7 pips) | 0.0438 | 40% |
+| total | 0.1094 | |
+
+Checked independently: `commission_R` at `sl` 3.0 is 0.0146, and 0.0146 × 3.0 = 0.0438,
+which equals 0.1094 − 0.0656 to the digit. Two unrelated paths, same number.
+
+**This displaces your worklist item 1.** You put commission verification first because it
+changes the shape of the EV surface. It does — but commission is 40% of the cost, and the
+part we cannot buy down with capital is the larger part. At your top tier (0.15 pips):
+
+| | new cost | gross | net |
+|---|---|---|---|
+| 12-symbol | 0.0750 | +0.0593 | **−0.0157 ATR** |
+| 10-symbol | 0.0733 | +0.0952 | +0.0219 ATR |
+
+**At near-zero commission the unselected pool is still negative.** The commission lever
+cannot close the gap alone. We will still verify the tier, because a wrong constant is a
+wrong constant, but it is no longer the item that decides anything.
+
+### 4.5 Your Q8 horizon proposal is not merely dead — the sign flips
+
+You called doctrine item 8 possibly our most expensive commitment and proposed ~10 days.
+Ten days is `h` = 240:
+
+* gross is still **rising** at `h` = 24 (0.0756 → 0.0952)
+* it has collapsed by `h` = 48 (−0.0027)
+* at `h` = 240 it is **−0.2188** (10-symbol) / **−0.2651** (12-symbol)
+* setup-minus-control peaks at `h` = 24 (+0.0992 / +0.1123) and **turns negative** at 48
+
+The peak lies somewhere in [24, 48). We fixed 24 before measuring anything and landed near
+it. You had flagged this branch yourself — *"if drift is front-loaded, the correct move is a
+shorter horizon... I would then be wrong in the opposite direction."* The drift is not
+front-loaded (it builds monotonically to 24), but it fully reverses afterwards, and the
+practical conclusion is the one you named: not longer.
+
+One honesty note on our own table: at long horizons the windows overlap heavily (points
+every ~8 bars, a 240-bar window), so the independent sample is far smaller than raw `n` and
+the `t` values in the 48–240 rows are inflated. The direction is clear; the magnitudes are
+not as certain as the column suggests.
+
+### 4.6 Your Q5 item 2 — the exclusion was not a cost rule
+
+You named the one way the exclusion stays honest: if the two symbols' negativity is
+explained by `cost_R` rather than by gross.
+
+| symbol | `cost_R` | **gross** | `EV net` | spread/ATR |
+|---|---|---|---|---|
+| USDJPY | 0.0176 | **+0.0913** | +0.0737 | 0.0252 |
+| GBPJPY | 0.0145 | **+0.0705** | +0.0560 | 0.0648 |
+| EURJPY | 0.0152 | **+0.0600** | +0.0447 | 0.0373 |
+| GBPUSD | 0.0151 | +0.0394 | +0.0242 | 0.0447 |
+| USDCAD | 0.0173 | +0.0168 | −0.0005 | 0.0688 |
+| USDCHF | 0.0215 | +0.0097 | −0.0118 | 0.0842 |
+| XAUUSD | 0.0040 | +0.0069 | +0.0029 | 0.1047 |
+| AUDUSD | 0.0194 | −0.0121 | −0.0315 | 0.0803 |
+| NZDUSD | 0.0227 | −0.0157 | −0.0384 | 0.0949 |
+| EURUSD | 0.0177 | −0.0169 | −0.0346 | 0.0218 |
+| **EURCHF** | 0.0342 | **−0.0817** | −0.1160 | 0.0993 |
+| **EURGBP** | 0.0251 | **−0.0839** | −0.1090 | 0.0809 |
+
+**Both are negative on gross, not on cost.** Their `cost_R` is above average but nowhere
+near enough to account for −0.08. The exclusion cannot be rewritten as a label-free cost
+rule. It was outcome selection, the escape route is closed, and we are not taking it.
+
+**Your corollary does not hold, and we report that against our own interest in the other
+direction.** You warned that if the 0.196 R dispersion were mostly `cost_R` dispersion,
+§2.4 would be the cost finding in another coordinate system:
+
+* `sd(gross)` = **0.0545**, `sd(cost_R)` = **0.0072** — a ratio of **7.6×**
+
+The dispersion is genuinely in gross. But the per-symbol standard error is **0.0438**
+(`σ_R` 1.275 over `N_eff` ≈ 848 per symbol), so under a null of identical true gross the
+expected spread across 12 symbols is 0.0438 against the 0.0545 observed:
+`χ²(11)` = 17.0, **`p` = 0.11**.
+
+So: not a cost artefact, and also not established. Both halves belong in the record.
 
 ---
 
@@ -195,3 +331,36 @@ Symmetry is cheap and we owe it.
   we have not yet explained. We should not have asserted a mechanism for it while calling
   the same gap unexplained.
 * **The 10-symbol pool as the reporting basis.** Retracted entirely, per §1.
+* **"The momentum trigger produces no measurable 24-hour drift."** Retracted, per §4.1.
+  It was a net figure carrying a gross claim.
+
+---
+
+## 7. What your gate returned — neither branch, and a third
+
+You gated D on the term structure and named two outcomes. It returned a third.
+
+* **Not a second accounting asymmetry.** So D does not collapse to E on that ground.
+* **Not front-loaded drift.** It builds monotonically to `h` = 24 — the opposite of
+  front-loaded — so "shorter horizon with tighter targets" is not what the shape implies.
+* **What it is: back-loaded drift inside 24 hours that fully reverses afterwards, and is
+  smaller than the round-trip cost of taking it.**
+
+That leaves us with a hypothesis that was **correct and unprofitable**, which is a
+different object from a hypothesis that was wrong. The four phases did not fail to find
+momentum continuation. They found it, measured it at 0.06–0.10 ATR over 24 hours, and
+established that the retail execution cost of 0.10–0.11 ATR exceeds it — with 60% of that
+cost being spread, which no amount of capital or volume buys down.
+
+We think that is the paper, and it is a better one than the negative you and we were both
+expecting a week ago. Two of its three central numbers were found by reconstructing a
+quantity someone else had assembled — your `σ_R`, then your optional-stopping identity.
+We are building the next thing with that property deliberately designed in, which is the
+one recommendation of yours we would keep even if every other item on your worklist turned
+out wrong.
+
+Our remaining question is the one your own framework now poses and neither of us has
+answered: **given a measured edge of 0.06–0.10 ATR and a spread floor of 0.066 ATR, is
+there any instrument class reachable from here where the ratio inverts** — or is the
+correct conclusion that this edge is real, known, and priced exactly at the level that
+makes it unavailable to us?

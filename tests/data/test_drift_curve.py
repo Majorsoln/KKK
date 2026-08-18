@@ -52,7 +52,10 @@ def _tree(
     index = pd.date_range("2016-01-04", periods=N_BARS, freq="1h", tz="UTC")
     anchors = np.arange(FIRST, N_BARS - 400, every)
 
-    for symbol in symbols:
+    for i, symbol in enumerate(symbols):
+        # Spread inatofautiana kwa symbol — vinginevyo `spread/ATR` ingekuwa
+        # constant na ρ isingekuwa na maana wala isingehesabika.
+        spread_here = spread_pips * (1.0 + 0.5 * i)
         close = np.full(N_BARS, 1.10)
         if front_load is None:
             close = 1.10 + step * np.arange(N_BARS)
@@ -91,8 +94,8 @@ def _tree(
             "entry_mid": entry_mid,
             "atr_price": ATR_PRICE,
             "atr_pips": ATR_PIPS,
-            "spread_entry_pips": spread_pips,
-            "spread_exit_pips": spread_pips,
+            "spread_entry_pips": spread_here,
+            "spread_exit_pips": spread_here,
             "terminal_atr": terminal,
         })
         folder = root / "data" / "L4_labels" / "labels" / f"symbol={symbol}"
@@ -272,7 +275,9 @@ def test_by_symbol_gross_ni_ev_net_jumlisha_cost(tree, capsys):
     line = next(l for l in out.splitlines() if l.strip().startswith("EURUSD"))
     parts = line.split()
     _, _, _, cost_r, gross, ev_net, _ = parts
-    assert float(gross) == pytest.approx(float(ev_net) + float(cost_r), abs=1e-4)
+    # Kila safu imezungushwa kwa 4dp KANDO — utambulisho unaweza kupishana kwa
+    # nusu-unit ya safu mbili zilizozungushwa. 2e-4 inaruhusu hilo tu.
+    assert float(gross) == pytest.approx(float(ev_net) + float(cost_r), abs=2e-4)
 
 
 def test_by_symbol_inahitaji_cell(tree, capsys):
@@ -280,3 +285,26 @@ def test_by_symbol_inahitaji_cell(tree, capsys):
     tree(step=ATR_PRICE / 100.0)
     main(["--config", CONFIG, "cost-audit", "--by-symbol", "--symbols", "EURUSD"])
     assert "MGAWANYO KWA SYMBOL" not in capsys.readouterr().out
+
+
+def test_by_symbol_hahitaji_scipy(tree, monkeypatch, capsys):
+    """ρ lazima ihesabiwe bila scipy — haiko kwenye mazingira ya PD.
+
+    `pandas.corr(method="spearman")` inaita scipy kimya kimya na inaanguka
+    pale tu inapoendeshwa kwenye mashine halisi, baada ya jedwali lote
+    kuchapishwa. Test hii inazuia kurudi kwake kwa kuficha scipy kabisa.
+    """
+    import builtins
+
+    halisi = builtins.__import__
+
+    def kataa(name, *rest):
+        if name == "scipy" or name.startswith("scipy."):
+            raise ImportError("scipy imefichwa na test")
+        return halisi(name, *rest)
+
+    monkeypatch.setattr(builtins, "__import__", kataa)
+    tree(step=ATR_PRICE / 100.0, symbols=("EURUSD", "GBPUSD", "USDJPY"))
+    assert main(["--config", CONFIG, "cost-audit", "--cell", "3.0/6.0",
+                 "--by-symbol", "--symbols", "EURUSD,GBPUSD,USDJPY"]) in (0, 1)
+    assert "ρ(spread/ATR, gross)" in capsys.readouterr().out

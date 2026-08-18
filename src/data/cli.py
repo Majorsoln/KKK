@@ -1965,7 +1965,12 @@ def cmd_cost_audit(args: argparse.Namespace) -> int:
                 print(f"   hasi kwa GROSS  : {', '.join(neg_gross) if neg_gross else '—'}")
                 if np.isfinite(sp).sum() >= 3:
                     ok = np.isfinite(sp) & np.isfinite(gr)
-                    rho = float(pd.Series(sp[ok]).corr(pd.Series(gr[ok]), method="spearman"))
+                    # `metalabel.spearman` — si `pandas.corr(method="spearman")`,
+                    # ambayo inaita scipy. scipy haiko kwenye mazingira ya PD, na
+                    # amri isiyoendesha kwenye mashine inayoihitaji si amri.
+                    from .metalabel import spearman
+
+                    rho = float(spearman(sp[ok], gr[ok]))
                     print(f"   ρ(spread/ATR, gross) = {rho:+.3f}  "
                           f"— karibu na 0 ⇒ gross haitegemei gharama, kwa hiyo "
                           f"mtawanyiko si wa gharama tu")
