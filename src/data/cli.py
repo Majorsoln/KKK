@@ -3281,6 +3281,172 @@ def cmd_drift_curve(args: argparse.Namespace) -> int:
     return 0
 
 
+def _binom_sf(k: int, n: int, p: float) -> float:
+    """P(X ≥ k) kwa X ~ Binomial(n, p) — bila scipy."""
+    from math import comb
+
+    if n <= 0:
+        return float("nan")
+    return float(sum(comb(n, i) * p**i * (1 - p) ** (n - i) for i in range(k, n + 1)))
+
+
+def cmd_monthly_pnl(args: argparse.Namespace) -> int:
+    """PIPS KWA MWEZI kwa kila pair, baada ya gharama ZOTE.
+
+    Swali la PD, na ni sahihi zaidi kuliko jinsi nilivyokuwa nikiripoti: si
+    "EV kwa ATR" bali **pair hii inaleta pips ngapi kwa mwezi, na inafanya
+    hivyo kwa uhakika kiasi gani?**
+
+    Kwa kila `symbol × mwezi`:
+
+        pips gross  = mwendo wa bei uliopatikana, kabla ya gharama
+        pips cost   = spread ya round-trip + commission
+        pips net    = gross − cost          ← ndiyo inayohesabiwa
+
+    Kisha kwa kila symbol: **sehemu ya miezi yenye faida**, jumla ya pips,
+    mwezi mbaya zaidi, na `p` ya binomial dhidi ya nadharia tete ya sarafu
+    ya haki (50% ya miezi kwa bahati).
+
+    **ONYO LA NIDHAMU, na ni la lazima.** Kuchagua pairs kwa jedwali hili ni
+    **uteuzi juu ya matokeo** — ndiko kuliko tuletea EURCHF/EURGBP, uteuzi
+    wenye thamani ya 0.0190 R. Jedwali hili linatoa **pendekezo**, si hukumu.
+    Hukumu inatoka kwenye holdout ambayo haijaguswa, kwa sheria iliyotangazwa
+    KABLA. Ndiyo maana amri hii inachapisha sheria yenyewe kwa maandishi na
+    kuiweka kwenye ushahidi — ili isibadilishwe baadaye.
+    """
+    cfg = _load(args)
+    import numpy as np
+    import pandas as pd
+
+    from .costs import realized_r
+    from .r1 import load_labels
+    from .splits import SplitPlan
+
+    labels_root = cfg.research_root / "data" / "L4_labels" / "labels"
+    points, barriers = load_labels(labels_root, _symbol_list(args))
+    if barriers.empty or points.empty:
+        print(f"hakuna labels chini ya {labels_root}", file=sys.stderr)
+        return 2
+
+    keys = points[points["is_setup"].fillna(False)][
+        ["symbol", "decision_time", "spread_entry_pips", "spread_exit_pips"]
+    ].copy()
+    keys["spread_rt_pips"] = (keys["spread_entry_pips"] + keys["spread_exit_pips"]) / 2.0
+
+    want_sl, want_tp = (float(x) for x in args.cell.split("/"))
+    cell = barriers[
+        np.isclose(barriers["sl_atr"], want_sl) & np.isclose(barriers["tp_atr"], want_tp)
+    ]
+    if cell.empty:
+        print(f"cell {args.cell} haipo kwenye grid", file=sys.stderr)
+        return 2
+    work = cell.merge(keys, on=["symbol", "decision_time"], how="inner")
+    if work.empty:
+        print("join ya barriers na points imetoa sifuri", file=sys.stderr)
+        return 2
+
+    comm = float(args.commission_pips)
+    sl_pips = work["sl_pips"].to_numpy(dtype=float)
+    spread = work["spread_rt_pips"].to_numpy(dtype=float)
+    work["net_pips"] = realized_r(work, commission_pips=comm) * sl_pips
+    work["cost_pips"] = spread + comm
+    work["gross_pips"] = work["net_pips"] + work["cost_pips"]
+    # `to_period` inadondosha timezone kwa onyo. Muda wote ni UTC tayari, kwa
+    # hiyo tunaandika mwezi kama kamba wazi badala ya kutegemea ubadilishaji.
+    work["month"] = pd.to_datetime(work["decision_time"], utc=True).dt.strftime("%Y-%m")
+
+    per_month = work.groupby(["symbol", "month"]).agg(
+        n=("net_pips", "size"),
+        gross=("gross_pips", "sum"),
+        cost=("cost_pips", "sum"),
+        net=("net_pips", "sum"),
+    ).reset_index()
+
+    holdout_start = SplitPlan.from_config(cfg).holdout_start
+    print(f"PIPS KWA MWEZI — cell {want_sl}/{want_tp} · commission {comm} pips")
+    print(f"TRAIN+VAL pekee (hadi {holdout_start}). Holdout HAIJAGUSWA.\n")
+    print(f"   {'symbol':<8} {'miezi':>6} {'faida':>6} {'%':>6} {'p':>7} "
+          f"{'pips/mwezi':>11} {'jumla':>10} {'mbaya zaidi':>12} {'trades/mwezi':>13}")
+
+    rows: list[dict[str, Any]] = []
+    for sym, chunk in per_month.groupby("symbol"):
+        months = len(chunk)
+        wins = int((chunk["net"] > 0).sum())
+        share = wins / months if months else float("nan")
+        p_val = _binom_sf(wins, months, 0.5)
+        rows.append({
+            "symbol": sym, "months": months, "months_profitable": wins,
+            "share_profitable": share, "binom_p": p_val,
+            "mean_net_pips_per_month": float(chunk["net"].mean()),
+            "total_net_pips": float(chunk["net"].sum()),
+            "worst_month_pips": float(chunk["net"].min()),
+            "best_month_pips": float(chunk["net"].max()),
+            "trades_per_month": float(chunk["n"].mean()),
+            "total_gross_pips": float(chunk["gross"].sum()),
+            "total_cost_pips": float(chunk["cost"].sum()),
+        })
+    rows.sort(key=lambda r: r["mean_net_pips_per_month"], reverse=True)
+    for r in rows:
+        print(f"   {r['symbol']:<8} {r['months']:>6} {r['months_profitable']:>6} "
+              f"{r['share_profitable']:>6.0%} {r['binom_p']:>7.3f} "
+              f"{r['mean_net_pips_per_month']:>+11.1f} {r['total_net_pips']:>+10.0f} "
+              f"{r['worst_month_pips']:>+12.0f} {r['trades_per_month']:>13.1f}")
+
+    tot_g = sum(r["total_gross_pips"] for r in rows)
+    tot_c = sum(r["total_cost_pips"] for r in rows)
+    print(f"\n   POOL NZIMA: gross {tot_g:+,.0f} pips · gharama {tot_c:,.0f} pips · "
+          f"net {tot_g - tot_c:+,.0f} pips")
+    print(f"   gharama ni {tot_c / tot_g:.2f}× ya gross" if tot_g > 0 else
+          "   gross ni hasi kabla ya gharama")
+
+    # ---- SHERIA, imeandikwa kabla ya holdout kuguswa ----
+    rule_ok = [r for r in rows
+               if r["share_profitable"] >= args.min_share
+               and r["mean_net_pips_per_month"] > 0]
+    print(f"\nSHERIA ILIYOTANGAZWA (train+val pekee):")
+    print(f"   bakiza symbol ikiwa miezi yenye faida ≥ {args.min_share:.0%} "
+          f"NA pips/mwezi > 0")
+    print(f"   zinazopita: {', '.join(r['symbol'] for r in rule_ok) or '—'}")
+    if rule_ok:
+        n_ok = len(rule_ok)
+        mean_p = sum(r["mean_net_pips_per_month"] for r in rule_ok) / n_ok
+        print(f"   {n_ok} symbols · wastani {mean_p:+.1f} pips/mwezi kila moja")
+        best_p = min(r["binom_p"] for r in rule_ok)
+        # Šidák juu ya symbols zote zilizoangaliwa, si zilizopita.
+        fwer = 1 - (1 - best_p) ** len(rows)
+        print(f"   `p` bora {best_p:.4f} · baada ya kurekebisha kwa symbols "
+              f"{len(rows)} (Šidák): {fwer:.4f}")
+        print("   " + ("INASHIKILIA baada ya marekebisho" if fwer < 0.05
+                       else "HAISHIKILII baada ya marekebisho — ni pendekezo, si hukumu"))
+
+    print("\nHATUA INAYOFUATA, na ndiyo pekee inayoweza kuthibitisha:")
+    print("   Jedwali hili ni UTEUZI JUU YA MATOKEO. Halithibitishi chochote peke yake —")
+    print("   ndiko EURCHF/EURGBP kulikotoka. Sheria hapo juu lazima iendeshwe kwenye")
+    print("   HOLDOUT isiyoguswa, mara MOJA, bila kuibadilisha baada ya kuona jibu.")
+
+    out_path = cfg.path_of("storage.reports_root") / "r2" / "monthly_pnl.json"
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_path.write_text(
+        json.dumps({
+            "cell": [want_sl, want_tp], "commission_pips": comm,
+            "holdout_start": holdout_start.isoformat(),
+            "rule": {"min_share_profitable": args.min_share,
+                     "min_mean_net_pips_per_month": 0.0,
+                     "passes": [r["symbol"] for r in rule_ok]},
+            "by_symbol": rows,
+            "by_month": [
+                {"symbol": r.symbol, "month": str(r.month), "n": int(r.n),
+                 "gross_pips": float(r.gross), "cost_pips": float(r.cost),
+                 "net_pips": float(r.net)}
+                for r in per_month.itertuples()
+            ],
+        }, indent=2, default=str) + "\n",
+        encoding="utf-8", newline="\n",
+    )
+    print(f"\nushahidi: {out_path}")
+    return 0
+
+
 def cmd_cost_by_hour(args: argparse.Namespace) -> int:
     """`cost_ATR` kwa saa ya kuingia — kushambulia MWANGA, si mgao.
 
@@ -4511,6 +4677,18 @@ def build_parser() -> argparse.ArgumentParser:
                         help="sehemu ya chini ya trades za kubakiza; lango linakua "
                              "hadi kufikia hapa, likipanga kwa cost_ATR pekee")
     p_hour.set_defaults(func=cmd_cost_by_hour)
+
+    p_mon = subparsers.add_parser(
+        "monthly-pnl",
+        help="pips kwa mwezi kwa kila pair, baada ya gharama zote (haitumii budget)",
+        parents=[common],
+    )
+    p_mon.add_argument("--symbols")
+    p_mon.add_argument("--commission-pips", type=float, default=0.7)
+    p_mon.add_argument("--cell", default="3.0/6.0")
+    p_mon.add_argument("--min-share", type=float, default=0.60,
+                       help="sehemu ya chini ya miezi yenye faida kwa sheria")
+    p_mon.set_defaults(func=cmd_monthly_pnl)
 
     p_sel = subparsers.add_parser(
         "select-symbols",

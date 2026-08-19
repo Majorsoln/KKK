@@ -444,3 +444,77 @@ def test_bar_ya_1_kwa_mzizi_wa_f_inaripotiwa(tree, capsys):
     gate = json.loads(
         (root / "reports" / "r1" / "cost_by_hour.json").read_text())["gate"]
     assert gate["bar_1_over_sqrt_f"] == pytest.approx(1.0 / math.sqrt(gate["f"]), abs=1e-9)
+
+
+# ===========================================================================
+# monthly-pnl — kipimo cha PD: pips kwa mwezi, baada ya gharama zote
+# ===========================================================================
+
+
+def _monthly(root: Path) -> dict:
+    return json.loads((root / "reports" / "r2" / "monthly_pnl.json").read_text())
+
+
+def test_pips_net_ni_gross_kutoa_gharama(tree):
+    """Utambulisho wa msingi: net = gross − (spread + commission).
+
+    PD anauliza "faida baada ya cost ZOTE". Ikivunjika hapa, kila namba
+    kwenye jedwali ni ya uongo kwa njia inayoonekana kuwa nzuri.
+    """
+    root = tree(step=ATR_PRICE / 100.0, symbols=("EURUSD", "GBPUSD"))
+    assert main(["--config", CONFIG, "monthly-pnl", "--cell", "3.0/6.0",
+                 "--symbols", "EURUSD,GBPUSD"]) == 0
+    for row in _monthly(root)["by_month"]:
+        assert row["net_pips"] == pytest.approx(
+            row["gross_pips"] - row["cost_pips"], abs=1e-6
+        )
+
+
+def test_gharama_kwa_mwezi_ni_spread_jumlisha_commission_kwa_kila_trade(tree):
+    """`cost_pips` lazima iwe (spread_rt + comm) × idadi ya trades, si kadirio."""
+    root = tree(step=ATR_PRICE / 100.0, symbols=("EURUSD",), spread_pips=0.6)
+    assert main(["--config", CONFIG, "monthly-pnl", "--cell", "3.0/6.0",
+                 "--symbols", "EURUSD"]) == 0
+    for row in _monthly(root)["by_month"]:
+        assert row["cost_pips"] == pytest.approx(row["n"] * (0.6 + 0.7), abs=1e-6)
+
+
+def test_sehemu_ya_miezi_yenye_faida_inahesabiwa_kutoka_miezi(tree):
+    """`share_profitable` = miezi yenye net > 0 ÷ miezi yote — si trades."""
+    root = tree(step=ATR_PRICE / 100.0, symbols=("EURUSD",))
+    assert main(["--config", CONFIG, "monthly-pnl", "--cell", "3.0/6.0",
+                 "--symbols", "EURUSD"]) == 0
+    payload = _monthly(root)
+    per_month = [r for r in payload["by_month"] if r["symbol"] == "EURUSD"]
+    row = next(r for r in payload["by_symbol"] if r["symbol"] == "EURUSD")
+    assert row["months"] == len(per_month)
+    assert row["months_profitable"] == sum(1 for r in per_month if r["net_pips"] > 0)
+    assert row["share_profitable"] == pytest.approx(
+        row["months_profitable"] / row["months"], abs=1e-12
+    )
+
+
+def test_sheria_inaandikwa_kwenye_ushahidi_kabla_ya_holdout(tree, capsys):
+    """Sheria lazima ihifadhiwe kwa maandishi, si kubaki kichwani.
+
+    Sheria isiyoandikwa inaweza kubadilishwa baada ya kuona jibu la holdout,
+    na hapo holdout inakuwa imepotea bure. Ndiyo kosa ambalo bajeti ya
+    trials iliundwa kuzuia na haikuzuia.
+    """
+    root = tree(step=ATR_PRICE / 100.0, symbols=("EURUSD", "GBPUSD"))
+    assert main(["--config", CONFIG, "monthly-pnl", "--cell", "3.0/6.0",
+                 "--min-share", "0.55", "--symbols", "EURUSD,GBPUSD"]) == 0
+    rule = _monthly(root)["rule"]
+    assert rule["min_share_profitable"] == pytest.approx(0.55)
+    assert "passes" in rule
+    out = capsys.readouterr().out
+    assert "SHERIA ILIYOTANGAZWA" in out and "HOLDOUT isiyoguswa" in out
+
+
+def test_binomial_p_ni_ya_upande_mmoja_dhidi_ya_nusu(tree):
+    """`p` ni P(X ≥ wins) kwa sarafu ya haki — si takwimu ya kubuni."""
+    from src.data.cli import _binom_sf
+
+    assert _binom_sf(10, 10, 0.5) == pytest.approx(0.5**10, abs=1e-12)
+    assert _binom_sf(0, 10, 0.5) == pytest.approx(1.0, abs=1e-12)
+    assert _binom_sf(5, 10, 0.5) == pytest.approx(0.623046875, abs=1e-9)
