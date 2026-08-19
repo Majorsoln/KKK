@@ -367,3 +367,119 @@ answered: **given a measured edge of 0.0593 ATR and a spread floor of 0.0656 ATR
 there any instrument class reachable from here where the ratio inverts** — or is the
 correct conclusion that this edge is real, known, and priced exactly at the level that
 makes it unavailable to us?
+
+---
+
+## 8. Your gate returned — Test 1 passes, and the gap is entirely in the stop
+
+Both tests are run. You were right to hold the gate, and right that I had asserted more
+than I had.
+
+### 8.1 Test 1 — the identity holds exactly
+
+`terminal_atr_trade == terminal_atr − spread_rt ÷ atr_pips`, trade by trade, tolerance 1e-6:
+
+| | 12-symbol | 10-symbol |
+|---|---|---|
+| timeouts checked | 15,648 | 13,268 |
+| mean difference | +0.000000 | +0.000000 |
+| **worst** | **0.000000** | **0.000000** |
+
+**Your illegitimate branch is closed.** No convention mismatch between `drift-curve` and
+the labeller.
+
+### 8.2 Test 2 — 93% of the gap is the SL class, 0% is timeout
+
+| 12-symbol | share | barrier | hold | gap | contribution |
+|---|---|---|---|---|---|
+| TP | 6.9% | +5.9574 | +5.9395 | +0.0179 | +0.0012 |
+| **SL** | **31.3%** | **−3.0838** | **−3.1358** | **+0.0520** | **+0.0163** |
+| timeout | 61.8% | +0.8445 | +0.8445 | **+0.0000** | **+0.0000** |
+| total | 100% | −0.0326 | −0.0501 | +0.0175 | +0.0175 |
+
+10-symbol is the same: SL 92%, timeout 0%.
+
+### 8.3 What that is: state-dependent drift, carried by the stop
+
+Further drift from barrier touch to bar 24:
+
+| | 12-symbol | 10-symbol |
+|---|---|---|
+| unconditional, from the trigger | **+0.0593** | +0.0952 |
+| after touching TP (+6 ATR) | −0.0179 | −0.0338 |
+| **after touching SL (−3 ATR)** | **−0.0520** | **−0.0916** |
+
+Unconditionally price drifts up; **once it has gone 3 ATR against the position it keeps
+going down.** The swing is **0.111 ATR — larger than the drift itself.** That is your
+branch (a), and your phrasing of the mechanism was exact: *"losers keep losing, so the stop
+at −3 ATR avoids a decline the full hold eats."*
+
+**Why time-remaining cannot explain it.** The obvious confound is that a +6 ATR target
+takes longer to reach than a −3 ATR stop, so the classes differ in time left to bar 24. But
+the unconditional drift is **positive**: more time remaining should produce a more
+**positive** further move. The SL class has more time remaining and produces **−0.052**.
+The confound runs against the observed sign, so it cannot be the explanation.
+
+Your Test 3 is still the clean separation of state from time, and we have not run it. We
+are not claiming it is unnecessary this time.
+
+### 8.4 Your denominator idea — real, and eight times too small
+
+You predicted `atr_pips` varies "by a factor of two or more" intraday.
+
+| | you predicted | measured |
+|---|---|---|
+| `atr_pips` intraday range | ≥ 2× | **1.44×** |
+| `cost_ATR` range, all 24 hours | — | 3.13× |
+| **`cost_ATR` range where the trades are** | — | **1.18×** |
+
+The 3.13× comes entirely from hours 21 and 22 — **527 trades, 2.1%**. Across the 15 hours
+with `n` ≥ 500 (91% of trades) `cost_ATR` runs 0.0965 to 0.1137.
+
+**The structural reason, which is the part worth keeping:** spread and ATR move *together*.
+Illiquid hours have wide spreads *and* low ATR; liquid hours have both favourable. Numerator
+and denominator co-move, so the ratio is nearly flat where the volume is.
+
+The cost-side-only gate (hours 1, 2, 3, 6, 8, 12, 13, 15, 16, 17, 20):
+
+| | |
+|---|---|
+| kept fraction `f` | 0.535 |
+| `cost_ATR` | 0.1094 → **0.1030** |
+| **reduction** | **5.9%** |
+| **reduction needed to reach zero** | **46%** |
+| net | −0.0501 → **−0.0270 ATR** |
+
+**Eight times too small.** But the gate design is right and we are keeping it: it is
+label-free, derived from the cost identity, consumes no trial budget, and a test that runs
+it twice with the sign of gross flipped confirms it selects the same hours. That is the
+criterion we wanted from SETUP-v2 and never had.
+
+**One warning we would put on our own output.** Gross in the gated hours reads +0.0760
+against +0.0593 overall — but the gate's `SE` is **0.0441**, so that is well inside one
+standard error. Per hour it is worse: `SE` runs 0.10 to 0.42, and the eye-catching
++0.3955 and +0.3995 at hours 6 and 7 are `n` = 256 and 331. **That column is noise and
+should not be read.** It is only in the output because the gate demonstrably does not use
+it.
+
+Gate plus your top commission tier gives cost 0.0691 ATR against a full-pool gross of
+0.0593 — **still short by 0.0098**. Using the gated hours' own gross would show +0.0069,
+but that reintroduces the noisy outcome the selection was built to avoid, so we do not
+report it as a result.
+
+### 8.5 Where this leaves us
+
+Your gate returned neither of the outcomes you named. Test 1 passed, so the grid numbers
+are not inflated by a second defect and the paper does not have to be written on
+`drift-curve` alone — though we will write it that way anyway, for your §4.2 reason: `t`
+1.84 unbarriered against 0.63 for the grid.
+
+And Test 2 returned the thing you said would be the first genuinely new finding: the exit
+rule carries information the entry rule does not. Unconditional +0.0593; conditional on a
+3 ATR adverse move, **−0.0520**. We had spent four phases on the entry.
+
+We accept **D**, we accept writing the paper now on the full pool, and we accept your
+framing of its contribution — that every artefact and every selection in this project was
+larger than the effect under study, and that the binding constraint is the number of
+independent reconstructions a quantity has survived. Three of those reconstructions were
+yours.

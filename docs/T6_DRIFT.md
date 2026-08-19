@@ -222,3 +222,133 @@ Hitimisho lililoandikwa kwa unyofu:
 >
 > Hii si "hakuna edge". Ni **edge iliyopimwa, iliyo ndogo kuliko gharama ya utekelezaji
 > inayopatikana kwetu** — na ndilo tokeo ambalo kwa kweli linaweza kutumika tena.
+
+---
+
+## 9. LANGO LA MTAALAMU WA PILI LIMERUDISHA JIBU — na si lolote kati ya mawili
+
+Alishikilia D juu ya vipimo viwili. Vyote vimeendeshwa.
+
+### 9.1 Kipimo 1 — utambulisho umepita KAMILI
+
+```
+terminal_atr_trade  ==  terminal_atr − spread_rt ÷ atr_pips
+```
+
+| | pool 12 | pool 10 |
+|---|---|---|
+| timeouts zilizopimwa | 15,648 | 13,268 |
+| wastani wa tofauti | +0.000000 | +0.000000 |
+| **mbaya zaidi** | **0.000000** | **0.000000** |
+
+Si wastani — ni **kila trade**, kwa uvumilivu 1e-6. **Tawi lake batili limefungwa.**
+Hakuna mkanganyiko wa convention kati ya `drift-curve` na labeller. Kasoro ya pili ya
+uhasibu aliyoiogopa haipo.
+
+### 9.2 Kipimo 2 — pengo lote liko kwenye STOP
+
+| pool 12 | sehemu | barrier | kushikilia | pengo | mchango |
+|---|---|---|---|---|---|
+| TP | 6.9% | +5.9574 | +5.9395 | +0.0179 | +0.0012 |
+| **SL** | **31.3%** | **−3.0838** | **−3.1358** | **+0.0520** | **+0.0163** |
+| timeout | 61.8% | +0.8445 | +0.8445 | **+0.0000** | **+0.0000** |
+| JUMLA | 100% | −0.0326 | −0.0501 | +0.0175 | +0.0175 |
+
+**SL inabeba 93% ya pengo. Timeout inabeba 0%, hasa sifuri.** Pool ya 10 inasema hivyo
+hivyo: SL 92%, timeout 0%.
+
+### 9.3 Kilichogunduliwa: DRIFT INAYOTEGEMEA HALI, na stop ndiyo inayoibeba
+
+Drift ya ziada kuanzia kuguswa kwa barrier hadi bar 24:
+
+| | pool 12 | pool 10 |
+|---|---|---|
+| bila masharti (kutoka trigger) | **+0.0593** | +0.0952 |
+| baada ya kugusa TP (+6 ATR) | −0.0179 | −0.0338 |
+| **baada ya kugusa SL (−3 ATR)** | **−0.0520** | **−0.0916** |
+
+Kwa maneno: **bila masharti bei inaenda juu; ikishaenda −3 ATR dhidi yetu, inaendelea
+kushuka.** Mzunguko ni **0.111 ATR** — mkubwa kuliko drift yenyewe.
+
+Hii ndiyo hasa mekanizimu ambayo mtaalamu wa pili aliisema kuwa halali:
+*"losers keep losing, so the stop at −3 ATR avoids a decline the full hold eats."*
+
+**Kwa nini muda-uliobaki hauwezi kuieleza.** Confound la wazi ni kwamba TP ya +6 ATR
+inachukua muda mrefu kuguswa kuliko SL ya −3, kwa hiyo madarasa yana muda tofauti
+uliobaki hadi bar 24. Lakini drift isiyo na masharti ni **CHANYA**. Muda zaidi uliobaki
+ungetoa mwendo zaidi wa **CHANYA**. SL ina muda zaidi uliobaki na inatoa **−0.052**.
+**Confound linafanya kazi kinyume na ishara tuliyoiona, kwa hiyo haiwezi kuwa maelezo.**
+
+Kipimo cha 3 cha mtaalamu wa pili (drift kwa masharti ya mwendo uliokusanywa kwa bar `k`,
+`k` ikiwa imefungwa) bado ndicho kinachotenganisha hali na muda kwa usafi. Hatujakifanya.
+
+**Hili ndilo jambo la KWANZA jipya kabisa ambalo mradi huu umelipata.** Na linaashiria
+kitu ambacho hatujawahi kulipima: **sheria ya kutoka inabeba taarifa ambayo sheria ya
+kuingia haina** — hypothesis tofauti kabisa na tuliyokuwa tukiijaribu, na yenye msingi
+bora kuliko SETUP-v2 iliyowahi kuwa nao.
+
+---
+
+## 10. WAZO LA MWANGA — halisi, lakini dogo mara nane kuliko linalohitajika
+
+`cost_ATR = (spread + commission) ÷ atr_pips`. Mtaalamu wa pili alitabiri `atr_pips`
+inatofautiana **"kwa mara mbili au zaidi"** ndani ya siku, na kwamba lango la saa
+lingegeuza uwiano.
+
+**Alichotabiri dhidi ya kilichopimwa:**
+
+| | alitabiri | ilipimwa |
+|---|---|---|
+| mtawanyiko wa `atr_pips` ndani ya siku | ≥ 2× | **1.44×** |
+| mtawanyiko wa `cost_ATR` (jedwali zima) | — | 3.13× |
+| **mtawanyiko wa `cost_ATR` pale trades ZILIPO** | — | **1.18×** |
+
+3.13× yote inatoka saa **21 na 22** — trades **527, asilimia 2.1**. Kwenye saa 15 zenye
+`n` ≥ 500 (asilimia 91 ya trades zote), `cost_ATR` inakwenda 0.0965 hadi 0.1137 tu.
+
+**Sababu ya kimuundo:** spread na ATR **zinaenda pamoja**. Saa zisizo na ukwasi zina
+spread kubwa *na* ATR ndogo; saa zenye ukwasi zina zote mbili nzuri. Mgao na mwanga
+vinasogea kwa pamoja, kwa hiyo uwiano unabaki tambarare. Hilo ndilo alilokosa.
+
+**Lango lililowekwa kwa gharama pekee** (saa 1, 2, 3, 6, 8, 12, 13, 15, 16, 17, 20):
+
+| | |
+|---|---|
+| sehemu iliyobakizwa `f` | 0.535 |
+| `cost_ATR` | 0.1094 → **0.1030** |
+| **punguzo** | **5.9%** |
+| **punguzo linalohitajika kufikia sifuri** | **46%** |
+| net | −0.0501 → **−0.0270 ATR** |
+
+**Lango ni dogo mara nane kuliko linalohitajika.**
+
+**Onyo juu ya safu ya `gross`.** Imepanda +0.0593 → +0.0760, lakini `SE` ya lango ni
+**0.0441** (`N_eff` 5,448) — tofauti ya +0.0167 iko **ndani ya SE moja**. Ni kelele. Na
+kwa saa moja moja `SE` ni 0.10 hadi **0.42**: saa 6 (+0.3955) na saa 7 (+0.3995) ni
+`n` = 256 na 331, chini ya `SE` moja na nusu kutoka sifuri. **Safu ile isisomwe kabisa.**
+Ndiyo maana lango halikuiangalia.
+
+**Kilichobaki kikiwa cha kweli:** lango likiunganishwa na tier ya juu ya commission
+(0.15 pips), gharama inashuka hadi **0.0691 ATR**. Hiyo ni chini ya gross ya pool kamili
+(+0.0593)? **Hapana — bado ni juu yake kwa 0.0098.** Ikitumia gross ya saa zilizochaguliwa
+(+0.0760) inatoa +0.0069 ATR, lakini hiyo ni kuingiza tena tokeo lenye kelele kwenye
+hesabu ambayo uteuzi ulikuwa umeepuka kwa makusudi. **Hatuandiki namba hiyo kama tokeo.**
+
+---
+
+## 11. Hukumu, toleo la mwisho
+
+1. **Kipimo 1 kimepita kamili** — hakuna kasoro ya pili ya uhasibu.
+2. **Pengo ni halisi na liko kwenye stop** — 93% SL, 0% timeout.
+3. **Drift inategemea hali:** +0.0593 bila masharti, **−0.0520 baada ya kugusa −3 ATR.**
+   Mzunguko wa 0.111 ATR. Confound la muda linafanya kazi kinyume, kwa hiyo halielezi.
+4. **Wazo la mwanga ni halisi lakini dogo mara nane** — 5.9% dhidi ya 46% inayohitajika,
+   kwa sababu spread na ATR zinaenda pamoja.
+5. **Hakuna mchanganyiko wa levers unaovusha sifuri kwenye pool kamili.**
+
+Na tokeo jipya, ambalo halikuwa kwenye mpango wa mtu yeyote:
+
+> Msukumo wa momentum unatabiri kuendelea kwa +0.0593 ATR kwa saa 24. **Lakini taarifa
+> kubwa zaidi haiko kwenye kuingia — iko kwenye kutoka.** Bei ikishaenda 3 ATR dhidi ya
+> nafasi, mwendo unaotarajiwa unaobaki ni **−0.052 ATR**, si +0.059. Sheria ya kutoka
+> inabeba mzunguko wa **0.111 ATR** ambao sheria ya kuingia haiuoni.
