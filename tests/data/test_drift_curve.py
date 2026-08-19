@@ -14,6 +14,7 @@ kwa gross. Kila moja ya hizo ni namba ambayo hitimisho linaitegemea.
 from __future__ import annotations
 
 import json
+import math
 from pathlib import Path
 
 import numpy as np
@@ -40,6 +41,8 @@ def _tree(
     front_load: float | None = None,
     spread_pips: float = 0.6,
     every: int = EVERY,
+    spread_by_hour: dict[int, float] | None = None,
+    trade_offset: float = 0.0,
 ) -> dict[str, np.ndarray]:
     """L2 bars + L4 points, kwa njia ya bei INAYOJULIKANA.
 
@@ -84,6 +87,14 @@ def _tree(
         truth[symbol] = terminal
 
         n = len(anchors)
+        hours = index[anchors].hour.to_numpy()
+        spread_col = (
+            np.array([spread_by_hour.get(int(h), spread_pips) for h in hours])
+            if spread_by_hour else np.full(n, spread_here)
+        )
+        # `terminal_atr_trade` ni utambulisho: MID ukiondoa round-trip spread.
+        # `trade_offset` inaivunja kwa makusudi ili Kipimo 1 kipimwe.
+        terminal_trade = terminal - spread_col / ATR_PIPS + trade_offset
         points = pd.DataFrame({
             "symbol": symbol,
             "decision_time": index[anchors],
@@ -94,9 +105,10 @@ def _tree(
             "entry_mid": entry_mid,
             "atr_price": ATR_PRICE,
             "atr_pips": ATR_PIPS,
-            "spread_entry_pips": spread_here,
-            "spread_exit_pips": spread_here,
+            "spread_entry_pips": spread_col,
+            "spread_exit_pips": spread_col,
             "terminal_atr": terminal,
+            "terminal_atr_trade": terminal_trade,
         })
         folder = root / "data" / "L4_labels" / "labels" / f"symbol={symbol}"
         folder.mkdir(parents=True, exist_ok=True)
@@ -273,11 +285,14 @@ def test_by_symbol_gross_ni_ev_net_jumlisha_cost(tree, capsys):
                  "--by-symbol", "--symbols", "EURUSD"]) in (0, 1)
     out = capsys.readouterr().out
     line = next(l for l in out.splitlines() if l.strip().startswith("EURUSD"))
-    parts = line.split()
-    _, _, _, cost_r, gross, ev_net, _ = parts
+    _, _, _, cost_r, gross_ms, gross, ev_net, spread = line.split()
     # Kila safu imezungushwa kwa 4dp KANDO — utambulisho unaweza kupishana kwa
     # nusu-unit ya safu mbili zilizozungushwa. 2e-4 inaruhusu hilo tu.
-    assert float(gross) == pytest.approx(float(ev_net) + float(cost_r), abs=2e-4)
+    assert float(gross_ms) == pytest.approx(float(ev_net) + float(cost_r), abs=2e-4)
+    # GROSS ya kweli inarudisha spread iliyo ndani ya path: (spread/ATR) ÷ sl_atr.
+    # Bila safu hii, symbol yenye spread kubwa inaonekana ikiwa na edge ndogo
+    # kimitambo, na uamuzi wa kuiondoa unajengwa juu ya gharama iliyofichwa.
+    assert float(gross) == pytest.approx(float(gross_ms) + float(spread) / 3.0, abs=2e-4)
 
 
 def test_by_symbol_inahitaji_cell(tree, capsys):
@@ -307,4 +322,125 @@ def test_by_symbol_hahitaji_scipy(tree, monkeypatch, capsys):
     tree(step=ATR_PRICE / 100.0, symbols=("EURUSD", "GBPUSD", "USDJPY"))
     assert main(["--config", CONFIG, "cost-audit", "--cell", "3.0/6.0",
                  "--by-symbol", "--symbols", "EURUSD,GBPUSD,USDJPY"]) in (0, 1)
-    assert "ρ(spread/ATR, gross)" in capsys.readouterr().out
+    assert "ρ(spread/ATR, GROSS)" in capsys.readouterr().out
+
+
+# ===========================================================================
+# stop-value — lango la mtaalamu wa pili
+# ===========================================================================
+
+
+def _stop(root: Path) -> dict:
+    return json.loads((root / "reports" / "r1" / "stop_value.json").read_text())
+
+
+def test_kipimo_1_kinapita_convention_ikiwa_MOJA(tree, capsys):
+    """`terminal_atr_trade == terminal_atr − spread_rt ÷ atr_pips`, kila trade.
+
+    Si makadirio — ni utambulisho. Uvumilivu ni 1e-6, si 1e-2.
+    """
+    root = tree(step=ATR_PRICE / 100.0)
+    assert main(["--config", CONFIG, "stop-value", "--cell", "3.0/6.0",
+                 "--symbols", "EURUSD"]) == 0
+    out = capsys.readouterr().out
+    assert "KIPIMO 1" in out and "INAPITA" in out
+    assert _stop(root)["identity_timeout"]["worst"] < 1e-9
+
+
+def test_kipimo_1_kinagundua_mkanganyiko_wa_convention(tree, capsys):
+    """Kikiongezwa upendeleo wa ATR 0.01 pekee, Kipimo 1 lazima kifeli.
+
+    Kasoro ya timeout ilinusurika awamu tatu kwa sababu hakuna kitu
+    kilichokuwa kikilinganisha njia mbili kwa trade moja moja. Test hii
+    ndiyo inayohakikisha haitanusurika mara ya pili.
+    """
+    root = tree(step=ATR_PRICE / 100.0, trade_offset=0.01)
+    assert main(["--config", CONFIG, "stop-value", "--cell", "3.0/6.0",
+                 "--symbols", "EURUSD"]) == 1
+    out = capsys.readouterr().out
+    assert "INAFELI" in out and "MKANGANYIKO WA CONVENTION" in out
+    assert _stop(root)["identity_timeout"]["worst"] == pytest.approx(0.01, abs=1e-9)
+
+
+def test_kipimo_2_michango_inajumlisha_pengo_zima(tree):
+    """Σ (sehemu × pengo la darasa) lazima iwe pengo la jumla.
+
+    Ikikosa kujumlisha, mgawanyo hauelezi chochote — unaonyesha tu namba
+    tatu zisizohusiana na jibu.
+    """
+    root = tree(step=ATR_PRICE / 100.0)
+    assert main(["--config", CONFIG, "stop-value", "--cell", "3.0/6.0",
+                 "--symbols", "EURUSD"]) == 0
+    payload = _stop(root)
+    total = sum(r["contribution"] for r in payload["by_class"])
+    assert total == pytest.approx(payload["gap_atr"], abs=1e-9)
+    assert sum(r["share"] for r in payload["by_class"]) == pytest.approx(1.0, abs=1e-9)
+
+
+def test_kipimo_2_kinaonyesha_darasa_lenye_pengo(tree, capsys):
+    """Pengo lote likiwa ndani ya timeout, ripoti lazima iseme hivyo.
+
+    Ndio utofautishaji wote: timeout ⇒ kasoro; TP/SL ⇒ drift ya hali.
+    """
+    root = tree(step=ATR_PRICE / 100.0, trade_offset=0.05)
+    main(["--config", CONFIG, "stop-value", "--cell", "3.0/6.0", "--symbols", "EURUSD"])
+    out = capsys.readouterr().out
+    assert "sehemu ya pengo iliyo ndani ya timeout" in out
+    payload = _stop(root)
+    to = next(r for r in payload["by_class"] if r["class"] == "timeout")
+    assert abs(to["contribution"]) > 1e-4
+
+
+# ===========================================================================
+# cost-by-hour — lango la gharama pekee
+# ===========================================================================
+
+
+def _hourly(cheap: tuple[int, ...], lo: float, hi: float) -> dict[int, float]:
+    return {h: (lo if h in cheap else hi) for h in range(24)}
+
+
+def test_lango_linachagua_saa_za_bei_nafuu(tree, capsys):
+    """Saa zilizochaguliwa lazima ziwe zile zenye `cost_ATR` ndogo, si nyingine."""
+    cheap = tuple(range(12))
+    root = tree(step=ATR_PRICE / 100.0, every=25,
+                spread_by_hour=_hourly(cheap, 0.2, 2.0))
+    assert main(["--config", CONFIG, "cost-by-hour", "--symbols", "EURUSD",
+                 "--keep", "0.4"]) == 0
+    gate = json.loads(
+        (root / "reports" / "r1" / "cost_by_hour.json").read_text())["gate"]
+    assert set(gate["hours"]) <= set(cheap)
+    assert gate["cost_after"] < gate["cost_before"]
+    assert "LANGO LILILOWEKWA KWA GHARAMA PEKEE" in capsys.readouterr().out
+
+
+def test_lango_HALIANGALII_gross(tree):
+    """Uteuzi lazima usibadilike hata gross ikigeuzwa kabisa.
+
+    Hili ndilo linalotofautisha lango hili na SETUP-v2: likiangalia tokeo,
+    lingekuwa uteuzi juu ya label na lingelipiwa na config budget. Test
+    inaendesha mara mbili kwa gross tofauti kabisa na kudai saa zile zile.
+    """
+    cheap = tuple(range(12))
+    spread = _hourly(cheap, 0.2, 2.0)
+    picks = []
+    for step in (ATR_PRICE / 100.0, -ATR_PRICE / 100.0):
+        root = tree(step=step, every=25, spread_by_hour=spread)
+        assert main(["--config", CONFIG, "cost-by-hour", "--symbols", "EURUSD",
+                     "--keep", "0.4"]) == 0
+        payload = json.loads(
+            (root / "reports" / "r1" / "cost_by_hour.json").read_text())
+        picks.append(tuple(payload["gate"]["hours"]))
+    assert picks[0] == picks[1]
+
+
+def test_bar_ya_1_kwa_mzizi_wa_f_inaripotiwa(tree, capsys):
+    """Bar ya mtaalamu wa pili lazima ionekane, na iwe `1/√f` hasa."""
+    root = tree(step=ATR_PRICE / 100.0, every=25,
+                spread_by_hour=_hourly(tuple(range(12)), 0.2, 2.0))
+    assert main(["--config", CONFIG, "cost-by-hour", "--symbols", "EURUSD",
+                 "--keep", "0.5"]) == 0
+    assert "BAR YA 1/√f" in capsys.readouterr().out
+    gate = json.loads(
+        (root / "reports" / "r1" / "cost_by_hour.json").read_text())["gate"]
+    assert gate["bar_1_over_sqrt_f"] == pytest.approx(1.0 / math.sqrt(gate["f"]), abs=1e-9)

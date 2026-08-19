@@ -77,15 +77,20 @@ chochote; zilikuwa zikikamata kitu kilichokuwepo.
 |---|---|---|
 | gross drift kwa bars 24 | +0.0593 ATR | +0.0952 ATR |
 | gharama ya round-trip | 0.1094 ATR | 0.1013 ATR |
-| **gharama ÷ gross** | **1.84×** | **1.06×** |
+| **gharama ÷ gross** | **1.84×** | *1.06×* |
 
-Kwenye pool tusiyoichagua, **gharama ni mara 1.84 ya edge yote iliyopo.** Kwenye pool
-tuliyoichagua, ni mara 1.06 — tunakosa kwa 6% ya gharama.
+Kwenye pool tusiyoichagua — ndiyo pekee inayoripotiwa — **gharama ni mara 1.84 ya edge
+yote iliyopo.**
 
 Hii ndiyo taarifa ya mwisho ya mradi, na ni kali zaidi kuliko "hakuna edge":
 
-> **Kuna drift halisi ya momentum ya takriban 0.06–0.10 ATR kwa saa 24. Gharama ya
-> kuingia na kutoka ni 0.10–0.11 ATR. Tunashindwa kwa upana wa spread.**
+> **Kuna drift ya momentum ya +0.0593 ATR kwa saa 24 (`t` 1.84, `p` 0.066 — inaashiria,
+> haijathibitika). Gharama ya kuingia na kutoka ni 0.1094 ATR. Gharama ni mara 1.84 ya
+> edge yote iliyopo.**
+>
+> *Namba ya kuripoti ni ya pool KAMILI. 1.06× ya pool ya 10 inakwenda kwenye tanbihi
+> pamoja na kila kitu kingine cha pool iliyoteuliwa — mtaalamu wa pili alinishika
+> nikilegeza sheria yangu mwenyewe ya §1 sehemu nne baadaye.*
 
 ---
 
@@ -210,9 +215,10 @@ lazima viandikwe.
 Hitimisho lililoandikwa kwa unyofu:
 
 > ELITEFX ilipima kama msukumo wa momentum unatabiri kuendelea kwa saa 24 kwenye FX
-> majors. **Unatabiri.** Athari ni takriban **0.06–0.10 ATR**. Gharama ya kuichukua kwa
-> bei ya retail ni takriban **0.10–0.11 ATR**. Tofauti ni **hasi**, na haifungiki kwa
-> commission peke yake kwa sababu spread ni sehemu kubwa ya gharama.
+> majors. **Unatabiri.** Athari kwenye pool kamili ni **+0.0593 ATR** (`t` 1.84,
+> `p` 0.066). Gharama ya kuichukua kwa bei ya retail ni **0.1094 ATR** — mara **1.84**.
+> Tofauti ni **hasi**, na haifungiki kwa commission peke yake kwa sababu spread ni 60%
+> ya gharama.
 >
 > Hii si "hakuna edge". Ni **edge iliyopimwa, iliyo ndogo kuliko gharama ya utekelezaji
 > inayopatikana kwetu** — na ndilo tokeo ambalo kwa kweli linaweza kutumika tena.

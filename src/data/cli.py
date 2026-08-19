@@ -1916,9 +1916,21 @@ def cmd_cost_audit(args: argparse.Namespace) -> int:
         # safu ya `gross` ipo hapa.
         if args.by_symbol:
             print(f"\nMGAWANYO KWA SYMBOL — cell {want_sl}/{want_tp}")
-            print("   gross = EV net + cost_R. Ni edge kabla ya gharama ya utekelezaji.")
+            # SAFU MBILI za gross, kwa makusudi.
+            #
+            # `gross(-sp)` = EV net + cost_R. Hii inaondoa commission na
+            # overshoot LAKINI SI SPREAD — spread iko ndani ya path (§5.2).
+            # Kwa hiyo symbols zenye spread kubwa zina `gross(-sp)` iliyoshushwa
+            # KIMITAMBO, na ρ hasi kati ya spread/ATR na safu hii ni ya lazima,
+            # si ushahidi wa chochote.
+            #
+            # `GROSS` = ...jumlisha spread/sl_atr. Hii ndiyo edge kabla ya
+            # gharama ZOTE, na ndiyo pekee inayoweza kulinganishwa kati ya
+            # symbols zenye spread tofauti.
+            print("   gross(-sp) = EV net + cost_R  — bado spread ipo ndani (§5.2)")
+            print("   GROSS      = ...+ spread/sl   — kabla ya gharama ZOTE")
             print(f"\n   {'symbol':<8} {'n':>6} {'comm R':>8} {'cost R':>8} "
-                  f"{'gross':>9} {'EV net':>9} {'spread/ATR':>11}")
+                  f"{'gross(-sp)':>11} {'GROSS':>9} {'EV net':>9} {'spread/ATR':>11}")
             per_symbol_rows: list[dict[str, Any]] = []
             for sym in sorted(barriers["symbol"].unique()):
                 sub = barriers[
@@ -1944,20 +1956,23 @@ def cmd_cost_audit(args: argparse.Namespace) -> int:
                              + pp["spread_exit_pips"].to_numpy(dtype=float)) / 2.0
                             / pp["atr_pips"].to_numpy(dtype=float)
                         ))
+                full = gross + (spread_atr / want_sl if np.isfinite(spread_atr) else 0.0)
                 print(f"   {sym:<8} {cc.n:>6,} {cc.commission_r:>8.4f} "
-                      f"{cc.cost_r_total:>8.4f} {gross:>+9.4f} {cc.ev_r_net:>+9.4f} "
-                      f"{spread_atr:>11.4f}")
+                      f"{cc.cost_r_total:>8.4f} {gross:>+11.4f} {full:>+9.4f} "
+                      f"{cc.ev_r_net:>+9.4f} {spread_atr:>11.4f}")
                 per_symbol_rows.append({
                     "symbol": sym, "n": cc.n, "commission_r": cc.commission_r,
-                    "cost_r": cc.cost_r_total, "gross_r": gross,
+                    "cost_r": cc.cost_r_total, "gross_minus_spread_r": gross,
+                    "gross_r": full,
                     "ev_r_net": cc.ev_r_net, "spread_per_atr": spread_atr,
                 })
             if per_symbol_rows:
-                gr = np.array([r["gross_r"] for r in per_symbol_rows])
+                gr = np.array([r["gross_minus_spread_r"] for r in per_symbol_rows])
+                fu = np.array([r["gross_r"] for r in per_symbol_rows])
                 cr = np.array([r["cost_r"] for r in per_symbol_rows])
                 sp = np.array([r["spread_per_atr"] for r in per_symbol_rows])
                 if len(per_symbol_rows) > 1:
-                    print(f"\n   mtawanyiko wa gross (sd) {gr.std(ddof=1):.4f} · "
+                    print(f"\n   mtawanyiko wa GROSS (sd) {fu.std(ddof=1):.4f} · "
                           f"wa cost_R (sd) {cr.std(ddof=1):.4f}")
                 neg = [r["symbol"] for r in per_symbol_rows if r["ev_r_net"] < 0]
                 neg_gross = [r["symbol"] for r in per_symbol_rows if r["gross_r"] < 0]
@@ -1970,11 +1985,13 @@ def cmd_cost_audit(args: argparse.Namespace) -> int:
                     # amri isiyoendesha kwenye mashine inayoihitaji si amri.
                     from .metalabel import spearman
 
-                    rho = float(spearman(sp[ok], gr[ok]))
-                    print(f"   ρ(spread/ATR, gross) = {rho:+.3f}  "
-                          f"— karibu na 0 ⇒ gross haitegemei gharama, kwa hiyo "
-                          f"mtawanyiko si wa gharama tu")
-                print("\n   SOMA HIVI: symbol iliyo hasi kwa EV net LAKINI chanya kwa gross\n"
+                    rho_ms = float(spearman(sp[ok], gr[ok]))
+                    rho = float(spearman(sp[ok], fu[ok]))
+                    print(f"   ρ(spread/ATR, gross(-sp)) = {rho_ms:+.3f}  "
+                          f"← HASI KWA LAZIMA: spread iko ndani ya safu hiyo")
+                    print(f"   ρ(spread/ATR, GROSS)      = {rho:+.3f}  "
+                          f"← hii ndiyo yenye maana")
+                print("\n   SOMA HIVI: symbol iliyo hasi kwa EV net LAKINI chanya kwa GROSS\n"
                       "   inaweza kuondolewa kwa sheria ya gharama isiyo na label.\n"
                       "   Iliyo hasi kwa GROSS haiwezi — kuiondoa ni uteuzi juu ya matokeo.")
 
@@ -3188,8 +3205,14 @@ def cmd_drift_curve(args: argparse.Namespace) -> int:
               f"   → ONYO: `{pick[0]}` unalingana vizuri zaidi kuliko `pos+h` "
               f"unaotumika hapa chini — mpangilio wa bar una kosa la bar moja.\n")
 
+    # Control ina safu ya GROSS yake mwenyewe, si net pekee. Bila hiyo,
+    # msomaji lazima atoe gharama kichwani — na akifanya hivyo kwa gharama ya
+    # setup (ambayo si ya control), atapata namba isiyo sahihi. Control gross
+    # inayoendelea kuwa hasi ni tokeo lenyewe: mwendo mdogo unarudi nyuma
+    # wakati mkubwa unaendelea.
     header = (f"   {'h':>4} {'trades':>7} {'gross':>9} {'net':>9} "
-              f"{'CI90 net':>20} {'t':>6} {'gharama':>8} | {'control':>9} {'tofauti':>9}")
+              f"{'CI90 net':>20} {'t':>6} {'gharama':>8} | "
+              f"{'ctl gross':>9} {'ctl net':>9} {'tofauti':>9}")
     print(header)
     out: list[dict[str, Any]] = []
     for h in horizons:
@@ -3209,13 +3232,20 @@ def cmd_drift_curve(args: argparse.Namespace) -> int:
         lo, hi = _year_block_ci(net[s], yr[s], seed=20260818 + h)
         t_stat = mu / (sd / np.sqrt(max(n, 1))) if sd > 0 else float("nan")
         mu_c = float(np.mean(net[c])) if c.any() else float("nan")
-        print(f"   {h:>4} {n:>7,} {np.mean(g[s]):>+9.4f} {mu:>+9.4f} "
+        gross_c = float(np.mean(g[c])) if c.any() else float("nan")
+        gross_s = float(np.mean(g[s]))
+        print(f"   {h:>4} {n:>7,} {gross_s:>+9.4f} {mu:>+9.4f} "
               f"[{lo:>+8.4f},{hi:>+8.4f}] {t_stat:>+6.2f} {np.mean(cost[s]):>8.4f} | "
-              f"{mu_c:>+9.4f} {mu - mu_c:>+9.4f}")
+              f"{gross_c:>+9.4f} {mu_c:>+9.4f} {gross_s - gross_c:>+9.4f}")
         out.append({
-            "h": h, "n_setup": n, "gross_atr": float(np.mean(g[s])), "net_atr": mu,
+            "h": h, "n_setup": n, "gross_atr": gross_s, "net_atr": mu,
             "net_ci90": [lo, hi], "t": t_stat, "cost_atr": float(np.mean(cost[s])),
-            "control_net_atr": mu_c, "setup_minus_control": mu - mu_c,
+            "control_gross_atr": gross_c, "control_net_atr": mu_c,
+            "control_cost_atr": float(np.mean(cost[c])) if c.any() else float("nan"),
+            "setup_minus_control": gross_s - gross_c,
+            "share_continuation": (
+                gross_s / (gross_s - gross_c) if gross_s != gross_c else float("nan")
+            ),
             "sd_atr": sd,
         })
 
@@ -3224,6 +3254,16 @@ def cmd_drift_curve(args: argparse.Namespace) -> int:
     print("   drift ikiwa imejikita NYUMA           : gross inaendelea kupanda hadi mwisho")
     print("   drift ikiwa HAIPO                     : gross inabaki karibu na sifuri kila mahali")
     print("   sifuri kila mahali PAMOJA na grid chanya ⇒ kasoro ya uhasibu, si drift")
+    peak = max((r for r in out if r["h"] <= 24), key=lambda r: r["gross_atr"], default=None)
+    if peak and any(r["h"] > 24 for r in out):
+        print("\n   `tofauti` ni ushahidi wa SABABU, si edge — HUWEZI kuitrade.")
+        print("   Inayotradiwa ni `gross` ya setup pekee. Sehemu ya tofauti inayotoka")
+        print("   kwenye setup yenyewe (si kuepuka kurudi nyuma kwa control):")
+        for r in out:
+            frac = r.get("share_continuation")
+            if frac is not None and np.isfinite(frac):
+                print(f"      h {r['h']:>3}: {frac:>5.0%} kuendelea · "
+                      f"{1 - frac:>5.0%} kuepuka kurudi nyuma")
 
     out_path = cfg.path_of("storage.reports_root") / "r1" / "drift_curve.json"
     out_path.parent.mkdir(parents=True, exist_ok=True)
@@ -3239,6 +3279,318 @@ def cmd_drift_curve(args: argparse.Namespace) -> int:
     )
     print(f"\nushahidi: {out_path}")
     return 0
+
+
+def cmd_cost_by_hour(args: argparse.Namespace) -> int:
+    """`cost_ATR` kwa saa ya kuingia — kushambulia MWANGA, si mgao.
+
+    Mtaalamu wa pili amegundua kitu ambacho mradi mzima haujakigusa:
+
+        cost_ATR = (spread_pips + commission_pips) ÷ atr_pips
+
+    Awamu zote nne zimeshambulia **mgao** — tier za commission, uteuzi wa
+    symbols, venue. **Mwanga haujaguswa kamwe.** `atr_pips` wakati wa kuingia
+    si constant: kwa chombo kile kile inatofautiana kwa mara mbili au zaidi
+    ndani ya siku, na gharama ZOTE MBILI zinashuka inapopanda.
+
+    Volatility gate yetu ni percentile ya ATR juu ya miezi sita — filter ya
+    regime kwa kila symbol, isiyosema chochote kuhusu **mahali ulipo ndani ya
+    siku**.
+
+    **Kinachofanya hili litofautiane na SETUP-v2:** lango linawekwa **kwa
+    upande wa gharama pekee**. Chagua saa zinazopunguza `cost_ATR`, bila
+    kuangalia drift hata mara moja. Ni sheria isiyo na label, inayotokana na
+    utambulisho wa gharama badala ya tokeo, kwa hiyo **haitumii config
+    budget** — ndicho kigezo tulichokitaka kwa SETUP-v2 na hatukukipata.
+
+    Drift ya saa zilizochaguliwa inaripotiwa **kama TOKEO**, baada ya uteuzi,
+    na imetiwa alama hivyo. Haiwezi kuingia kwenye uteuzi kwa sababu uteuzi
+    umeshafanyika kabla haijasomwa.
+
+    Bar ya mtaalamu wa pili inatumika pia: filter inayobakiza sehemu `f`
+    lazima ipandishe EV kwa `1/√f` ili tu isipoteze Sharpe.
+    """
+    cfg = _load(args)
+    import numpy as np
+    import pandas as pd
+
+    from .r1 import load_labels
+
+    labels_root = cfg.research_root / "data" / "L4_labels" / "labels"
+    points, _ = load_labels(labels_root, _symbol_list(args))
+    if points.empty:
+        print(f"hakuna points chini ya {labels_root}", file=sys.stderr)
+        return 2
+    need = {"spread_entry_pips", "spread_exit_pips", "atr_pips", "terminal_atr"}
+    missing = need - set(points.columns)
+    if missing:
+        print(f"points hazina safu: {sorted(missing)}", file=sys.stderr)
+        return 2
+
+    comm = float(args.commission_pips)
+    setups = points[points["is_setup"].fillna(False)].copy()
+    spread_rt = (setups["spread_entry_pips"].to_numpy(dtype=float)
+                 + setups["spread_exit_pips"].to_numpy(dtype=float)) / 2.0
+    atr_pips = setups["atr_pips"].to_numpy(dtype=float)
+    setups["spread_atr"] = spread_rt / atr_pips
+    setups["comm_atr"] = comm / atr_pips
+    setups["cost_atr"] = setups["spread_atr"] + setups["comm_atr"]
+    setups["hour"] = pd.to_datetime(setups["decision_time"]).dt.hour
+    setups["gross"] = setups["terminal_atr"].astype(float)
+
+    table = setups.groupby("hour").agg(
+        n=("cost_atr", "size"),
+        atr_pips=("atr_pips", "median"),
+        spread_atr=("spread_atr", "mean"),
+        comm_atr=("comm_atr", "mean"),
+        cost_atr=("cost_atr", "mean"),
+        gross=("gross", "mean"),
+    ).reset_index()
+
+    print(f"GHARAMA KWA SAA YA KUINGIA — commission {comm} pips · "
+          f"symbols {setups['symbol'].nunique()} · setups {len(setups):,}")
+    print("Uteuzi unafanywa kwa GHARAMA PEKEE. `gross` ni tokeo, si kigezo.\n")
+    print(f"   {'saa':>4} {'n':>7} {'ATR pips':>9} {'spread':>8} {'comm':>8} "
+          f"{'cost_ATR':>9} | {'gross':>9}")
+    for _, r in table.iterrows():
+        print(f"   {int(r['hour']):>4} {int(r['n']):>7,} {r['atr_pips']:>9.1f} "
+              f"{r['spread_atr']:>8.4f} {r['comm_atr']:>8.4f} {r['cost_atr']:>9.4f} | "
+              f"{r['gross']:>+9.4f}")
+
+    span = table["cost_atr"].max() / max(table["cost_atr"].min(), 1e-12)
+    print(f"\n   `cost_ATR` ya ghali zaidi ÷ ya rahisi zaidi = {span:.2f}×")
+    print(f"   `atr_pips` ya juu zaidi ÷ ya chini zaidi      = "
+          f"{table['atr_pips'].max() / max(table['atr_pips'].min(), 1e-12):.2f}×")
+
+    # ----- LANGO, kwa gharama pekee -----
+    ordered = table.sort_values("cost_atr")
+    total_n = int(table["n"].sum())
+    keep_n, chosen = 0, []
+    for _, r in ordered.iterrows():
+        chosen.append(int(r["hour"]))
+        keep_n += int(r["n"])
+        if keep_n / total_n >= args.keep:
+            break
+    f = keep_n / total_n
+    picked = table[table["hour"].isin(chosen)]
+    base_cost = float((table["cost_atr"] * table["n"]).sum() / total_n)
+    new_cost = float((picked["cost_atr"] * picked["n"]).sum() / keep_n)
+
+    print(f"\nLANGO LILILOWEKWA KWA GHARAMA PEKEE (bakiza ≥ {args.keep:.0%})")
+    print(f"   saa zilizochaguliwa: {', '.join(str(h) for h in sorted(chosen))}")
+    print(f"   sehemu iliyobakizwa f = {f:.3f}  ·  trades {keep_n:,} / {total_n:,}")
+    print(f"   cost_ATR: {base_cost:.4f} → {new_cost:.4f}  "
+          f"(punguzo {1 - new_cost / base_cost:.1%})")
+
+    base_gross = float((table["gross"] * table["n"]).sum() / total_n)
+    new_gross = float((picked["gross"] * picked["n"]).sum() / keep_n)
+    print(f"\nTOKEO (halikutumika kwenye uteuzi)")
+    print(f"   gross: {base_gross:+.4f} → {new_gross:+.4f} ATR")
+    print(f"   net  : {base_gross - base_cost:+.4f} → {new_gross - new_cost:+.4f} ATR")
+
+    # Bar ya mtaalamu wa pili: filter inayobakiza `f` inahitaji 1/√f kwenye EV.
+    need_mult = 1.0 / np.sqrt(f)
+    base_net, new_net = base_gross - base_cost, new_gross - new_cost
+    print(f"\n   BAR YA 1/√f: kubakiza {f:.0%} kunahitaji EV ipande kwa "
+          f"{need_mult:.2f}× ili tu isipoteze Sharpe")
+    if base_net > 0:
+        print(f"   imepanda kwa {new_net / base_net:.2f}× — "
+              + ("INAPITA" if new_net / base_net >= need_mult else "HAIPITI"))
+    else:
+        print(f"   EV ya msingi ni hasi ({base_net:+.4f}), kwa hiyo uwiano hauna maana.")
+        print(f"   Swali sahihi: je lango limeivusha sifuri? "
+              + ("NDIYO" if new_net > 0 else "HAPANA"))
+
+    out_path = cfg.path_of("storage.reports_root") / "r1" / "cost_by_hour.json"
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_path.write_text(
+        json.dumps({
+            "commission_pips": comm, "symbols": sorted(setups["symbol"].unique()),
+            "by_hour": table.to_dict(orient="records"),
+            "gate": {
+                "rule": "saa za bei nafuu kwa cost_ATR hadi kubakiza >= keep",
+                "keep_target": args.keep, "hours": sorted(chosen), "f": f,
+                "cost_before": base_cost, "cost_after": new_cost,
+                "gross_before": base_gross, "gross_after": new_gross,
+                "net_before": base_net, "net_after": new_net,
+                "bar_1_over_sqrt_f": float(need_mult),
+            },
+        }, indent=2, default=str) + "\n",
+        encoding="utf-8", newline="\n",
+    )
+    print(f"\nushahidi: {out_path}")
+    return 0
+
+
+def cmd_stop_value(args: argparse.Namespace) -> int:
+    """Pengo kati ya BARRIERS na KUSHIKILIA — liko wapi, na ni halali?
+
+    Mtaalamu wa pili ameshikilia lango juu ya hoja hii, na ni sahihi:
+
+    > Drift ikipanda kwa mpangilio kwenye dirisha lote, basi kwa drift
+    > isiyotegemea hali, **sheria yoyote ya kusimama `τ ≤ 24` inarudisha
+    > KIDOGO** kuliko kushikilia hadi mwisho — unasimama mapema, unakusanya
+    > kidogo. Barriers zinarudisha ZAIDI.
+
+    Kwa hiyo pengo linahitaji mojawapo:
+
+    * **halali** — drift inayotegemea HALI (walioshuka wanaendelea kushuka,
+      kwa hiyo stop inaepuka; walioshinda wanafika kilele ndani ya dirisha,
+      kwa hiyo target inakamata kile muda wa mwisho umerudisha). Hilo ni
+      tokeo halisi na jipya.
+    * **batili** — kasoro ya pili ya uhasibu: mkanganyiko wa convention kati
+      ya `drift-curve` na labeller, au granularity ya tie-break.
+
+    Amri hii inafanya vipimo viwili alivyoviomba, kwa pass moja:
+
+    **KIPIMO 1 — usawa wa kila trade kwenye timeouts.** Trade isiyogusa
+    barrier yoyote ni trade ILE ILE kwa vipimo vyote viwili: kuingia kule
+    kule, kutoka bar ile ile. Kwa hiyo *lazima* zilingane **trade kwa trade**,
+    si kwa wastani. Kwa uhasibu:
+
+        terminal_atr_trade  ==  terminal_atr − spread_rt ÷ atr_pips
+
+    Hakuna kelele ya kitakwimu ndani yake; ni utambulisho. Ikikosa kulingana,
+    hiyo ndiyo kasoro, na ukubwa wake unaeleza hadithi nzima.
+
+    **KIPIMO 2 — gawa pengo kwa darasa la tokeo.** Kwa kila darasa, linganisha
+    kilichopatikana kwa barrier na kile trade ILE ILE ingerudisha ikishikiliwa
+    hadi bar 24. Pengo litajionyesha mahali lilipo:
+
+    * lote ndani ya timeout  → kasoro (na Kipimo 1 tayari limeeleza)
+    * limegawanyika TP na SL → drift inayotegemea hali — tokeo halisi
+
+    Ni maelezo, si uteuzi: **haitumii config budget.**
+    """
+    cfg = _load(args)
+    import numpy as np
+    import pandas as pd
+
+    from .costs import realized_r
+    from .labels import SL_FIRST, TIMEOUT, TP_FIRST
+    from .r1 import load_labels
+
+    labels_root = cfg.research_root / "data" / "L4_labels" / "labels"
+    points, barriers = load_labels(labels_root, _symbol_list(args))
+    if barriers.empty or points.empty:
+        print(f"hakuna labels chini ya {labels_root}", file=sys.stderr)
+        return 2
+
+    need = {"spread_entry_pips", "spread_exit_pips", "atr_pips",
+            "terminal_atr", "terminal_atr_trade"}
+    missing = need - set(points.columns)
+    if missing:
+        print(f"points hazina safu: {sorted(missing)} — jenga upya labels "
+              f"(schema 3)", file=sys.stderr)
+        return 2
+
+    keys = points[points["is_setup"].fillna(False)][
+        ["symbol", "decision_time", "spread_entry_pips", "spread_exit_pips",
+         "atr_pips", "terminal_atr", "terminal_atr_trade"]
+    ].copy()
+    keys["spread_rt_pips"] = (keys["spread_entry_pips"] + keys["spread_exit_pips"]) / 2.0
+
+    want_sl, want_tp = (float(x) for x in args.cell.split("/"))
+    cell = barriers[
+        np.isclose(barriers["sl_atr"], want_sl) & np.isclose(barriers["tp_atr"], want_tp)
+    ]
+    if cell.empty:
+        print(f"cell {args.cell} haipo kwenye grid", file=sys.stderr)
+        return 2
+    work = cell.merge(keys, on=["symbol", "decision_time"], how="inner")
+    if work.empty:
+        print("join ya barriers na points imetoa sifuri", file=sys.stderr)
+        return 2
+
+    comm = float(args.commission_pips)
+    atr_pips = work["atr_pips"].to_numpy(dtype=float)
+    spread_atr = work["spread_rt_pips"].to_numpy(dtype=float) / atr_pips
+    comm_atr = comm / atr_pips
+    outcome = work["outcome"].to_numpy()
+    sl = work["sl_atr"].to_numpy(dtype=float)
+
+    # Kilichopatikana kwa BARRIER, kwa ATR (R × sl_atr).
+    barrier_atr = realized_r(work, commission_pips=comm) * sl
+    # Kile trade ILE ILE ingerudisha ikishikiliwa hadi mwisho wa dirisha.
+    hold_atr = work["terminal_atr"].to_numpy(dtype=float) - spread_atr - comm_atr
+
+    print(f"THAMANI YA KUSIMAMA — cell {want_sl}/{want_tp} · commission {comm} pips")
+    print(f"symbols {work['symbol'].nunique()} · trades {len(work):,}\n")
+
+    # ---------------- KIPIMO 1 ----------------
+    is_to = outcome == TIMEOUT
+    lhs = work["terminal_atr_trade"].to_numpy(dtype=float)
+    rhs = work["terminal_atr"].to_numpy(dtype=float) - spread_atr
+    diff = (lhs - rhs)[is_to & np.isfinite(lhs) & np.isfinite(rhs)]
+    print("KIPIMO 1 — utambulisho kwenye timeouts (si wastani; kila trade)")
+    print("   terminal_atr_trade  ==  terminal_atr − spread_rt ÷ atr_pips")
+    if diff.size:
+        worst = float(np.max(np.abs(diff)))
+        print(f"   n {diff.size:,} · wastani {float(np.mean(diff)):+.6f} ATR · "
+              f"mbaya zaidi {worst:.6f} ATR")
+        ok1 = worst <= args.tol
+        print(f"   {'INAPITA' if ok1 else 'INAFELI'} kwa uvumilivu {args.tol:g} — "
+              + ("convention ni MOJA kwenye njia zote mbili"
+                 if ok1 else "KUNA MKANGANYIKO WA CONVENTION; hiyo ndiyo kasoro"))
+    else:
+        ok1 = True
+        print("   hakuna timeout kwenye cell hii")
+
+    # ---------------- KIPIMO 2 ----------------
+    print(f"\nKIPIMO 2 — pengo limegawanywa kwa darasa la tokeo")
+    print(f"   {'darasa':<9} {'n':>7} {'sehemu':>7} {'barrier':>9} {'kushikilia':>11} "
+          f"{'pengo':>9} {'mchango':>9}")
+    rows: list[dict[str, Any]] = []
+    total = 0.0
+    for tag, mask in (("TP", outcome == TP_FIRST), ("SL", outcome == SL_FIRST),
+                      ("timeout", is_to)):
+        fin = mask & np.isfinite(barrier_atr) & np.isfinite(hold_atr)
+        if not fin.any():
+            continue
+        share = float(fin.sum()) / len(work)
+        b, h = float(np.mean(barrier_atr[fin])), float(np.mean(hold_atr[fin]))
+        contrib = share * (b - h)
+        total += contrib
+        print(f"   {tag:<9} {int(fin.sum()):>7,} {share:>7.1%} {b:>+9.4f} "
+              f"{h:>+11.4f} {b - h:>+9.4f} {contrib:>+9.4f}")
+        rows.append({"class": tag, "n": int(fin.sum()), "share": share,
+                     "barrier_atr": b, "hold_atr": h, "gap": b - h,
+                     "contribution": contrib})
+    fin_all = np.isfinite(barrier_atr) & np.isfinite(hold_atr)
+    b_all, h_all = float(np.mean(barrier_atr[fin_all])), float(np.mean(hold_atr[fin_all]))
+    print(f"   {'JUMLA':<9} {int(fin_all.sum()):>7,} {'100.0%':>7} {b_all:>+9.4f} "
+          f"{h_all:>+11.4f} {b_all - h_all:>+9.4f} {total:>+9.4f}")
+
+    print("\nJINSI YA KUISOMA")
+    print("   mchango wote ndani ya `timeout`   ⇒ KASORO ya uhasibu (Kipimo 1 linaeleza)")
+    print("   umegawanyika kati ya TP na SL     ⇒ drift INAYOTEGEMEA HALI — tokeo halisi")
+    if rows:
+        biggest = max(rows, key=lambda r: abs(r["contribution"]))
+        share_to = next((r["contribution"] for r in rows if r["class"] == "timeout"), 0.0)
+        frac = share_to / total if total else float("nan")
+        print(f"\n   mchango mkubwa zaidi: `{biggest['class']}` "
+              f"({biggest['contribution']:+.4f} ATR)")
+        print(f"   sehemu ya pengo iliyo ndani ya timeout: {frac:.0%}")
+
+    out_path = cfg.path_of("storage.reports_root") / "r1" / "stop_value.json"
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_path.write_text(
+        json.dumps({
+            "cell": [want_sl, want_tp], "commission_pips": comm,
+            "symbols": sorted(work["symbol"].unique()), "n": int(len(work)),
+            "identity_timeout": {
+                "n": int(diff.size),
+                "mean": float(np.mean(diff)) if diff.size else 0.0,
+                "worst": float(np.max(np.abs(diff))) if diff.size else 0.0,
+                "tolerance": args.tol, "passed": bool(ok1),
+            },
+            "by_class": rows,
+            "barrier_atr": b_all, "hold_atr": h_all, "gap_atr": b_all - h_all,
+        }, indent=2, default=str) + "\n",
+        encoding="utf-8", newline="\n",
+    )
+    print(f"\nushahidi: {out_path}")
+    return 0 if ok1 else 1
 
 
 def cmd_select_symbols(args: argparse.Namespace) -> int:
@@ -4135,6 +4487,30 @@ def build_parser() -> argparse.ArgumentParser:
     p_drift.add_argument("--horizons", default="3,6,12,24,48,120,240",
                          help="horizons kwa bars za H1, zikitenganishwa kwa koma")
     p_drift.set_defaults(func=cmd_drift_curve)
+
+    p_stop = subparsers.add_parser(
+        "stop-value",
+        help="pengo kati ya barriers na kushikilia — liko wapi? (haitumii budget)",
+        parents=[common],
+    )
+    p_stop.add_argument("--symbols")
+    p_stop.add_argument("--commission-pips", type=float, default=0.7)
+    p_stop.add_argument("--cell", default="3.0/6.0")
+    p_stop.add_argument("--tol", type=float, default=1e-6,
+                        help="uvumilivu wa Kipimo 1 kwa ATR — ni utambulisho, si makadirio")
+    p_stop.set_defaults(func=cmd_stop_value)
+
+    p_hour = subparsers.add_parser(
+        "cost-by-hour",
+        help="cost_ATR kwa saa ya kuingia — lango la gharama pekee (haitumii budget)",
+        parents=[common],
+    )
+    p_hour.add_argument("--symbols")
+    p_hour.add_argument("--commission-pips", type=float, default=0.7)
+    p_hour.add_argument("--keep", type=float, default=0.5,
+                        help="sehemu ya chini ya trades za kubakiza; lango linakua "
+                             "hadi kufikia hapa, likipanga kwa cost_ATR pekee")
+    p_hour.set_defaults(func=cmd_cost_by_hour)
 
     p_sel = subparsers.add_parser(
         "select-symbols",

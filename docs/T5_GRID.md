@@ -396,7 +396,10 @@ python -m src.data.cli cost-audit --cell 3.0/6.0
 
 Uteuzi ulisogeza EV kwa **+0.0190 R** — mara **2.3** ya makadirio yote yaliyobaki
 baada ya marekebisho ya labelling. Ni **uteuzi mkubwa kuliko dosari ya labelling**
-(0.0124), na mkubwa kuliko athari nzima ya SETUP-v1 dhidi ya control (0.0056).
+(0.0124). **[Ilirekebishwa 2026-08-18** — hapa awali niliandika kuwa ni mkubwa pia
+kuliko athari ya SETUP-v1 dhidi ya control, nikitaja **0.0056**. Namba sahihi ni
+**0.0560 R**, na kwa hiyo dai linapinduka: uteuzi (0.0190) ni **MDOGO** kuliko athari
+uliyokuwa ukiificha. Mtaalamu wa pili ndiye aliyeliona.**]**
 
 ### Kinachoanguka
 

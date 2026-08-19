@@ -36,7 +36,9 @@ So your pre-commitment stands as a genuine one, and we are answering it below.
 **No cell in the grid is positive on the unselected pool.** Best is `sl` 3.0 / `tp` 2.0 at
 −0.0107 R. The selection was worth **+0.0190 R** — 2.3× the entire remaining point
 estimate, larger than the labelling defect that preceded it (0.0124), and larger than the
-setup-vs-control effect we called our best result (0.0056).
+setup-vs-control effect we called our best result. **[Corrected — that parenthesis read
+0.0056; the figure is 0.0560 R, and the comparison reverses: the selection is *smaller*
+than the effect it was hiding, not larger. Your catch.]**
 
 You said you would treat a negative full pool as dispositive for the hypothesis as
 specified. We accept that reading, and we adopt your instruction on presentation: **the
@@ -195,16 +197,17 @@ assumed.
 |---|---|---|
 | gross drift over 24 bars | +0.0593 ATR | +0.0952 ATR |
 | round-trip cost | 0.1094 ATR | 0.1013 ATR |
-| **cost ÷ gross** | **1.84×** | **1.06×** |
+| **cost ÷ gross** | **1.84×** | *1.06×* |
 
-On the pool we did not choose, cost is **1.84× the entire edge that exists**. On the pool
-we chose, it is 1.06× — we miss by 6% of the cost.
+**The reporting figure is the full pool: cost is 1.84× the entire edge that exists.** The
+1.06× belongs in the footnote with the rest of the selected pool — you caught us relaxing
+our own §1 rule four sections after adopting it, and you were right to.
 
-This is a sharper statement than "no edge", and it is the one we will publish:
+The statement we will publish, on unselected data only:
 
-> There is real momentum continuation of roughly **0.06–0.10 ATR over 24 hours**. The
-> round-trip cost of taking it at retail is **0.10–0.11 ATR**. We lose by the width of the
-> spread.
+> There is momentum continuation of **+0.0593 ATR over 24 hours** (`t` 1.84, `p` 0.066 —
+> suggestive, not established). The round-trip cost of taking it at retail is
+> **0.1094 ATR**. Cost is **1.84×** the edge.
 
 ### 4.4 The cost split — and 60% of it is not commission
 
@@ -348,9 +351,9 @@ You gated D on the term structure and named two outcomes. It returned a third.
 
 That leaves us with a hypothesis that was **correct and unprofitable**, which is a
 different object from a hypothesis that was wrong. The four phases did not fail to find
-momentum continuation. They found it, measured it at 0.06–0.10 ATR over 24 hours, and
-established that the retail execution cost of 0.10–0.11 ATR exceeds it — with 60% of that
-cost being spread, which no amount of capital or volume buys down.
+momentum continuation. They found it, measured it at +0.0593 ATR over 24 hours on the full
+pool, and established that the retail execution cost of 0.1094 ATR is 1.84× as large — with
+60% of that cost being spread, which no amount of capital or volume buys down.
 
 We think that is the paper, and it is a better one than the negative you and we were both
 expecting a week ago. Two of its three central numbers were found by reconstructing a
@@ -360,7 +363,7 @@ one recommendation of yours we would keep even if every other item on your workl
 out wrong.
 
 Our remaining question is the one your own framework now poses and neither of us has
-answered: **given a measured edge of 0.06–0.10 ATR and a spread floor of 0.066 ATR, is
+answered: **given a measured edge of 0.0593 ATR and a spread floor of 0.0656 ATR, is
 there any instrument class reachable from here where the ratio inverts** — or is the
 correct conclusion that this edge is real, known, and priced exactly at the level that
 makes it unavailable to us?

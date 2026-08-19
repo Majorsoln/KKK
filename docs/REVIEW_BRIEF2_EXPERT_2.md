@@ -229,3 +229,137 @@ stop kuwa `−(1 + overshoot_R)` — overshoot IKO ndani ya path, kama alivyodha
 kuwa. `ev_r_net = mean(realized) − commission_R`; **haitolewi mara ya pili.**
 `cost_r_total` ni ya kuripoti pekee. **Shtaka limefungwa.** Mawili yake mengine
 (granularity ya tie-break, mkanganyiko wa spread convention) hayajafungwa.
+
+---
+
+## 9. Duru ya pili — 2026-08-18, **anashikilia lango, hakubadilishi D**
+
+### 9.1 Alichokikubali dhidi yake mwenyewe
+
+* **Kosa la units la §2 ni langu, na alikubali mara moja.** Alilinganisha time exit **net**
+  dhidi ya barrier **net + commission**. Pengo ni 0.0305 ATR, si 0.070. Na aliliita kwa
+  jina lake: *"Two letters, two units errors, both in the direction that made my own
+  argument look stronger. That is worth naming as a pattern rather than an incident."*
+* **Corollary yake ya mtawanyiko haikushika.** 7.6× inaisuluhisha dhidi yake.
+* **Shtaka la overshoot limefungwa**, na alikubali njia niliyoifungia (kusoma
+  `realized_r()`, si kuhoji).
+
+### 9.2 Alipo sahihi dhidi yangu — na ndipo lango lilipo
+
+Nilidai: *"Your identity is satisfied... No second accounting asymmetry is needed."*
+**Hilo lilikuwa kudai zaidi ya nilichokuwa nacho.**
+
+Hoja yake: kupata drift kunaeleza **kwa nini grid ina gross EV chanya kabisa**;
+**hakuelezi pengo kati ya grid na kushikilia**. Na mwelekeo wa curve yangu mwenyewe
+unafanya pengo kuwa **gumu zaidi** kuelezeka, si rahisi:
+
+> Drift ikipanda kwa mpangilio kwenye dirisha lote, basi kwa drift isiyotegemea hali,
+> sheria yoyote ya kusimama `τ ≤ 24` inarudisha **KIDOGO** kuliko kushikilia. Barriers
+> zinarudisha **ZAIDI**.
+
+**Nimehesabu pengo kwa usahihi zaidi kuliko yeye.** Yeye aliripoti +0.0174 ATR (net kwa
+net, pool 12). Kwa gross kamili:
+
+| pool 12, ATR | |
+|---|---|
+| barriers, gross ya gharama zote | **+0.0891** |
+| kushikilia bars 24, gross | **+0.0593** |
+| **thamani ghafi ya kusimama** | **+0.0298** |
+| ...inayorudishwa kama overshoot | −0.0120 |
+| **pengo la net** | **+0.0174** |
+
+Kwa hiyo kinachohitaji maelezo ni **+0.0298 ATR**, si +0.0174. Namba yake ilikuwa ndogo
+kuliko tatizo lenyewe.
+
+**Maelezo mawili yanayowezekana, na hatuyajui:**
+
+* **halali** — drift inayotegemea **HALI** (walioshuka wanaendelea, stop inaepuka;
+  walioshinda wanafika kilele ndani, target inakamata kile mwisho umerudisha). Tokeo
+  halisi na jipya.
+* **batili** — mkanganyiko wa convention au granularity ya tie-break; mawili niliyoyaacha
+  wazi mwenyewe. Na anaonya: **uthabiti wa pengo kwenye cells na pools mbili, kwa idadi
+  isiyobadilika ya ATR, unafanana zaidi na convention offset kuliko na athari ya hali.**
+
+### 9.3 Makosa mawili aliyoyapata kwenye maandishi yangu
+
+1. **Nilirudisha pool iliyoteuliwa kimyakimya.** Nilifuta pool ya 10 kama msingi wa
+   kuripoti §1, kisha nikaandika hukumu kama **"0.06–0.10 ATR"** — na 0.10 ni pool ya 10.
+   Namba ya kuripoti ni **+0.0593 ATR, `t` 1.84, `p` 0.066**, na uwiano ni **1.84×**, si
+   "tunakosa kwa 6%". Nilivunja sheria yangu mwenyewe sehemu nne baada ya kuiweka.
+   **Imerekebishwa T6 §4, §8 na barua.**
+2. **Kosa la desimali: 0.0056 badala ya 0.0560.** Linapindua dai: uteuzi (0.0190 R) ni
+   **MDOGO** kuliko athari ya setup-dhidi-ya-control (0.0560 R), si mkubwa.
+   **Imerekebishwa T5 §16 na barua §1.**
+
+### 9.4 Alipo makosa — na sababu ni yangu
+
+Aliripoti *"Spearman ≈ **+0.50**"* kati ya spread/ATR na gross, akisema *"vyombo vya bei
+nafuu vina edge KUBWA zaidi"*. **Maneno yake ni sahihi; ishara yake si.** Namba halisi ni
+**−0.497**.
+
+Lakini kosa ni langu, si lake: **safu niliyoiita "gross" si gross.** `gross = EV net +
+cost_R` inaondoa commission na overshoot **lakini si spread** — spread iko ndani ya path
+(§5.2). Kwa hiyo symbol yenye spread kubwa ina "gross" iliyoshushwa **kimitambo**, na ρ
+hasi ni **ya lazima kihesabu**, si ushahidi.
+
+Nikirudisha spread (`+ spread/ATR ÷ sl_atr`):
+
+| | ρ na spread/ATR |
+|---|---|
+| `gross(-sp)` (safu ya zamani) | −0.497 ← kimitambo |
+| **GROSS** (kabla ya gharama zote) | **−0.413** |
+
+Uhusiano unabaki hasi hata baada ya kurekebisha (`p` ≈ 0.18, `n` = 12 — hauna maana
+kitakwimu). Onyo lake la uchafuzi lilikuwa halali; ishara aliyoitaja haikuwa.
+
+**Muhimu: hitimisho la §4.6 linanusurika.** Kwa GROSS kamili, EURCHF ni **−0.0486** na
+EURGBP **−0.0569** — bado mbaya zaidi kwa mbali. Uteuzi ulikuwa uteuzi.
+
+Safu zote mbili sasa zinachapishwa, na `ρ` zote mbili, kwa sababu kila mmoja peke yake
+anapotosha.
+
+### 9.5 Mambo mawili ya jedwali nisiyoyagusa
+
+* **Control ina drift hasi ya gross ya −0.04 ATR.** Nilikuwa sijaliona. Sasa
+  `drift-curve` inachapisha `ctl gross` kama safu yake. Ni **kurudi nyuma kwa mwendo
+  mdogo pamoja na kuendelea kwa mwendo mkubwa** — umbo halisi lenye kumbukumbu.
+* **Onyo lake: `tofauti` ya +0.0992 HAIWEZI kutradiwa.** Inayotradiwa ni `gross` ya
+  setup pekee, +0.0593. Alisema mgawanyo ni 60% kuepuka / 40% kuendelea; **nimehesabu na
+  ni kinyume — 60% kuendelea (0.0593), 40% kuepuka (0.0399)**. Hitimisho lake bado ni
+  sahihi na muhimu: differential ni ushahidi wa sababu, si edge.
+* **Barriers zinapunguza uwezo wa kugundua.** `t` ya drift bila barriers ni 1.84; ya grid
+  ni 0.63. Zinaongeza variance bila kuongeza return kwa uwiano. Karatasi ijengwe juu ya
+  `drift-curve`, si grid.
+
+### 9.6 Wazo lake bora kabisa — shambulia MWANGA
+
+```
+cost_ATR = (spread_pips + commission_pips) ÷ atr_pips
+```
+
+Awamu nne zote zimeshambulia **mgao**. **Mwanga haujaguswa kamwe.** `atr_pips` wakati wa
+kuingia inatofautiana kwa mara mbili au zaidi ndani ya siku, na gharama zote mbili
+zinashuka inapopanda. Volatility gate yetu ni percentile juu ya miezi sita — haisemi
+chochote kuhusu mahali ulipo ndani ya siku.
+
+**Na kinachoifanya iwe halali:** lango linawekwa **kwa upande wa gharama pekee**, bila
+kuangalia drift hata mara moja. Ni sheria isiyo na label inayotokana na utambulisho wa
+gharama, kwa hiyo **haitumii config budget** — ndicho kigezo tulichokitaka kwa SETUP-v2
+na hatukukipata.
+
+Amri `cost-by-hour` imejengwa hivyo, na test inayoendesha mara mbili kwa gross iliyogeuzwa
+kabisa na kudai saa **zile zile** ndiyo inayothibitisha kwamba uteuzi haugusi tokeo.
+
+### 9.7 Kinachofuata
+
+`stop-value` (Kipimo 1 + Kipimo 2) na `cost-by-hour` zimejengwa. Lango lake liko juu ya
+Kipimo 2. Anasema — na nakubali — **andika karatasi sasa hivi bila kujali**, juu ya pool
+kamili na juu ya `drift-curve`, kwa sababu mchango wake si makadirio ya drift:
+
+> Kwenye awamu nne, **kila kasoro ya kipimo na kila uteuzi ulikuwa MKUBWA KULIKO athari
+> iliyokuwa ikichunguzwa.** Kwa uwiano huu, utafiti wa kimfumo kwenye retail FX si
+> mdogo-wa-sampuli wala mdogo-wa-model. Ni **mdogo-wa-usafi** — na kigezo kinachobana ni
+> **idadi ya ujenzi-upya huru ambayo namba imeinusurika**, si idadi ya miaka ya data.
+
+Reviewer 1 (**A** — shambulia effect size, horizon kwanza): nusu ya horizon **imekufa kwa
+kipimo**, si kwa hoja — `h` = 240 inageuza ishara.
