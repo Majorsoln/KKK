@@ -113,7 +113,53 @@ kusahau tulichokiona.
 
 ## 4. Mkataba wa data
 
-Chanzo: ticks za bid/ask, si bars zilizotengenezwa na mtu mwingine.
+### 4.1 Ingizo — ticks za bid/ask, si OHLC
+
+```
+   RAW TICKS  2016–2024
+   ├── timestamp   (UTC, µs)
+   ├── bid
+   └── ask
+            │
+            ▼
+      Data Quality  (§4.3)
+            │
+            ▼
+      Bar Builder
+            │
+   ┌────┬────┬─────┬────┬────┬────┬────┐
+   M5   M15  M30   H1   H2   H4   D1
+   └────┴────┴─────┴────┴────┴────┴────┘
+            │
+            ▼
+   OHLC · spread · features · events · regimes · strategies
+```
+
+**OHLC haipokelewi kama ingizo.** Inazalishwa. Sababu si upendeleo — ni kwamba mambo
+matano ya doctrine hii **hayawezi kutekelezwa** bila bid/ask:
+
+| kinachovunjika bila ticks | kinatumika wapi |
+|---|---|
+| spread halisi kwa kila trade | §8 Calibration A — lango zima la uchumi |
+| entry kwa `ask`, exit kwa `bid` | §11 backtest — bila hii kila return imevimba |
+| utekelezaji kwa kiwango cha tick | §11 — kugusa kwa barrier kunatokea ndani ya bar |
+| calibration ya slippage | §12 robustness |
+| calibration ya gharama ya RCE | §18 |
+
+Data ya OHLC inatosha kwa **prototype**. Haitoshi kwa ELITEFX. **Doctrine
+haibadilishwi ili iendane na data iliyopo** — data ndiyo inayotafutwa ili iendane na
+doctrine.
+
+### 4.2 Volume
+
+`bid_vol` / `ask_vol` za FX ni **za kiashiria, si volume ya soko** — hakuna exchange
+inayoripoti volume ya kweli ya spot FX. Kwa hiyo:
+
+* Volume ya broker **haitumiki** kama feature.
+* Kinachotumika ni **idadi ya ticks kwa bar**, inayohesabiwa na Bar Builder. Ni kipimo
+  halisi cha shughuli za soko, na kinatoka kwenye data yetu wenyewe.
+
+### 4.3 Ukaguzi
 
 Kila pair, kila mwaka, inapita ukaguzi ufuatao **kila inapopakiwa**, si mara moja:
 
@@ -149,6 +195,8 @@ wakati huo tu**.
 | muundo wa candle | `body`, `upper_wick`, `lower_wick`, `range`, `body/range`, `close_pos_in_range` |
 | nafasi sokoni | `dist_from_high_{20,50}`, `dist_from_low_{20,50}`, `dist_from_EMA200` |
 | muda | `hour`, `day_of_week`, `session`, `minutes_from_session_open` |
+| shughuli | `tick_count`, `tick_count_percentile` — kutoka ticks, si volume ya broker (§4.2) |
+| spread | `spread_p50`, `spread_per_atr` — kutoka ticks halisi (§4.1) |
 
 **Sheria mbili zisizovunjika:**
 
@@ -531,14 +579,15 @@ Zifuatazo ni malango, si mapendekezo. Kila moja inaweza kupimwa kwa test.
 | **R2** | Strategy ni entry **na** exit. Exit haitafutwi baada ya kuona matokeo. |
 | **R3** | Candidate yenye `gross < 2 × gharama` inakataliwa kabla ya takwimu. |
 | **R4** | Kizingiti chochote kinatoka kwenye sakafu iliyopimwa, si kwenye maoni. |
-| **R5** | `variants_tested` inahesabiwa daima na inaingia kwenye kila ripoti. |
-| **R6** | Kila namba muhimu inafikiwa kwa njia mbili; tofauti inachapishwa. |
-| **R7** | Uthabiti unapimwa kwa **miezi**, si miaka. |
-| **R8** | Holdout inaguswa mara moja, kwa sheria iliyoandikwa kabla, na hairudishwi. |
-| **R9** | Output ya model inayolisha model nyingine ni out-of-fold. |
-| **R10** | Entry inafungwa **H1**. |
-| **R11** | RCE ndiyo mamlaka ya gharama na ukubwa. Haibadilishwi na hati hii. |
-| **R12** | Hakuna amri inayoendesha kimya. Kila hatua inachapisha maendeleo. |
+| **R5** | **Generator haifunguki** kabla Calibration A na B (§8.2, §9.2) hazijakamilika na kuhifadhiwa kama ushahidi wenye tarehe. |
+| **R6** | `variants_tested` inahesabiwa daima na inaingia kwenye kila ripoti. |
+| **R7** | Kila namba muhimu inafikiwa kwa njia mbili; tofauti inachapishwa. |
+| **R8** | Uthabiti unapimwa kwa **miezi**, si miaka. |
+| **R9** | Holdout inaguswa mara moja, kwa sheria iliyoandikwa kabla, na hairudishwi. |
+| **R10** | Output ya model inayolisha model nyingine ni out-of-fold. |
+| **R11** | Entry inafungwa **H1**. |
+| **R12** | RCE ndiyo mamlaka ya gharama na ukubwa. Haibadilishwi na hati hii. |
+| **R13** | Hakuna amri inayoendesha kimya. Kila hatua inachapisha maendeleo. |
 
 ---
 
