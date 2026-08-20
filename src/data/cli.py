@@ -1436,26 +1436,9 @@ def cmd_build_labels(args: argparse.Namespace) -> int:
     from .manifest import code_rev
     from .splits import SplitPlan
 
-    # DF-20 (§4.3 sheria 5): "R1 haianzi kabla sheria hii haijasainiwa na PD".
-    # Hii ndiyo kinga ya darasa la tatu la uvujaji; haiwezi kuwa ya hiari.
-    if not args.skip_signature_check:
-        from src.governance.signatures import LEDGER, load as load_signatures
-
-        root = Path(__file__).resolve().parents[2]
-        signed = {
-            s.item
-            for s in load_signatures(root / LEDGER)
-            if s.decision in ("APPROVED", "VERIFIED")
-        }
-        if "DF-20" not in signed:
-            print(
-                "DF-20 haijasainiwa. Sheria ya setup ni PRE-REGISTRATION (§4.3 sheria 5): "
-                "label ikihesabiwa kabla ya sahihi, kila namba ya R1+ ni ya baada ya "
-                "ukweli.\n  scripts\\sign.bat DF-20 APPROVED --evidence "
-                "research\\reports\\r1\\setup_rates.json --reason \"...\"",
-                file=sys.stderr,
-            )
-            return 2
+    # Rejista ya sahihi imefutwa (agizo la PD 2026-08-18, DOCTRINE v2 §0).
+    # Ulinzi wa pre-registration sasa ni faili la ushahidi lenye tarehe, si
+    # jedwali la sahihi — tazama DOCTRINE_V2 §6 (sakafu ya kelele) na K6.
 
     symbols = _symbol_list(args) or cfg.symbols
     holdout_start = SplitPlan.from_config(cfg).holdout_start
@@ -2178,13 +2161,10 @@ def cmd_setup_effect(args: argparse.Namespace) -> int:
     cfg = _load(args)
     import numpy as np
 
-    from src.governance import budget as bud
-
     from .costs import realized_r
     from .matching import DEFAULT_STRATA, build_strata, matched_effect
     from .r1 import load_labels
 
-    bud.guard()
     want_sl, want_tp = (float(x) for x in args.cell.split("/"))
 
     labels_root = cfg.research_root / "data" / "L4_labels" / "labels"
@@ -2240,11 +2220,6 @@ def cmd_setup_effect(args: argparse.Namespace) -> int:
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(json.dumps(result.to_json(), indent=2, default=str), encoding="utf-8", newline="\n")
     print(f"\nushahidi: {out_path}")
-    print(
-        "\nbajeti: matumizi hayajaandikwa. Yaandike ukikubali matokeo:\n"
-        f'  python -m src.governance.cli budget-spend setup-effect-{args.cell.replace("/", "-")}'
-        ' --reason "..."'
-    )
     return 0
 
 
@@ -2439,15 +2414,12 @@ def cmd_meta_label(args: argparse.Namespace) -> int:
     cfg = _load(args)
     import numpy as np
 
-    from src.governance import budget as bud
-
     from .effective_n import estimate
     from .experiment import EXPERIMENT_VERSION, available_models, oof_predict
     from .features import FEATURE_NAMES, FEATURE_SET_VERSION
     from .manifest import code_rev
     from .metalabel import METALABEL_VERSION, evaluate
 
-    bud.guard()
     models = available_models()
     if args.model not in models:
         print(
@@ -2558,11 +2530,6 @@ def cmd_meta_label(args: argparse.Namespace) -> int:
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(json.dumps(payload, indent=2, default=str), encoding="utf-8", newline="\n")
     print(f"\nushahidi: {out_path}")
-    print(
-        "\nbajeti: matumizi hayajaandikwa. Yaandike ukikubali matokeo:\n"
-        f"  python -m src.governance.cli budget-spend meta-label-{args.model}"
-        ' --reason "..."'
-    )
     return 0
 
 
@@ -4503,11 +4470,6 @@ def build_parser() -> argparse.ArgumentParser:
     p_labels.add_argument("--symbols", help="orodha ya symbols, comma separated")
     p_labels.add_argument("--no-resume", action="store_true", help="anza upya, puuza hali")
     p_labels.add_argument("--progress-every", type=int, default=1000)
-    p_labels.add_argument(
-        "--skip-signature-check",
-        action="store_true",
-        help="kwa tests pekee — DF-20 ni pre-registration ya lazima (§4.3 sheria 5)",
-    )
     p_labels.set_defaults(func=cmd_build_labels)
 
     p_r1 = subparsers.add_parser(

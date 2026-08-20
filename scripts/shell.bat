@@ -4,7 +4,6 @@
 ::
 ::      scripts\shell.bat
 ::      python -m src.data.cli audit-status
-::      python -m src.governance.cli pending
 ::
 ::  Scripts nyingine (audit/catchup/record/status/sign) hujiandaa zenyewe.
 ::  Hii ni kwa pale unapotaka kuendesha `python -m ...` moja kwa moja —
@@ -22,5 +21,4 @@ echo(
 echo   Amri za haraka:
 echo     python -m src.data.cli audit-status      ^:^: hatua za R0 zilizokamilika
 echo     python -m src.data.cli quality-stats     ^:^: mgawanyo + vizingiti
-echo     python -m src.governance.cli pending     ^:^: kinachosubiri sahihi yako
 echo(

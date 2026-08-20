@@ -24,9 +24,19 @@ Kilichowekwa `docs/archive/v1/`:
 | `RESEARCH_PLAN_R0.md` | mpango wa R0–R4 | R0–R2 zimekamilika; R3+ zinabadilishwa |
 | `T3_PLAN.md` | pre-registration ya meta-labelling | jaribio limekwisha, tokeo hasi |
 
-Zilizobaki `docs/` ni **ushahidi**, si doctrine: T0, T4, T5, T6, mapitio ya wataalamu,
-`SIGNATURES.md`, `TRIAL_BUDGET.md`, `RIPOTI_MAENDELEO.md`. **Hazitupwi.** Ndizo
-zinazothibitisha kwa nini v2 inaonekana hivi.
+**Nyongeza 2026-08-18:** kwa agizo la PD, `docs/archive/v1/` yenyewe imefutwa. Hati
+hizi zipo kwenye historia ya git pekee.
+
+**Zilizofutwa kabisa (agizo la PD, 2026-08-18):** hati zote za utafiti wa v1 (T0, T4,
+T5, T6), mapitio yote ya wataalamu, rejista ya sahihi (`SIGNATURES.md`), bajeti ya
+majaribio (`TRIAL_BUDGET.md`), na `RIPOTI_MAENDELEO.md`. Vilevile `src/governance/`
+na tests zote isipokuwa za RCE na za mipaka ya repo.
+
+Zipo kwenye **historia ya git** ikiwa zitahitajika. Namba nne zinazobeba §5 na §6
+zimehamishwa §1.1 hapa chini, kwa sababu bila hizo doctrine ingekuwa maoni.
+
+**Kinachobaki:** `RISK_COST_ENGINE.md` (haiguswi), hati hii, na `SETUP.md`
+(uendeshaji wa mazingira).
 
 ---
 
@@ -55,6 +65,29 @@ zinazothibitisha kwa nini v2 inaonekana hivi.
 **Hitimisho linalobeba v2:** hypothesis moja iliyopimwa kwa ukali haitoshi. Tunahitaji
 **wagombea wengi**, wanaopimwa kwa **rekodi**, wakilindwa dhidi ya **bahati**.
 
+### 1.1 Namba zilizopimwa zinazobebwa mbele
+
+Hati za utafiti wa v1 (T0, T4, T5, T6, mapitio ya wataalamu) **zimefutwa kwa agizo la
+PD, 2026-08-18.** Zipo kwenye historia ya git ikiwa zitahitajika. Namba zifuatazo
+zimehamishwa hapa kwa sababu **v2 inazitegemea** — zisingekuwepo, §5 na §6 zingekuwa
+maoni badala ya vipimo.
+
+| namba | thamani | inatumika wapi |
+|---|---|---|
+| gharama ya round-trip, H1, pool 12 | **0.1094 ATR** (spread 0.0656 + commission 0.0438) | §5 |
+| ATR ya H1, wastani wa pool | **≈ 16 pips** | §5.1 |
+| commission iliyodhaniwa | 0.7 pips round-turn (**haijathibitishwa** dhidi ya statement) | §5 |
+| drift ya bars 24, pool 12 | **+0.0593 ATR**, `t` 1.84, `p` 0.066 | §5, §6 |
+| gharama ÷ drift | **1.84×** | §1, §5 |
+| drift baada ya kugusa −3 ATR | **−0.0520 ATR** (mzunguko 0.111) | §4.4 |
+| `σ_R` kwa trade, cell 3.0/6.0 | **1.275 R** | §6, §7 |
+| `N_eff ÷ n_raw` | **0.402** | §7 |
+| sehemu ya timeout, cell 3.0/6.0 | 61.8% | — |
+
+**Onyo lililoambatana nazo:** zote ni za SETUP-v1 kwenye cell moja. Ni **vipimo vya
+mazingira** (gharama, ATR, `σ_R`, uwiano wa `N_eff`), si vya strategy. Zinatumika kama
+constants za kupanga v2, si kama matokeo ya kutegemewa.
+
 ---
 
 ## 2. Vikwazo saba vinavyovuka kutoka v1 vikiwa HAI
@@ -78,7 +111,9 @@ kilikaa kwenye asilimia 25 ya null yake yenyewe — hakikuwa lango kamwe.
 kuona matokeo lazima kuhesabiwe.
 
 **K6 — Holdout inaguswa MARA MOJA.** 2024-04-01 → 2026-04-30 haijaguswa. Sheria
-inaandikwa kwenye ushahidi **kabla**, kwa hiyo haiwezi kubadilishwa baada ya kuona jibu.
+inaandikwa kwenye **faili la ushahidi** kabla, kwa hiyo haiwezi kubadilishwa baada ya
+kuona jibu. (Rejista ya sahihi ya v1 imefutwa; ulinzi sasa ni faili la JSON lenye
+tarehe, si jedwali la sahihi.)
 
 **K7 — Hakuna amri inayoendeshwa kimya.** Kila hatua inachapisha maendeleo.
 
@@ -225,15 +260,34 @@ Hii ndiyo sababu ya kiuchumi ya kuchagua TF, si ladha:
 | H4 | 32.0 | 0.0406 | 0.50× |
 | D1 | 78.4 | **0.0166** | 0.20× |
 
-Ulitaja M5 kama mfano wa dataset. **Nakushauri kwa nguvu tusiweke maamuzi hapo.**
-Kwa M5 gharama ingekuwa **0.2815 ATR**, na edge ingehitaji kuwa **mara 4.7** ya
-tuliyonayo. Data ni kubwa zaidi, lakini kila trade inakuwa ndogo mno kuvuka gharama.
+### 5.2 UAMUZI WA PD (2026-08-18): entries zimefungwa H1
 
-Hoja yako mwenyewe — "trades kubwa" — inaelekeza **juu**, si chini. **H1 na H4 ndipo
-penye nafasi; D1 ina gharama ndogo kuliko zote lakini trades chache.**
+> *"timeframe ni zile za zamani, lakini entries ni 1H kama awali tulivyokubaliana."*
 
-M5 inabaki kwa **RCE** (spread, slippage, microstructure) — kama RCE §0 inavyosema
-tayari. Haibadiliki.
+**Imefungwa. Hii si pendekezo tena; ni kigezo.**
+
+Uongozi wa TF unabaki kama ulivyokuwa v1, na kila TF ina kazi **moja**:
+
+| TF | kazi | inalisha |
+|---|---|---|
+| **D1** | macro bias — mwelekeo mkuu | regime |
+| **H4** | structural trend — uthibitisho | regime · event |
+| **H2** | filter regime — hali ya soko | regime |
+| **H1** | **UAMUZI WA KUINGIA — hapa pekee** | models ZOTE |
+| **M30** | uboreshaji wa setup | features |
+| **M15** | uthibitisho wa timing **ndani ya** muundo wa H1 | features |
+| **M5** | **RCE pekee** — spread, slippage, microstructure | RCE |
+
+**Sheria mbili zinazotokana nayo:**
+
+* **Uamuzi wa entry unafungwa H1.** M15 inathibitisha timing ndani ya muundo wa H1;
+  **haihamishi** uamuzi kwenda TF ndogo. Strategy inayodai kuingia M15 au M5
+  inakataliwa na generator, si kujadiliwa.
+* **M5 ni ya RCE, si ya KAIROS.** Kama RCE §0 inavyosema tayari.
+
+Sababu ya kiuchumi ipo kwenye jedwali hapo juu, na sasa ni ya kumbukumbu tu: M5
+ingekuwa na gharama **0.2815 ATR**, na edge ingehitaji kuwa **mara 4.7** ya
+tuliyoipima. TF ndogo hazikatazwi kwa ladha — hazivuki lango la §5.
 
 ---
 
@@ -385,8 +439,7 @@ src/
 
 Sitajenga chochote kabla ya haya.
 
-**U1 — Timeframe ya maamuzi.** Napendekeza **H1 na H4**, si M5, kwa sababu za §5.1
-(M5 ina gharama mara 3.46). Unakubali?
+**U1 imeamuliwa** — entries H1, TF za zamani (§5.2). Zilizobaki:
 
 **U2 — Ukubwa wa utafutaji wa kwanza.** Napendekeza **tuanze na strategies ~1,000**,
 si 100,000 — si kwa woga bali kwa sababu tunahitaji **kupima sakafu ya kelele

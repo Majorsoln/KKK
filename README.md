@@ -21,19 +21,14 @@
 ## MUUNDO
 ```
 engine/
-├── docs/RISK_COST_ENGINE.md       spec kamili (bajeti · gharama · lots · gate)
-├── docs/KAIROS_1_STANDARD.md      standard ya Idara 3 (models: S1–S6, EV madarasa 3, §5A pretraining)
-├── docs/DATA_FEATURE_STANDARD.md  mkataba wa data/features/labels (ticks, provenance, utafiti → uzalishaji)
-├── docs/RESEARCH_PLAN_R0.md       awamu R0–R9 + track P: kupima kila eneo, kuanzia data
-├── docs/DATA_SPLIT_PLAN.md        mgawanyo rasmi train/validation/holdout (2016–2026)
-├── docs/IMPLEMENTATION_PLAN.md    terms za utekelezaji (T0–T7) + rejista ya compliance + milango ya CI
-├── docs/SETUP.md                  runbook: kusimamisha mfumo kwenye server yoyote (+ production)
-├── docs/T0_REPORT.md              ripoti ya TERM T0 (tabaka la data L0)
+├── docs/RISK_COST_ENGINE.md       spec kamili (bajeti · gharama · lots · gate) — HAIGUSWI
+├── docs/DOCTRINE_V2.md            doctrine hai: injini ya kugundua strategy kiotomatiki
+├── docs/SETUP.md                  runbook: kusimamisha mfumo kwenye server yoyote
 ├── config/risk.yaml               vigezo VYOTE vya risk/cost (PD anahariri, hakuna code)
 ├── config/data.yaml               vigezo VYOTE vya data/features/utafiti + storage/recorder
-├── src/data/                      L0: recorder wa feed ya broker · normalization A/B · SHA256 + manifest
-├── src/rce/                       budget · cost · sizing · gate · engine (Track E)
 ├── config/broker_costs.yaml       commission round-turn + usiku za strategy (PD)
+├── src/data/                      L0–L3: recorder · normalization · bars · features · labels
+├── src/rce/                       budget · cost · sizing · gate · engine (Track E)
 ├── src/opm/                       (baadaye) open-position management
 └── tests/
 ```
