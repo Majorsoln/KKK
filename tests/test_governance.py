@@ -44,7 +44,7 @@ def _sign(ledger: Path, evidence: Path | None = None, **kwargs):
         "code_rev": "deadbee",
         "signer": PD,
         "ledger": ledger,
-        "plan": REPO / "docs" / "IMPLEMENTATION_PLAN.md",
+        "plan": REPO / sig.PLAN,
         "root": ledger.parent,
     }
     payload.update(kwargs)
@@ -58,7 +58,7 @@ def _sign(ledger: Path, evidence: Path | None = None, **kwargs):
 
 def test_rejista_inasomeka_kamili_kutoka_kwenye_mpango():
     """Familia zote nne. `K1-07` ina namba kwenye prefix — isirukwe kimya."""
-    ids = sig.register_ids(REPO / "docs" / "IMPLEMENTATION_PLAN.md")
+    ids = sig.register_ids(REPO / sig.PLAN)
     for expected in ("DF-05", "K1-07", "RCE-13", "RS-01", "DF-20", "RS-17"):
         assert expected in ids, f"{expected} haikusomeka kwenye rejista"
 
@@ -102,12 +102,12 @@ def test_sahihi_bila_sababu_inakataliwa(ledger, evidence):
 def test_ushahidi_ukibadilika_baada_ya_sahihi_uthibitisho_unafeli(ledger, evidence):
     """Hila ya kawaida zaidi: kusaini ripoti, kisha kuiandika upya."""
     _sign(ledger, evidence)
-    assert sig.verify(ledger=ledger, plan=REPO / "docs" / "IMPLEMENTATION_PLAN.md",
+    assert sig.verify(ledger=ledger, plan=REPO / sig.PLAN,
                       root=ledger.parent).ok
 
     evidence.write_text(json.dumps({"totals": {"partitions": 400, "failed": 0}}), encoding="utf-8")
     report = sig.verify(
-        ledger=ledger, plan=REPO / "docs" / "IMPLEMENTATION_PLAN.md", root=ledger.parent
+        ledger=ledger, plan=REPO / sig.PLAN, root=ledger.parent
     )
     assert not report.ok
     assert any("umebadilika baada ya kusainiwa" in p for p in report.problems)
@@ -115,7 +115,7 @@ def test_ushahidi_ukibadilika_baada_ya_sahihi_uthibitisho_unafeli(ledger, eviden
 
 def _verify(ledger):
     return sig.verify(
-        ledger=ledger, plan=REPO / "docs" / "IMPLEMENTATION_PLAN.md", root=ledger.parent
+        ledger=ledger, plan=REPO / sig.PLAN, root=ledger.parent
     )
 
 
@@ -173,7 +173,7 @@ def test_ushahidi_ukifutwa_uthibitisho_unafeli(ledger, evidence):
     _sign(ledger, evidence)
     evidence.unlink()
     report = sig.verify(
-        ledger=ledger, plan=REPO / "docs" / "IMPLEMENTATION_PLAN.md", root=ledger.parent
+        ledger=ledger, plan=REPO / sig.PLAN, root=ledger.parent
     )
     assert not report.ok and any("haupo tena" in p for p in report.problems)
 
@@ -201,7 +201,7 @@ def test_uamuzi_ukibadilika_unawekwa_mstari_mpya(ledger, evidence):
     assert [r.decision for r in rows] == ["REJECTED", "VERIFIED"]
 
     report = sig.verify(
-        ledger=ledger, plan=REPO / "docs" / "IMPLEMENTATION_PLAN.md", root=ledger.parent
+        ledger=ledger, plan=REPO / sig.PLAN, root=ledger.parent
     )
     assert report.verified_items == {"DF-05"}, "uamuzi wa mwisho ndio unaotawala"
 
@@ -210,7 +210,7 @@ def test_rejected_baada_ya_verified_inaondoa_hadhi(ledger, evidence):
     _sign(ledger, evidence, decision="VERIFIED", reason="ilionekana sawa")
     _sign(ledger, evidence, decision="REJECTED", reason="nimegundua kasoro")
     report = sig.verify(
-        ledger=ledger, plan=REPO / "docs" / "IMPLEMENTATION_PLAN.md", root=ledger.parent
+        ledger=ledger, plan=REPO / sig.PLAN, root=ledger.parent
     )
     assert report.verified_items == set()
 
@@ -218,14 +218,14 @@ def test_rejected_baada_ya_verified_inaondoa_hadhi(ledger, evidence):
 def test_mwenye_sahihi_lazima_awe_na_utambulisho_wa_git(ledger, evidence):
     _sign(ledger, evidence, signer="mtu fulani")
     report = sig.verify(
-        ledger=ledger, plan=REPO / "docs" / "IMPLEMENTATION_PLAN.md", root=ledger.parent
+        ledger=ledger, plan=REPO / sig.PLAN, root=ledger.parent
     )
     assert not report.ok and any("utambulisho wa git" in p for p in report.problems)
 
 
 def test_pending_inaonyesha_visivyosainiwa(ledger, evidence):
     _sign(ledger, evidence)
-    ids = sig.register_ids(REPO / "docs" / "IMPLEMENTATION_PLAN.md")
+    ids = sig.register_ids(REPO / sig.PLAN)
     waiting = sig.pending(ids, ledger=ledger)
     assert "DF-05" not in waiting and "DF-06" in waiting
 
@@ -239,7 +239,7 @@ def test_ledger_ya_repo_inapita_lango_g14():
     """Sahihi zilizowekwa kweli ni halali (ushahidi wa research hauko CI)."""
     report = sig.verify(
         ledger=REPO / sig.LEDGER,
-        plan=REPO / "docs" / "IMPLEMENTATION_PLAN.md",
+        plan=REPO / sig.PLAN,
         root=REPO,
         check_evidence=False,
     )
@@ -251,7 +251,7 @@ def test_mtekelezaji_hawezi_kujisainia_verified(ledger, evidence):
 
     Hii ndiyo kinga inayozuia mtekelezaji — au model — kujipandisha hadhi.
     """
-    plan = REPO / "docs" / "IMPLEMENTATION_PLAN.md"
+    plan = REPO / sig.PLAN
     assert sig.declared_pd(ledger) == PD
     _sign(ledger, evidence)
     assert sig.verify(ledger=ledger, plan=plan, root=ledger.parent).ok
@@ -292,7 +292,7 @@ def test_herufi_kubwa_za_jina_hazimzuii_pd(ledger, evidence):
     lilikataa sahihi ZOTE NNE. Kufelisha kwa herufi kubwa hakuzuii mtu asiye
     halali hata mmoja; kunazuia PD halali pekee.
     """
-    plan = REPO / "docs" / "IMPLEMENTATION_PLAN.md"
+    plan = REPO / sig.PLAN
     _sign(ledger, evidence, signer="pd <PD@ELITEFX.TEST>")
     report = sig.verify(ledger=ledger, plan=plan, root=ledger.parent)
     assert report.ok, report.problems
@@ -301,7 +301,7 @@ def test_herufi_kubwa_za_jina_hazimzuii_pd(ledger, evidence):
 
 def test_jina_tofauti_linaandikwa_lakini_halizuii(ledger, evidence):
     """Barua pepe ile ile, jina tofauti kabisa → inapita, lakini inaonekana."""
-    plan = REPO / "docs" / "IMPLEMENTATION_PLAN.md"
+    plan = REPO / sig.PLAN
     _sign(ledger, evidence, signer="J. Lemma <pd@elitefx.test>")
     report = sig.verify(ledger=ledger, plan=plan, root=ledger.parent)
     assert report.ok, report.problems
@@ -311,7 +311,7 @@ def test_jina_tofauti_linaandikwa_lakini_halizuii(ledger, evidence):
 
 def test_barua_pepe_tofauti_bado_inakataliwa(ledger, evidence):
     """Kulegeza jina KUSILEGEZE mamlaka — hii ndiyo kinga yenyewe."""
-    plan = REPO / "docs" / "IMPLEMENTATION_PLAN.md"
+    plan = REPO / sig.PLAN
     _sign(ledger, evidence, signer="PD <mwingine@elitefx.test>")
     report = sig.verify(ledger=ledger, plan=plan, root=ledger.parent)
     assert not report.ok and any("si PD" in p for p in report.problems)

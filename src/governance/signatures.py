@@ -48,7 +48,12 @@ DECISIONS: dict[str, str] = {
 
 HASH_PREFIX = 16          # herufi za hash zinazoandikwa kwenye jedwali
 LEDGER = Path("docs/SIGNATURES.md")
-PLAN = Path("docs/IMPLEMENTATION_PLAN.md")
+# Rejista ya vipengele (IDs) inaishi NDANI ya mpango wa v1. Doctrine ya v1
+# imehifadhiwa `docs/archive/v1/` (2026-08-18), lakini rejista yenyewe bado ni
+# HAI — ndiyo inayothibitisha kila kipengele kilichosainiwa tangu R0. Kwa hiyo
+# njia inafuata faili, si kinyume chake. `DOCTRINE_V2` itakapopata rejista yake,
+# hii itakuwa ya kihistoria; hadi hapo kuivunja kungefuta ukaguzi wote uliopita.
+PLAN = Path("docs/archive/v1/IMPLEMENTATION_PLAN.md")
 
 _ROW = re.compile(r"^\|\s*(\d+)\s*\|")
 _PD_LINE = re.compile(r"^\*\*PD:\*\*\s*`([^`]+)`", re.MULTILINE)
