@@ -22,7 +22,7 @@
 ```
 engine/
 ├── docs/RISK_COST_ENGINE.md       spec kamili (bajeti · gharama · lots · gate) — HAIGUSWI
-├── docs/DOCTRINE_V2.md            doctrine hai: injini ya kugundua strategy kiotomatiki
+├── docs/DOCTRINE.md                doctrine: injini ya kugundua strategy kiotomatiki
 ├── docs/SETUP.md                  runbook: kusimamisha mfumo kwenye server yoyote
 ├── config/risk.yaml               vigezo VYOTE vya risk/cost (PD anahariri, hakuna code)
 ├── config/data.yaml               vigezo VYOTE vya data/features/utafiti + storage/recorder

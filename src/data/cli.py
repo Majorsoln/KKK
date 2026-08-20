@@ -1436,9 +1436,8 @@ def cmd_build_labels(args: argparse.Namespace) -> int:
     from .manifest import code_rev
     from .splits import SplitPlan
 
-    # Rejista ya sahihi imefutwa (agizo la PD 2026-08-18, DOCTRINE v2 §0).
-    # Ulinzi wa pre-registration sasa ni faili la ushahidi lenye tarehe, si
-    # jedwali la sahihi — tazama DOCTRINE_V2 §6 (sakafu ya kelele) na K6.
+    # Ulinzi wa pre-registration ni faili la ushahidi lenye tarehe, si jedwali
+    # la sahihi — DOCTRINE §16 (holdout) na §9 (sakafu ya kelele).
 
     symbols = _symbol_list(args) or cfg.symbols
     holdout_start = SplitPlan.from_config(cfg).holdout_start
