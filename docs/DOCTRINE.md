@@ -62,7 +62,9 @@ kusahau tulichokiona.
 ## 3. Mtiririko kamili
 
 ```
-                    pairs · 2016–2024
+     Research universe : 2016-04  →  2026-04
+     Discovery/training: 2016     →  2023
+     HOLDOUT (§16)     : 2024-04  →  2026-04   ← haiguswi hadi mwisho
                            │
                   ┌────────▼────────┐
                   │ Data Quality &  │  §4 — kila mara, si mara moja
@@ -116,7 +118,7 @@ kusahau tulichokiona.
 ### 4.1 Ingizo — ticks za bid/ask, si OHLC
 
 ```
-   RAW TICKS  2016–2024
+   RAW TICKS  2016-04 → 2026-04
    ├── timestamp   (UTC, µs)
    ├── bid
    └── ask
@@ -232,46 +234,77 @@ Kanuni ya §5 inatumika hapa bila upole.
 
 ---
 
-## 8. LANGO LA UCHUMI — linapimwa, halidhaniwi
+## 8. GHARAMA — ufafanuzi MMOJA, matumizi mawili
 
-### 8.1 Kanuni
+### 8.1 Ufafanuzi mmoja
 
-Gharama ya kuingia na kutoka ni **thabiti kwa kila trade** — spread ya round-trip
-pamoja na commission. Haibadiliki trade ikiwa kubwa au ndogo.
-
-Kwa hiyo:
-
-> **Tatizo kamwe si trades za bei ghali. Ni trades ndogo mno.**
-
-Strategy inayoshinda kidogo kuliko gharama inapoteza haijalishi ina trades ngapi, na
-haijalishi asilimia yake ya kushinda ni kubwa kiasi gani.
-
-### 8.2 Calibration A — injini inapima gharama yake yenyewe
-
-Kabla ya strategy yoyote:
+Mfumo mzima una **dhana moja** ya gharama. Haigawanyiki kwa hati.
 
 ```
-kwa kila pair, kwa kila TF:
-    cost_ATR = (spread_ya_round_trip + commission) ÷ ATR
+REALIZED_TRADING_COST
+├── ENTRY_COST    = nusu ya spread wakati wa kuingia  + slippage ya kuingia
+├── EXIT_COST     = nusu ya spread wakati wa kutoka   + slippage ya kutoka
+└── HOLDING_COST  = swap × idadi ya usiku
+                  + commission (round-turn)
 ```
 
-Spread inatoka kwenye **ticks halisi wakati wa kuingia**, si kwa wastani wa broker.
-Commission inatoka **RCE** (§18), si kwa kudhania.
+`total_expected_cost = ENTRY + EXIT + HOLDING`.
 
-Tokeo ni jedwali la gharama kwa kila `(pair, TF)`. Ndilo linalofungua au kufunga
-mlango, na linahifadhiwa kama ushahidi wenye tarehe.
+**Chanzo ni kimoja:** ticks za bid/ask (§4) kwa spread na slippage; **RCE** (§18) kwa
+commission na swap. Doctrine haikadirii commission wala swap, na RCE haikadirii
+spread ya kihistoria.
 
-### 8.3 Lango
+### 8.2 Matumizi mawili ya chanzo kile kile
 
-> **Candidate yoyote yenye `gross edge kwa trade < 2 × gharama kwa trade` inakataliwa
-> kabla ya takwimu yoyote kuhesabiwa.**
+Hapa ndipo ilipokuwa hatari ya kujidanganya, kwa hiyo imeandikwa wazi:
 
-`2×` na si `1×` kwa sababu `1×` inadai makadirio ya gharama yawe sahihi kabisa.
-`2×` inaacha nafasi ya slippage, kuzorota kwa spread, na makosa ya utekelezaji.
+| | `research_cost` | `live_sizing_cost` |
+|---|---|---|
+| ni nini | gharama **halisi** iliyotokea kwenye tick ile ile | **makadirio ya kihafidhina** ya mbele |
+| spread | tick halisi wakati wa kuingia | `max(spread_H1_baseline, p95(spread_M5))` |
+| slippage | iliyopimwa, ikiwa ndani ya cap | cap iliyowekwa na RCE |
+| inatumika | backtest, lango la §8.4, `net_return` | ukubwa wa lots (RCE) |
+| inamiliki | Doctrine | RCE |
 
-Lango hili linaendeshwa kwanza kwa sababu ni **la bei nafuu**: linakata sehemu kubwa
-ya wagombea kwa hesabu ya mstari mmoja, kabla ya backtest yoyote. Hilo linapunguza
-idadi ya majaribio — ambayo ndiyo inayotawala §9.
+> **`research_cost ≠ live_sizing_cost`, na si kosa.** Moja ni **kilichotokea**,
+> nyingine ni **kadirio la kihafidhina la kitakachotokea**. Zote zinatoka kwenye data
+> ile ile ya msingi.
+
+Kudai kwamba backtest na live zina gharama ile ile kungekuwa uongo unaojionyesha kama
+faida. **`live_sizing_cost ≥ research_cost` daima**; ikiwa si hivyo kwa `(pair, TF)`
+yoyote, calibration imevunjika na injini inasimama.
+
+### 8.3 Calibration A — injini inapima gharama yake yenyewe
+
+Kabla ya strategy yoyote, kwa kila `(pair, TF)`:
+
+```
+research_cost_ATR    = (ENTRY + EXIT + HOLDING) ÷ ATR      ← ticks halisi
+live_sizing_cost_ATR = RCE spread_effective + cap + comm   ← kihafidhina
+```
+
+Tokeo ni jedwali lenye safu **zote mbili**, pamoja na ukaguzi wa
+`live ≥ research`. Linahifadhiwa kama ushahidi wenye tarehe (R5).
+
+### 8.4 Lango — ni chujio la kiuchumi, si uthibitisho
+
+> **Candidate yenye `gross edge kwa trade < 2 × research_cost` inakataliwa kabla ya
+> takwimu yoyote kuhesabiwa.**
+
+Sababu ya lango: gharama ni **thabiti kwa kila trade** — haibadiliki trade ikiwa
+kubwa au ndogo. Kwa hiyo tatizo kamwe si trades za bei ghali; ni **trades ndogo mno**.
+
+`2×` na si `1×` kwa sababu `1×` inadai makadirio yawe sahihi kabisa. `2×` inaacha
+nafasi ya slippage, kuzorota kwa spread, na makosa ya utekelezaji.
+
+**Lakini `2×` si ukweli wa kitakwimu, na haipitishi chochote.** Candidate yenye
+`1.9×` inaweza kuwa ya kweli; yenye `3×` inaweza kuwa kelele. Lango hili ni la bei
+nafuu na linakata wagombea wengi kwa hesabu ya mstari mmoja — thamani yake ni
+**kupunguza idadi ya majaribio**, ambayo ndiyo inayotawala §9. Uamuzi unabaki hapa:
+
+```
+2 × cost  →  backtest  →  validation  →  sakafu ya kelele  →  UAMUZI
+```
 
 ---
 
@@ -313,13 +346,44 @@ robustness, walk-forward, CPCV — juu ya DATA BANDIA isiyo na edge.
 Data bandia inahifadhi tabia za kitakwimu za data halisi (volatility clustering,
 mgawanyo wa returns, muundo wa spread) lakini **haina uhusiano wowote wa kutabirika**.
 
+**Familia MOJA ya null haitoshi.** Sakafu inayotokana na generator moja ya data bandia
+ni sehemu **tabia ya soko** na sehemu **tabia ya generator** — na hatuwezi kutofautisha
+mbili hizo kwa kuangalia. Kwa hiyo Calibration B inaendeshwa kwa familia **tatu**
+zisizohusiana:
+
+| familia | inahifadhi nini | inavunja nini |
+|---|---|---|
+| **A · block resample** | autocorrelation ya ndani ya block | uhusiano kati ya blocks |
+| **B · regime-preserving shuffle** | urefu na mpangilio wa regimes | mfuatano ndani ya regime |
+| **C · return surrogate** | mgawanyo na wigo wa returns | awamu (phase) yote |
+
+```
+noise_floor = max(p95_A, p95_B, p95_C)
+```
+
+**`max`, si wastani.** Familia yoyote ikitoa sakafu ya juu, hiyo ndiyo inayotumika —
+kwa sababu tofauti kati yao ni kipimo cha kutokuwa na uhakika kwetu wenyewe, na
+kutokuwa na uhakika hakupunguzi bar.
+
 Kile ambacho injini "inagundua" pale ndiyo **sakafu**. Kizingiti cha strategy halisi ni
-p95 ya sakafu ile — si 50%, si 85%, si namba yoyote iliyochaguliwa na binadamu.
+sakafu ile — si 50%, si 85%, si namba yoyote iliyochaguliwa na binadamu.
 
 ### 9.3 Sheria tatu
 
 **S1** — `variants_tested` inahesabiwa daima, ikiwemo waliokufa mapema, na inaingia
 kwenye kila ripoti.
+
+Si namba inayotolewa na generator (`len(walionusurika)` si hesabu — ni matokeo).
+Ni **ledger ya matukio isiyofutika**, row moja kwa kila candidate iliyowahi kuzalishwa:
+
+```
+candidate_id · generation · parent_ids · variant_hash
+tested_at · stage_reached · reject_reason
+```
+
+Ili swali hili lijibike kwa ushahidi, si kwa kumbukumbu:
+
+> *"Strategy hii ilichaguliwa baada ya kujaribu variants ngapi?"*
 
 **S2** — kizingiti kinatoka Calibration B pekee.
 
@@ -380,22 +444,77 @@ Vizazi vinavyofuata (mutation, recombination) vinaruhusiwa **chini ya bajeti ya
 
 ## 11. Backtest Engine
 
-Kwa kila trade, rekodi hii kamili — si muhtasari:
+### 11.1 Utekelezaji una matokeo MAWILI, si moja
+
+Signal si trade. Kati yao kuna utekelezaji, na unaweza kushindwa:
 
 ```
-entry_time · entry_price · direction · SL · TP
+signal  →  bei iliyoombwa  →  soko limehama  →  slippage > cap  →  HAKUNA FILL
+signal  →  bei iliyoombwa  →  ndani ya cap   →  FILL kwa bei halisi
+```
+
+RCE inaweka cap ya slippage, na order inayozidi cap **haijazwi** (§18). Kwa hiyo
+backtest lazima iwe na matokeo **mawili**:
+
+```
+FILL     →  trade ipo, na ina gharama halisi
+NO_FILL  →  trade HAIPO. Si hasara; si faida. Haijatokea.
+```
+
+**Kwa nini hii si ya hiari.** Backtest ikidhani kila signal inajazwa wakati live
+inakataa asilimia 30, basi:
+
+* research inahesabu trades ambazo hazingetokea kamwe
+* na — mbaya zaidi — zilizokataliwa **si sampuli ya nasibu**. Zinakataliwa pale bei
+  ilipohama haraka, ambako ndiko trades bora **na** mbaya zaidi zinapoishi
+
+Pengo la research-dhidi-ya-live linarudi kwa mlango huu, likiwa limejificha ndani ya
+namba inayoonekana sahihi.
+
+### 11.2 Rekodi kwa kila **jaribio**, si kwa kila trade
+
+```
+signal_time · requested_price · direction
+execution_outcome ∈ {FILL, NO_FILL}
+reject_reason                        (kwa NO_FILL)
+
+...ikiwa FILL:
+entry_time · entry_price · SL · TP
 exit_time · exit_price · exit_reason
-gross_return · spread · slippage · net_return
+gross_return · entry_cost · exit_cost · holding_cost · net_return
 MFE · MAE · holding_time
 ```
 
 `MFE` (Maximum Favorable Excursion) na `MAE` (Maximum Adverse Excursion) ni za lazima:
-ndizo pekee zinazoweza kujibu maswali ya kutoka baadaye, na haziwezi kurudishwa
-baada ya backtest kuisha.
+ndizo pekee zinazoweza kujibu maswali ya kutoka baadaye, na haziwezi kurudishwa baada
+ya backtest kuisha.
 
-**Uhakiki uliojengwa ndani:** kila namba muhimu inayotoka kwenye engine lazima ifikiwe
-kwa **njia mbili zinazojitegemea**, na tofauti yake ichapishwe. Mfano: return ya bar
-`t+24` inayohesabiwa kutoka bars lazima ilingane na ile inayohesabiwa kutoka ticks.
+Gharama zimegawanywa kwa `ENTRY / EXIT / HOLDING` kama §8.1 — si namba moja ya
+jumla, kwa sababu jumla haiwezi kukaguliwa dhidi ya RCE.
+
+### 11.3 `fill_rate` ni kipimo cha validation
+
+```
+fill_rate = orders zilizojazwa ÷ orders zilizoombwa
+```
+
+Strategy yenye `Sharpe 1.8` na `PF 1.7` **lakini** `fill_rate 61%` wakati backtest
+ilidhani 100% **si strategy ile ile**. Kwa hiyo `fill_rate` haiishi kwenye dashboard;
+inaishi kwenye ripoti ya mwisho ya kila candidate, pamoja na:
+
+```
+research_fill_rate · OOS_fill_rate · live_fill_rate · fill_rate_gap
+```
+
+Candidate ambayo `OOS_fill_rate` yake iko chini sana ya ya research inakataliwa kwa
+sababu ile ile ambayo strategy isiyo thabiti inakataliwa: **haifanyi kile
+kilichopimwa.**
+
+### 11.4 Uhakiki uliojengwa ndani
+
+Kila namba muhimu inayotoka kwenye engine lazima ifikiwe kwa **njia mbili
+zinazojitegemea**, na tofauti yake ichapishwe. Mfano: return ya bar `t+24`
+inayohesabiwa kutoka bars lazima ilingane na ile inayohesabiwa kutoka ticks.
 Zisipolingana, moja ina kasoro — na tofauti yenyewe inaeleza ipi.
 
 ---
@@ -504,8 +623,24 @@ Targets nyingi zinafanya model ijifunze **tabia ya soko**, si tokeo la binary pe
 ### 15.1 `NO TRADE` ni darasa, si kizingiti
 
 Model inatoa `P(BUY)` · `P(SELL)` · `P(NO_TRADE)`. Kutokutrade ni **uamuzi**
-unaojifunzwa, si sheria iliyoongezwa juu ya model. Ndiyo namna sahihi ya kutekeleza
-veto.
+unaojifunzwa, si sheria iliyoongezwa juu ya model.
+
+### 15.2 Aina TATU za kutokutrade — hazichanganywi kamwe
+
+Trade isipotokea, sababu ni mojawapo ya tatu, na zina maana tofauti kabisa:
+
+| tokeo | nani anaamua | maana |
+|---|---|---|
+| `MODEL_NO_TRADE` | model | *"Sioni edge hapa."* |
+| `RCE_REJECT` | RCE (§18) | *"Edge inaweza kuwepo, lakini hairuhusiwi kutekelezwa."* |
+| `EXECUTION_NO_FILL` | soko (§11.1) | *"Iliruhusiwa, lakini bei ilihama zaidi ya cap."* |
+
+Zote tatu zinaandikwa kwenye ledger moja, zikiwa **zimetenganishwa**. Zikichanganywa
+kuwa "hakuna trade", diagnostics inakufa: hutajua kama tatizo ni model isiyoona,
+utawala unaobana, au utekelezaji unaoshindwa — na matibabu ya matatu ni tofauti
+kabisa.
+
+Uwiano wa tatu hizi ni **kipimo cha afya ya mfumo**, kinachoripotiwa kila run.
 
 ---
 
@@ -567,6 +702,35 @@ Namba ya gharama inayotumika kwenye lango la §8 na ile inayotumika kwenye sizin
 `docs/RISK_COST_ENGINE.md` na `config/risk.yaml` haziko chini ya hati hii na
 hazibadilishwi nayo.
 
+### 18.1 Madai dhidi ya RCE yanahakikiwa kwa hesabu, si kwa kukubaliwa
+
+Mapitio ya nje (2026-08-18) yalidai kuwa jedwali la bajeti la RCE linapingana na
+formula yake:
+
+> *"base 400, DD 200, penalty 100, today_loss 150 → budget inapaswa kuwa 150,
+> lakini jedwali linaonyesha 75."*
+
+**Dai hilo si sahihi, na RCE haikubadilishwa.** Safu ya tatu ya jedwali ina
+`current_balance` ya **9,650**, si 9,800 — kwa sababu hasara ya leo ya −$150
+**imeshaingia kwenye salio**. Kwa hiyo DD ni 350, si 200, na `penalty = 0.5 × 350 =
+175`:
+
+| hali | salio | DD | penalty | budget | risk/trade |
+|---|---|---|---|---|---|
+| siku ya kwanza | 10,000 | 0 | 0 | 400 | 57.14 |
+| baada ya DD −200 | 9,800 | 200 | 100 | 300 | 42.86 |
+| leo tayari −150 | **9,650** | **350** | **175** | **75** | 10.71 |
+| leo +100 baada ya hapo | 9,750 | 250 | 125 | 175 | 25.00 |
+
+Safu zote nne zinajirudia kwa usahihi kutoka `config/risk.yaml`
+(`penalty_factor 0.50`, `win_factor 0.50`, `loss_factor 1.00`, `max_open_trades 7`).
+**Formula na mifano vinaendana.**
+
+Kilichoandikwa hapa si utetezi wa RCE bali **kumbukumbu**: dai lililokataliwa
+linaandikwa pamoja na hesabu iliyolikataa, ili lisirudi baadaye na kusababisha mtu
+"kurekebisha" kitu kisicho na kasoro. Kubadilisha RCE kwa msingi wa mapitio yenye
+kosa la kusoma kungeharibu sehemu pekee ya mfumo iliyothibitishwa.
+
 ---
 
 ## 19. Sheria zisizovunjika
@@ -579,7 +743,7 @@ Zifuatazo ni malango, si mapendekezo. Kila moja inaweza kupimwa kwa test.
 | **R2** | Strategy ni entry **na** exit. Exit haitafutwi baada ya kuona matokeo. |
 | **R3** | Candidate yenye `gross < 2 × gharama` inakataliwa kabla ya takwimu. |
 | **R4** | Kizingiti chochote kinatoka kwenye sakafu iliyopimwa, si kwenye maoni. |
-| **R5** | **Generator haifunguki** kabla Calibration A na B (§8.2, §9.2) hazijakamilika na kuhifadhiwa kama ushahidi wenye tarehe. |
+| **R5** | **Generator haifunguki** kabla Calibration A na B (§8.3, §9.2) hazijakamilika na kuhifadhiwa kama ushahidi wenye tarehe. |
 | **R6** | `variants_tested` inahesabiwa daima na inaingia kwenye kila ripoti. |
 | **R7** | Kila namba muhimu inafikiwa kwa njia mbili; tofauti inachapishwa. |
 | **R8** | Uthabiti unapimwa kwa **miezi**, si miaka. |
@@ -587,7 +751,11 @@ Zifuatazo ni malango, si mapendekezo. Kila moja inaweza kupimwa kwa test.
 | **R10** | Output ya model inayolisha model nyingine ni out-of-fold. |
 | **R11** | Entry inafungwa **H1**. |
 | **R12** | RCE ndiyo mamlaka ya gharama na ukubwa. Haibadilishwi na hati hii. |
-| **R13** | Hakuna amri inayoendesha kimya. Kila hatua inachapisha maendeleo. |
+| **R13** | Backtest ina matokeo mawili: `FILL` na `NO_FILL`. Signal si trade. |
+| **R14** | `MODEL_NO_TRADE`, `RCE_REJECT`, `EXECUTION_NO_FILL` haziunganishwi. |
+| **R15** | Sakafu inatoka familia **tatu** za null; inayotumika ni `max`. |
+| **R16** | `research_cost` na `live_sizing_cost` ni tofauti, zinatoka chanzo kimoja, na `live ≥ research` daima. |
+| **R17** | Hakuna amri inayoendesha kimya. Kila hatua inachapisha maendeleo. |
 
 ---
 
