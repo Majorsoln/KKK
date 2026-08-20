@@ -1,4 +1,4 @@
-"""Mzizi wa pytest — inahakikisha `import src.data...` inafanya kazi popote."""
+"""Mzizi wa pytest — inahakikisha `import src.rce...` inafanya kazi popote."""
 
 import sys
 from pathlib import Path

@@ -5,20 +5,19 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "elitefx-engine"
 version = "0.1.0"
-description = "ELITEFX engine — tabaka la data (T0) + RCE (Track E)"
+description = "ELITEFX — Risk & Cost Engine"
 requires-python = ">=3.11"
+# RCE inahitaji YAML pekee. Dependencies za injini ya kugundua strategy
+# zitaongezwa pale itakapojengwa (DOCTRINE §20), si kabla.
 dependencies = [
-    "pandas>=2.0",
-    "pyarrow>=14.0",
     "PyYAML>=6.0",
 ]
 
 [project.optional-dependencies]
 dev = ["pytest>=8.0"]
-mt5 = ["MetaTrader5>=5.0.45"]   # Windows pekee — recorder ya live
 
 [tool.setuptools]
-packages = ["src", "src.data", "src.rce", "src.governance"]
+packages = ["src", "src.rce"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
