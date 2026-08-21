@@ -222,15 +222,24 @@ inayoripoti volume ya kweli ya spot FX. Kwa hiyo:
 
 Kila pair, kila mwaka, inapita ukaguzi ufuatao **kila inapopakiwa**, si mara moja:
 
-| ukaguzi | kigezo |
-|---|---|
-| mpangilio | timestamps zinapanda, hakuna kurudi nyuma |
-| duplicates | hakuna tick mbili zenye muda na bei ile ile |
-| mapengo | kila pengo linaelezwa na kalenda ya soko, si kudhaniwa |
-| timezone | UTC pekee, kila mahali |
-| wikendi | kanuni moja, iliyoandikwa, inayotumika kwa pairs zote |
-| OHLC | `low ≤ open, close ≤ high` kwa kila bar |
-| **ya baadaye** | **hakuna thamani ya bar `t+k` inayoonekana kwenye row ya `t`** |
+| ukaguzi | kigezo | daraja |
+|---|---|---|
+| timezone | UTC pekee, kila mahali | FATAL |
+| mpangilio | timestamps zinapanda, hakuna kurudi nyuma | FATAL |
+| duplicates | hakuna tick mbili zenye muda **na** bei zile zile | FATAL |
+| **quotes zilizovuka** | **`bid ≤ ask` kila tick** | **FATAL** |
+| bei halali | zote ni chanya, zenye ukomo | FATAL |
+| mpaka wa dirisha | kila tick iko ndani ya dirisha lililotangazwa (§16.1) | FATAL |
+| OHLC | `low ≤ open, close ≤ high` kwa kila bar | FATAL |
+| **ya baadaye** | **hakuna thamani ya bar `t+k` inayoonekana kwenye row ya `t`** | FATAL |
+| mapengo | pengo linalozidi ukimya wa wikendi haliwezi kudhaniwa | WARN |
+| wikendi | hakuna tick ya Jumamosi — dalili ya timezone ya chanzo | WARN |
+| spread kubwa | ikizidi kikomo kilichotolewa | WARN |
+
+**`bid ≤ ask` ni FATAL kwa sababu ya kiuchumi, si ya kiufundi.** `bid > ask`
+inatoa spread **hasi**, ambayo inatoa gharama **hasi** — pesa ya bure kwenye
+kila trade inayoigusa. Ni aina hatari zaidi ya data mbovu kwa sababu
+**haijionyeshi kama kosa kwenye matokeo; inajionyesha kama edge.**
 
 Ukaguzi wa mwisho ndio pekee usio na msamaha: **ukishindwa, kila namba inayofuata ni ya
 uongo,** na haitajionyesha kwenye matokeo kama kosa — itajionyesha kama faida.
