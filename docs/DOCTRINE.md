@@ -21,8 +21,21 @@ Si signal generator. Si model moja inayotabiri bei. Ni mfumo wa hatua tatu:
 | **KUPIMA** | kila moja inaingiza pips ngapi kwa mwezi, baada ya gharama zote? | rekodi kwa kila (strategy × pair) |
 | **KUGAWA** | ipi inapewa kipaumbele, ipi inazuiwa? | uzito, au veto |
 
-**Kipimo cha mwisho ni kimoja:** *pips net kwa mwezi, na sehemu ya miezi yenye faida.*
-Kila kipimo kingine ni cha ndani.
+### 1.1 Vipimo vina madaraja MANNE, na havichanganywi
+
+Kila metric ina kazi **moja**. Metric ikitumika kwa kazi mbili, mojawapo itakuwa
+inadanganya.
+
+| daraja | vipimo | kazi |
+|---|---|---|
+| **PRIMARY OUTCOME** | `net_pips_month` · `profitable_month_fraction` | ndicho tunachokitafuta. Ndicho kinachoripotiwa nje. |
+| **GATE** | metric yoyote yenye `noise_floor[metric]` (§9.2) | inapitisha au inakataa. Hakuna kingine kinachopitisha. |
+| **RANKING** | `fitness` (§13) | inapanga walionusurika kwa kuangaliwa kwanza. **Haipitishi.** |
+| **DIAGNOSTIC** | `expectancy` · `PF` · `Sharpe` · `DD` · `MFE` · `MAE` · `fill_rate` · `stability` | inaeleza **kwa nini**. Haipitishi wala haipangi. |
+
+**Sheria:** metric isiyokuwa na `noise_floor` yake **haiwezi kuwa lango**. Inaweza kuwa
+diagnostic pekee. Hilo linazuia kile kinachotokea kwa urahisi zaidi kuliko kitu
+kingine chochote: kupima kwa kipimo kimoja na kuhukumu kwa kingine.
 
 ---
 
@@ -63,7 +76,7 @@ kusahau tulichokiona.
 
 ```
      Research universe : 2016-04  →  2026-04
-     Discovery/training: 2016     →  2023
+     Discovery/training: 2016-04  →  2024-03
      HOLDOUT (§16)     : 2024-04  →  2026-04   ← haiguswi hadi mwisho
                            │
                   ┌────────▼────────┐
@@ -242,13 +255,20 @@ Mfumo mzima una **dhana moja** ya gharama. Haigawanyiki kwa hati.
 
 ```
 REALIZED_TRADING_COST
-├── ENTRY_COST    = nusu ya spread wakati wa kuingia  + slippage ya kuingia
-├── EXIT_COST     = nusu ya spread wakati wa kutoka   + slippage ya kutoka
+├── ENTRY_COST    = nusu ya spread (kuingia) + slippage (kuingia) + nusu ya commission
+├── EXIT_COST     = nusu ya spread (kutoka)  + slippage (kutoka)  + nusu ya commission
 └── HOLDING_COST  = swap × idadi ya usiku
-                  + commission (round-turn)
 ```
 
 `total_expected_cost = ENTRY + EXIT + HOLDING`.
+
+**Commission iko ENTRY/EXIT, si HOLDING.** Inalipwa kwa **muamala**, si kwa muda —
+trade ya saa moja na ya wiki mbili zinalipa commission ile ile. Kuiweka HOLDING
+kungefanya strategy za muda mfupi zionekane ghali kuliko zilivyo, na ndefu nafuu
+kuliko zilivyo.
+
+`config/risk.yaml` ina `commission_side: "round_turn"` — thamani ya `broker_costs.yaml`
+ni ya **pande MBILI**. Kwa hiyo inagawanywa nusu kwa nusu hapa, **haitozwi mara mbili**.
 
 **Chanzo ni kimoja:** ticks za bid/ask (§4) kwa spread na slippage; **RCE** (§18) kwa
 commission na swap. Doctrine haikadirii commission wala swap, na RCE haikadirii
@@ -358,8 +378,24 @@ zisizohusiana:
 | **C · return surrogate** | mgawanyo na wigo wa returns | awamu (phase) yote |
 
 ```
-noise_floor = max(p95_A, p95_B, p95_C)
+noise_floor[metric] = max( p95_A[metric], p95_B[metric], p95_C[metric] )
 ```
+
+**Sakafu ni kwa kila METRIC, si namba moja.** Sakafu ya `Sharpe` haiwezi kuhukumu
+`net pips/mwezi` — ni vipimo tofauti vyenye mgawanyo tofauti chini ya null ile ile.
+Kila lango linapima metric yake dhidi ya sakafu yake:
+
+```
+noise_floor.net_pips_month
+noise_floor.profitable_month_fraction
+noise_floor.sharpe
+noise_floor.profit_factor
+noise_floor.max_drawdown          ← hapa ni p5, si p95 (ndogo ni bora)
+noise_floor.fill_rate
+```
+
+Kila run ya Calibration B inatoa **jedwali**, si namba. Metric isiyokuwa na sakafu
+yake **haiwezi kuwa lango** — inaweza kuwa diagnostic pekee (§13).
 
 **`max`, si wastani.** Familia yoyote ikitoa sakafu ya juu, hiyo ndiyo inayotumika —
 kwa sababu tofauti kati yao ni kipimo cha kutokuwa na uhakika kwetu wenyewe, na
@@ -525,17 +561,21 @@ Zisipolingana, moja ina kasoro — na tofauti yenyewe inaeleza ipi.
 
 | hatua | kipindi | kazi |
 |---|---|---|
-| A | 2016–2020 | screening ya bei nafuu — kata wengi |
-| B | 2016–2021 | |
-| C | 2016–2022 | |
-| D | 2016–2023 | walionusurika pekee |
+| A | 2016-04 → 2020-12 | screening ya bei nafuu — kata wengi |
+| B | 2016-04 → 2021-12 | |
+| C | 2016-04 → 2022-12 | |
+| D | 2016-04 → **2024-03** | walionusurika pekee |
 
 **Walk-forward** juu ya walionusurika:
 
 ```
-2016–2019 → 2020        2016–2021 → 2022
-2016–2020 → 2021        2016–2022 → 2023
+2016-04 → 2019-12  →  2020        2016-04 → 2021-12  →  2022
+2016-04 → 2020-12  →  2021        2016-04 → 2022-12  →  2023-01 → 2024-03
 ```
+
+**Hakuna pengo.** Kila mwezi kati ya 2016-04 na 2024-03 uko ndani ya train au test ya
+walk-forward; kila mwezi kuanzia 2024-04 uko ndani ya holdout. Miezi ya 2024-01 →
+2024-03 ni sehemu ya dirisha la mwisho la test, si eneo lisilo na mwenyewe.
 
 **Purging na embargo** ni ya lazima pale label ina horizon ya baadaye: sample ya
 training inayogusa kipindi cha test inaondolewa (purge), na buffer inaachwa baada ya
@@ -648,7 +688,7 @@ Uwiano wa tatu hizi ni **kipimo cha afya ya mfumo**, kinachoripotiwa kila run.
 
 | kipindi | matumizi |
 |---|---|
-| 2016 – 2023 | kugundua · kufundisha · kuthibitisha |
+| **2016-04 → 2024-03** | kugundua · kufundisha · kuthibitisha |
 | **2024-04 → 2026-04** | **HOLDOUT — haijaguswa, inaguswa MARA MOJA** |
 | 2026+ | forward / paper validation |
 
