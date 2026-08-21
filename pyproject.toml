@@ -5,19 +5,21 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "elitefx-engine"
 version = "0.1.0"
-description = "ELITEFX — Risk & Cost Engine"
+description = "ELITEFX — Risk & Cost Engine + injini ya kugundua strategy"
 requires-python = ">=3.11"
-# RCE inahitaji YAML pekee. Dependencies za injini ya kugundua strategy
-# zitaongezwa pale itakapojengwa (DOCTRINE §20), si kabla.
+# RCE inahitaji YAML pekee; tabaka la data linahitaji pandas/pyarrow kwa ticks.
+# Dependencies za models zitaongezwa pale zitakapojengwa (DOCTRINE §20).
 dependencies = [
     "PyYAML>=6.0",
+    "pandas>=2.0",
+    "pyarrow>=14.0",
 ]
 
 [project.optional-dependencies]
 dev = ["pytest>=8.0"]
 
 [tool.setuptools]
-packages = ["src", "src.rce"]
+packages = ["src", "src.rce", "src.data"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

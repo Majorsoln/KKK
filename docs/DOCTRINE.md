@@ -119,8 +119,8 @@ kusahau tulichokiona.
 ## 3. Mtiririko kamili
 
 ```
-     Research universe : 2016-04  →  2026-04
-     Discovery/training: 2016-04  →  2024-03
+     Research universe : 2016-01  →  2026-04
+     Discovery/training: 2016-01  →  2024-03
      HOLDOUT (§16)     : 2024-04  →  2026-04   ← haiguswi hadi mwisho
                            │
                   ┌────────▼────────┐
@@ -175,7 +175,7 @@ kusahau tulichokiona.
 ### 4.1 Ingizo — ticks za bid/ask, si OHLC
 
 ```
-   RAW TICKS  2016-04 → 2026-04
+   RAW TICKS  2016-01 → 2026-04
    ├── timestamp   (UTC, µs)
    ├── bid
    └── ask
@@ -699,19 +699,19 @@ Zisipolingana, moja ina kasoro — na tofauti yenyewe inaeleza ipi.
 
 | hatua | kipindi | kazi |
 |---|---|---|
-| A | 2016-04 → 2020-12 | screening ya bei nafuu — kata wengi |
-| B | 2016-04 → 2021-12 | |
-| C | 2016-04 → 2022-12 | |
-| D | 2016-04 → **2024-03** | walionusurika pekee |
+| A | 2016-01 → 2020-12 | screening ya bei nafuu — kata wengi |
+| B | 2016-01 → 2021-12 | |
+| C | 2016-01 → 2022-12 | |
+| D | 2016-01 → **2024-03** | walionusurika pekee |
 
 **Walk-forward** juu ya walionusurika:
 
 ```
-2016-04 → 2019-12  →  2020        2016-04 → 2021-12  →  2022
-2016-04 → 2020-12  →  2021        2016-04 → 2022-12  →  2023-01 → 2024-03
+2016-01 → 2019-12  →  2020        2016-01 → 2021-12  →  2022
+2016-01 → 2020-12  →  2021        2016-01 → 2022-12  →  2023-01 → 2024-03
 ```
 
-**Hakuna pengo.** Kila mwezi kati ya 2016-04 na 2024-03 uko ndani ya train au test ya
+**Hakuna pengo.** Kila mwezi kati ya 2016-01 na 2024-03 uko ndani ya train au test ya
 walk-forward; kila mwezi kuanzia 2024-04 uko ndani ya holdout. Miezi ya 2024-01 →
 2024-03 ni sehemu ya dirisha la mwisho la test, si eneo lisilo na mwenyewe.
 
@@ -826,14 +826,14 @@ Uwiano wa tatu hizi ni **kipimo cha afya ya mfumo**, kinachoripotiwa kila run.
 
 | kipindi | matumizi |
 |---|---|
-| **2016-04 → 2024-03** | kugundua · kufundisha · kuthibitisha |
-| **2024-04 → 2026-04** | **HOLDOUT — haijaguswa, inaguswa MARA MOJA** |
+| **2016-01-04 → 2024-03-31** | kugundua · kufundisha · kuthibitisha |
+| **2024-04-01 → 2026-04-30** | **HOLDOUT — haijaguswa, inaguswa MARA MOJA** |
 | 2026+ | forward / paper validation |
 
 ### 16.1 MPAKA MGUMU — mkataba wa kufikia data, si maelezo
 
 ```
-2016-04-01 ──────────────── 2024-03-31 │ 2024-04-01 ────────── 2026-04
+2016-01-04 ──────────────── 2024-03-31 │ 2024-04-01 ────────── 2026-04
       RESEARCH / CALIBRATION           │        HOLDOUT
                                        ↑
                               HARD ACCESS BOUNDARY
@@ -850,7 +850,7 @@ Kwa hiyo hii **si kanuni ya nidhamu; ni mkataba wa code.**
 
 ```yaml
 stage:   cost_calibration
-start:   2016-04-01
+start:   2016-01-04
 end:     2024-03-31
 purpose: Calibration A (§8.3)
 ```
