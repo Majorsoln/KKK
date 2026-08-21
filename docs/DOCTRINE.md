@@ -1,7 +1,7 @@
 # ELITEFX — DOCTRINE
 ## Injini ya Kugundua Strategy Kiotomatiki
 
-**Tarehe:** 2026-08-18 · **Hadhi:** rasimu ya kujadiliwa, kabla ya utekelezaji
+**Toleo:** 1.0 · **Tarehe:** 2026-08-18 · **Hadhi:** contracts zimefungwa (A1–A10)
 **Haigusi:** `docs/RISK_COST_ENGINE.md` na `config/risk.yaml` — RCE ni mamlaka huru ya
 gharama na ukubwa, na haiko chini ya hati hii.
 
@@ -28,7 +28,7 @@ inadanganya.
 
 | daraja | vipimo | kazi |
 |---|---|---|
-| **PRIMARY OUTCOME** | `net_pips_month` · `profitable_month_fraction` | ndicho tunachokitafuta. Ndicho kinachoripotiwa nje. |
+| **PRIMARY OUTCOME** | `net_pips_month` **na** `net_account_return_month` (§1.2) | ndicho tunachokitafuta. Ndicho kinachoripotiwa nje. |
 | **GATE** | metric yoyote yenye `noise_floor[metric]` (§9.2) | inapitisha au inakataa. Hakuna kingine kinachopitisha. |
 | **RANKING** | `fitness` (§13) | inapanga walionusurika kwa kuangaliwa kwanza. **Haipitishi.** |
 | **DIAGNOSTIC** | `expectancy` · `PF` · `Sharpe` · `DD` · `MFE` · `MAE` · `fill_rate` · `stability` | inaeleza **kwa nini**. Haipitishi wala haipangi. |
@@ -36,6 +36,50 @@ inadanganya.
 **Sheria:** metric isiyokuwa na `noise_floor` yake **haiwezi kuwa lango**. Inaweza kuwa
 diagnostic pekee. Hilo linazuia kile kinachotokea kwa urahisi zaidi kuliko kitu
 kingine chochote: kupima kwa kipimo kimoja na kuhukumu kwa kingine.
+
+### 1.2 PRIMARY OUTCOME ni MBILI, na pesa ndiyo yenye mamlaka
+
+Vinajibu maswali mawili tofauti:
+
+| | inajibu nini |
+|---|---|
+| `net_pips_month` | *strategy imezalisha mwendo kiasi gani, bila kujali njia ya sizing?* |
+| `net_account_return_month` | *strategy ile ile imezalisha kiasi gani baada ya RCE kuamua ukubwa kulingana na hali ya hatari?* |
+
+Vinatengana kwa sababu ya mnyororo huu (RCE §2, §4):
+
+```
+DD ↑  →  budget ↓  →  risk_per_trade ↓  →  lots ↓
+```
+
+**Pips hazitegemei mpangilio. Pesa zinategemea.** Seti ile ile ya trades — 25 za
+−30 pips na 13 za +60 pips, jumla **+30 pips** — inatoa:
+
+| mpangilio | pips | pesa |
+|---|---|---|
+| hasara kwanza | +30 | **−$72.21** |
+| faida kwanza | +30 | **+$52.68** |
+
+**Ishara inageuka kwa mpangilio pekee.**
+
+#### Mkataba
+
+```
+AUTHORITY: net_account_return_month
+```
+
+Ishara zikipingana, `net_account_return_month` ndiyo inayoamua. Na candidate
+inapewa alama:
+
+```
+pip_sign        ∈ {POSITIVE, NEGATIVE}
+money_sign      ∈ {POSITIVE, NEGATIVE}
+path_dependence = (pip_sign ≠ money_sign)
+```
+
+`path_dependence = TRUE` **si kufeli peke yake** — ni **onyo lililoandikwa**
+linalosema strategy inategemea mfuatano wa wins/losses, si tu wastani wao.
+Halifichwi kwenye muhtasari; linaonekana kwenye ripoti ya candidate.
 
 ---
 
@@ -204,19 +248,23 @@ wakati huo tu**.
 | kundi | features |
 |---|---|
 | returns | `return_{1,3,5,10,20,50}` |
-| volatility | `ATR_14`, `ATR_20`, `std_20`, `std_50`, `ATR_percentile`, `vol_regime` |
+| volatility | `ATR_14`, `ATR_20`, `std_20`, `std_50`, `ATR_percentile_252d`, `vol_regime_252d` |
 | trend | `EMA_{20,50,100,200}`, tofauti zao, `slope_EMA_{20,50,200}` |
 | momentum | `RSI`, `ROC`, `MACD`, `ADX` |
 | muundo wa candle | `body`, `upper_wick`, `lower_wick`, `range`, `body/range`, `close_pos_in_range` |
 | nafasi sokoni | `dist_from_high_{20,50}`, `dist_from_low_{20,50}`, `dist_from_EMA200` |
 | muda | `hour`, `day_of_week`, `session`, `minutes_from_session_open` |
-| shughuli | `tick_count`, `tick_count_percentile` — kutoka ticks, si volume ya broker (§4.2) |
+| shughuli | `tick_count`, `tick_count_percentile_252d` — kutoka ticks, si volume ya broker (§4.2) |
 | spread | `spread_p50`, `spread_per_atr` — kutoka ticks halisi (§4.1) |
 
 **Sheria mbili zisizovunjika:**
 
 * Feature ya bar `t` inatumia **hadi bar `t` ikiwa imefungwa**. Rolling extremes
   zinatumia `[t−1]`, si `[t]`.
+* **Kila percentile inatangaza dirisha lake ndani ya JINA lake.** `ATR_percentile`
+  bila dirisha **hairuhusiwi kuwepo kwenye code**. Sababu: percentile juu ya sample
+  nzima ingempa bar ya 2017 taarifa ya volatility ya 2020 — uvujaji ambao hakuna
+  test itakayouona, na utakaojionyesha kama ustadi.
 * Feature yoyote inayotokana na model iliyofit inafundishwa **expanding au per-fold**,
   kamwe si juu ya sample nzima.
 
@@ -227,6 +275,11 @@ wakati huo tu**.
 Soko haliko katika hali moja. Regime inaelezwa kwanza kwa sheria (ADX, EMA, ATR
 percentile), na baadaye kwa clustering (KMeans · GMM · HMM) ikiwa clustering itashinda
 sheria kwenye §12.
+
+**Regime detector ni `model-derived feature`, kwa hiyo iko chini ya sheria ya §5 bila
+ubaguzi:** inafundishwa **expanding au per-fold, kamwe si juu ya sample nzima.** HMM
+iliyofit juu ya 2016–2024 kisha kutumika kwa 2017 ni uvujaji wa moja kwa moja, na
+haitajionyesha kama kosa — itajionyesha kama regime detection nzuri.
 
 **Kipimo cha sample kwa regime ni tofauti, na ni kigezo:** hypothesis ya regime
 haipimwi kwa idadi ya **trades**, bali kwa idadi ya **matukio huru ya regime**. ER na
@@ -308,8 +361,22 @@ Tokeo ni jedwali lenye safu **zote mbili**, pamoja na ukaguzi wa
 
 ### 8.4 Lango — ni chujio la kiuchumi, si uthibitisho
 
-> **Candidate yenye `gross edge kwa trade < 2 × research_cost` inakataliwa kabla ya
+> **Candidate yenye `gross edge kwa trade < 2 × live_sizing_cost` inakataliwa kabla ya
 > takwimu yoyote kuhesabiwa.**
+
+**Mamlaka ni `live_sizing_cost`, si `research_cost`.** Swali si *"ilikuwa na uchumi
+kihistoria?"* bali *"ina uchumi chini ya gharama ambayo RCE itaitumia kweli
+kuiweka ukubwa?"* Kutumia ya matumaini kimya ndiyo aina hasa ya dhana inayofanya
+mfumo uonekane wenye faida bila kuwa nao.
+
+**Zote mbili zinaripotiwa, kwa sababu tofauti yao ni kipimo cha udhaifu:**
+
+| | `edge ÷ research_cost` | `edge ÷ live_sizing_cost` | tafsiri |
+|---|---|---|---|
+| dhaifu | 3.2× | **1.7×** | inategemea gharama kubaki nzuri |
+| imara | 3.2× | **2.8×** | inastahimili gharama mbaya |
+
+`cost_sensitivity = (edge ÷ research) ÷ (edge ÷ live)` inaingia kwenye Strategy DNA.
 
 Sababu ya lango: gharama ni **thabiti kwa kila trade** — haibadiliki trade ikiwa
 kubwa au ndogo. Kwa hiyo tatizo kamwe si trades za bei ghali; ni **trades ndogo mno**.
@@ -476,6 +543,16 @@ Vizazi vinavyofuata (mutation, recombination) vinaruhusiwa **chini ya bajeti ya
 `variants_tested` iliyotangazwa mapema.** Kila kizazi kinaongeza hesabu, na sakafu ya
 §9 inapanda pamoja nayo.
 
+**`max_conditions` ni invariant, si kigezo cha kizazi cha kwanza:**
+
+```
+child_conditions ≤ max_conditions        ...baada ya KILA mutation/recombination
+```
+
+Mzazi mwenye masharti 4 na mwenye 4 wanaweza kutoa mtoto mwenye 8. Mtoto huyo ni
+`INVALID_CANDIDATE` **kabla ya backtest** — hahesabiwi kwenye `variants_tested` kwa
+sababu hakupimwa, lakini anaandikwa kwenye ledger ya §9.3 na `reject_reason`.
+
 ---
 
 ## 11. Backtest Engine
@@ -489,13 +566,43 @@ signal  →  bei iliyoombwa  →  soko limehama  →  slippage > cap  →  HAKUN
 signal  →  bei iliyoombwa  →  ndani ya cap   →  FILL kwa bei halisi
 ```
 
-RCE inaweka cap ya slippage, na order inayozidi cap **haijazwi** (§18). Kwa hiyo
-backtest lazima iwe na matokeo **mawili**:
+RCE inaweka cap ya slippage, na order inayozidi cap **haijazwi** (§18). Lakini kabla
+ya utekelezaji kuna **ukaguzi wa RCE**, na huo unaweza kukataa kwa sababu tofauti
+kabisa. Kwa hiyo signal inapita **hatua mbili**, si moja:
 
 ```
-FILL     →  trade ipo, na ina gharama halisi
-NO_FILL  →  trade HAIPO. Si hasara; si faida. Haijatokea.
+                    SIGNAL
+                      │
+              ┌───────▼────────┐
+              │   RCE CHECK    │   ← si utekelezaji; ni RUHUSA
+              └───────┬────────┘
+        ┌─────────────┼──────────────────────────┐
+        │             │                          │
+   NO_BUDGET   MIN_LOT_REJECT          reject nyingine za RCE §5:
+  (budget ≤ 0)  (risk_below_min_lot)   max_open_trades · max_correlated
+        │             │                daily_loss_75pct_with_open
+        │             │                max_total_dd · max_spread · news_window
+        └─────────────┴──────────┬───────────────┘
+                                 │  ...au PASS
+                        ┌────────▼────────┐
+                        │   EXECUTION     │
+                        └────────┬────────┘
+                     ┌───────────┴───────────┐
+                   FILL                   NO_FILL
+              (bei ndani ya cap)     (bei imezidi cap)
 ```
+
+**`NO_BUDGET` si `NO_FILL`.** Ya kwanza inasema *"hatukuruhusiwa kujaribu"*; ya pili
+inasema *"tuliruhusiwa, lakini soko lilihama."* Zikichanganywa, huwezi kujibu swali
+muhimu zaidi la uchunguzi:
+
+> *Strategy ilikufa kwa sababu haikuwa na edge, au kwa sababu RCE ilizuia hatari?*
+
+**Kumbuka la kiufundi:** RCE haina reject reason inayoitwa `NO_BUDGET`. Budget
+ikiisha, lots zinakuwa 0 na RCE inatoa `risk_below_min_lot` (`sizing.py:20`). Doctrine
+inatofautisha mbili hizo kwa kurekodi `budget_at_signal` (§11.2) — `budget ≤ 0` ni
+`NO_BUDGET`; `budget > 0` lakini lots chini ya `volume_min` ni `MIN_LOT_REJECT`.
+**Hakuna kinachoongezwa kwa RCE**; tofauti inatoka kwenye rekodi ya Doctrine.
 
 **Kwa nini hii si ya hiari.** Backtest ikidhani kila signal inajazwa wakati live
 inakataa asilimia 30, basi:
@@ -511,8 +618,15 @@ namba inayoonekana sahihi.
 
 ```
 signal_time · requested_price · direction
-execution_outcome ∈ {FILL, NO_FILL}
-reject_reason                        (kwa NO_FILL)
+
+rce_outcome ∈ {PASS, NO_BUDGET, MIN_LOT_REJECT, max_open_trades,
+               max_correlated, daily_loss_75pct_with_open,
+               max_total_dd, max_spread, news_window}
+budget_at_signal · risk_per_trade_at_signal
+requested_lots · allowed_lots · broker_min_lot
+
+execution_outcome ∈ {FILL, NO_FILL}   (ikiwa rce_outcome == PASS)
+reject_reason                          (kwa NO_FILL)
 
 ...ikiwa FILL:
 entry_time · entry_price · SL · TP
@@ -528,6 +642,20 @@ ya backtest kuisha.
 Gharama zimegawanywa kwa `ENTRY / EXIT / HOLDING` kama §8.1 — si namba moja ya
 jumla, kwa sababu jumla haiwezi kukaguliwa dhidi ya RCE.
 
+**Kwa nini `budget_at_signal` na wenzake ni wa lazima:** bila wao, `NO_BUDGET` ni
+hesabu tupu. Nao, kila uamuzi unaweza kutolewa upya:
+
+```
+2021-03-14 09:00 · EURUSD · BUY
+budget            = $37.20
+risk_per_trade    = $5.31
+requested_lots    = 0.007
+broker_min_lot    = 0.01
+rce_outcome       = MIN_LOT_REJECT
+```
+
+Hiyo ni **audit trail**, si log.
+
 ### 11.3 `fill_rate` ni kipimo cha validation
 
 ```
@@ -542,9 +670,19 @@ inaishi kwenye ripoti ya mwisho ya kila candidate, pamoja na:
 research_fill_rate · OOS_fill_rate · live_fill_rate · fill_rate_gap
 ```
 
-Candidate ambayo `OOS_fill_rate` yake iko chini sana ya ya research inakataliwa kwa
-sababu ile ile ambayo strategy isiyo thabiti inakataliwa: **haifanyi kile
-kilichopimwa.**
+Candidate inakataliwa ikiwa `OOS_fill_rate < noise_floor.fill_rate` (§9.2) — si kwa
+namba iliyochaguliwa.
+
+**`fill_rate_min: 0.60` ya `config/risk.yaml` SI lango la utafiti.** Ni **onyo la
+uendeshaji** la RCE kwa live. Vipimo viwili, vyenye kazi mbili:
+
+| | chanzo | kazi |
+|---|---|---|
+| `fill_rate_min` = 0.60 | RCE, `config/risk.yaml:48` | onyo la live: cap ni ngumu mno |
+| `noise_floor.fill_rate` | Calibration B (§9.2) | **lango la utafiti** |
+
+Kizingiti cha utafiti kinatoka kwenye sakafu iliyopimwa **kabla ya holdout**, na
+hakibadilishwi baada ya kuona matokeo.
 
 ### 11.4 Uhakiki uliojengwa ndani
 
@@ -692,6 +830,48 @@ Uwiano wa tatu hizi ni **kipimo cha afya ya mfumo**, kinachoripotiwa kila run.
 | **2024-04 → 2026-04** | **HOLDOUT — haijaguswa, inaguswa MARA MOJA** |
 | 2026+ | forward / paper validation |
 
+### 16.1 MPAKA MGUMU — mkataba wa kufikia data, si maelezo
+
+```
+2016-04-01 ──────────────── 2024-03-31 │ 2024-04-01 ────────── 2026-04
+      RESEARCH / CALIBRATION           │        HOLDOUT
+                                       ↑
+                              HARD ACCESS BOUNDARY
+```
+
+**Holdout si labels pekee.** Spread ya 2025, volatility ya 2025, mgawanyo wa 2025 —
+vikiingia kwenye calibration inayosaidia kuchagua strategy, **holdout imeshasaidia
+uteuzi** hata kama hakuna `future_return` iliyoangaliwa. Tumepata taarifa kuhusu
+mazingira yajayo.
+
+Kwa hiyo hii **si kanuni ya nidhamu; ni mkataba wa code.**
+
+**Kila hatua inayosoma data inatangaza dirisha lake:**
+
+```yaml
+stage:   cost_calibration
+start:   2016-04-01
+end:     2024-03-31
+purpose: Calibration A (§8.3)
+```
+
+**Invariant inayoendeshwa, si kuaminiwa:**
+
+```python
+assert stage.end < HOLDOUT_START     # kwa KILA stage isiyo ya holdout
+```
+
+**Na muundo wenyewe unafanya uvujaji kuwa mgumu.** Function haipewi data yote:
+
+```python
+calibrate_cost(all_ticks)        # HAPANA — inaona kila kitu
+calibrate_cost(research_window)  # NDIYO  — haiwezi kuona isiyopewa
+```
+
+Kizuizi kikiwa kwenye **saini ya function**, developer wa baadaye hawezi kukiuka
+bila kuandika code inayoonekana kuwa ya ajabu. Kizuizi kikiwa kwenye maandishi,
+atakisahau.
+
 **Sheria mbili:**
 
 * Sheria ya uteuzi inaandikwa kwenye **faili la ushahidi lenye tarehe** kabla holdout
@@ -781,7 +961,7 @@ Zifuatazo ni malango, si mapendekezo. Kila moja inaweza kupimwa kwa test.
 |---|---|
 | **R1** | Hakuna data ya baadaye ndani ya row ya nyuma. Ukaguzi kila upakiaji. |
 | **R2** | Strategy ni entry **na** exit. Exit haitafutwi baada ya kuona matokeo. |
-| **R3** | Candidate yenye `gross < 2 × gharama` inakataliwa kabla ya takwimu. |
+| **R3** | Candidate yenye `gross < 2 × live_sizing_cost` inakataliwa kabla ya takwimu. |
 | **R4** | Kizingiti chochote kinatoka kwenye sakafu iliyopimwa, si kwenye maoni. |
 | **R5** | **Generator haifunguki** kabla Calibration A na B (§8.3, §9.2) hazijakamilika na kuhifadhiwa kama ushahidi wenye tarehe. |
 | **R6** | `variants_tested` inahesabiwa daima na inaingia kwenye kila ripoti. |
@@ -795,7 +975,13 @@ Zifuatazo ni malango, si mapendekezo. Kila moja inaweza kupimwa kwa test.
 | **R14** | `MODEL_NO_TRADE`, `RCE_REJECT`, `EXECUTION_NO_FILL` haziunganishwi. |
 | **R15** | Sakafu inatoka familia **tatu** za null; inayotumika ni `max`. |
 | **R16** | `research_cost` na `live_sizing_cost` ni tofauti, zinatoka chanzo kimoja, na `live ≥ research` daima. |
-| **R17** | Hakuna amri inayoendesha kimya. Kila hatua inachapisha maendeleo. |
+| **R17** | PRIMARY OUTCOME ni **mbili**; `net_account_return_month` ndiyo yenye mamlaka. |
+| **R18** | Kila hatua inatangaza dirisha lake la data; `stage.end < HOLDOUT_START` ni assertion, si nidhamu. |
+| **R19** | Utekelezaji una hatua **mbili**: RCE CHECK kisha EXECUTION. `NO_BUDGET` ≠ `NO_FILL`. |
+| **R20** | Lango la uchumi linatumia `live_sizing_cost`; `research_cost` ni diagnostic. |
+| **R21** | `max_conditions` ni invariant baada ya **kila** mutation, si kizazi cha kwanza. |
+| **R22** | Kila variable ya formula ina ufafanuzi wa §21; hakuna prose kwenye hesabu. |
+| **R23** | Hakuna amri inayoendesha kimya. Kila hatua inachapisha maendeleo. |
 
 ---
 
@@ -817,7 +1003,100 @@ src/
 
 ---
 
-## 21. Maamuzi yanayosubiri PD
+## 21. Kamusi ya vipimo — kila kimoja kinaweza kutekelezwa na code
+
+**Kanuni:** *variable yoyote inayoingia kwenye formula ya deterministic lazima iwe na
+ufafanuzi unaoweza kutekelezwa na code bila tafsiri.* Ikibaki kwenye prose,
+developer wa baadaye atatengeneza tafsiri yake mwenyewe — na tafsiri mbili tofauti
+zote zikiwa "zinatii doctrine" ndiyo mwisho wa doctrine.
+
+Kila kipimo kina sehemu **saba**: `name · inputs · window · formula · range ·
+higher_is · daraja`.
+
+---
+
+**`stability`** · RANKING, DIAGNOSTIC
+
+```
+inputs    : net_pips_month[t]  kwa miezi yote ya OOS
+window    : miezi yote ya OOS ya walk-forward
+formula   : clip( 1 − sd(net_pips_month) ÷ |mean(net_pips_month)| , 0, 1 )
+range     : [0, 1]
+higher_is : better
+kumbuka   : mean ikikaribia 0, uwiano unalipuka → clip inarudisha 0.
+            Hiyo ni sahihi: strategy isiyo na wastani haina uthabiti.
+```
+
+**`complexity`** · RANKING (adhabu)
+
+```
+inputs    : entry_conditions, exit_conditions
+window    : —
+formula   : len(entry_conditions) + len(exit_conditions)
+range     : [2, 2 × max_conditions]
+higher_is : worse
+```
+
+**`overfit_score`** · DIAGNOSTIC
+
+```
+inputs    : IS_profit_factor, OOS_profit_factor
+window    : IS = walk-forward train · OOS = walk-forward test
+formula   : (IS_PF − OOS_PF) ÷ IS_PF
+range     : (−∞, 1]
+higher_is : worse
+mfano     : IS 2.10 / OOS 1.28 → 0.39 (inakubalika)
+            IS 4.50 / OOS 0.91 → 0.80 (inakataliwa)
+```
+
+**`ATR_percentile_252d`** · FEATURE
+
+```
+inputs    : ATR_14[t]
+window    : siku 252 za kalenda ya soko zilizopita, zikiishia bar t (imefungwa)
+formula   : rank ya ATR_14[t] ndani ya dirisha ÷ ukubwa wa dirisha
+range     : [0, 1]
+higher_is : neutral
+```
+
+**`tick_count_percentile_252d`** · FEATURE — kama ilivyo hapo juu, ingizo
+`tick_count[t]`.
+
+**`vol_regime_252d`** · FEATURE
+
+```
+inputs    : ATR_percentile_252d[t]
+window    : ule ule
+formula   : LOW  kwa < 0.33 · MID kwa [0.33, 0.67) · HIGH kwa ≥ 0.67
+range     : {LOW, MID, HIGH}
+higher_is : neutral
+```
+
+**`cost_sensitivity`** · DIAGNOSTIC (§8.4)
+
+```
+inputs    : gross_edge, research_cost, live_sizing_cost
+formula   : (gross_edge ÷ research_cost) ÷ (gross_edge ÷ live_sizing_cost)
+          = live_sizing_cost ÷ research_cost
+range     : [1, ∞)   ...kwa sababu live ≥ research (R16)
+higher_is : worse    ...juu = strategy inategemea gharama kubaki nzuri
+```
+
+**`path_dependence`** · PRIMARY (onyo, §1.2)
+
+```
+inputs    : net_pips_month, net_account_return_month
+formula   : sign(Σ net_pips_month) ≠ sign(Σ net_account_return_month)
+range     : {TRUE, FALSE}
+higher_is : worse
+```
+
+Vipimo hivi ni **mapendekezo ya ufafanuzi**, si vya kutobadilika. Kinachotobadilika
+ni kwamba **lazima vifafanuliwe hivi** kabla ya code kuandikwa.
+
+---
+
+## 22. Maamuzi yanayosubiri PD
 
 **U1 — Ukubwa wa utafutaji wa kwanza.** Napendekeza **~1,000**, si 100,000 — si kwa
 woga, bali kwa sababu Calibration B lazima ipime sakafu ya mchakato wetu halisi kwanza.
