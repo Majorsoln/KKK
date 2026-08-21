@@ -19,7 +19,7 @@ dependencies = [
 dev = ["pytest>=8.0"]
 
 [tool.setuptools]
-packages = ["src", "src.rce", "src.data"]
+packages = ["src", "src.rce", "src.data", "src.backtest"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
