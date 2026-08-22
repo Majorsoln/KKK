@@ -152,10 +152,30 @@ def test_takwimu_za_spread_zinahifadhiwa(cfg):
     frame.attrs["symbol"] = "EURUSD"
 
     row = B.build(frame, "H1", _stage(cfg)).bars.iloc[0]
-    assert row["spread_p50"] == pytest.approx(0.00010)
-    assert row["spread_max"] == pytest.approx(0.00100)
+    # PIPS, si bei: 0.00010 ni pip 1.0 kwa EURUSD.
+    assert row["spread_p50"] == pytest.approx(1.0)
+    assert row["spread_max"] == pytest.approx(10.0)
     assert row["spread_p50"] < row["spread_max"], "spike imefichwa na median"
     assert row["n_ticks"] == 60
+
+
+def test_spread_iko_kwa_PIPS_si_kwa_bei(cfg):
+    """Kila anayeitumia anaidai kwa pips: RCE, `max_spread`, `cost_pips`.
+
+    Ikitolewa kwa bei, kila mmoja anapokea namba ndogo mara 10,000 na hakuna
+    anayelipuka — RCE ingeripoti spread 0.00 pips, lots zingekuwa kubwa mno, na
+    EV ingekuwa ya bandia bila kosa kuonekana popote.
+    """
+    stamps = pd.date_range("2020-06-01 00:00", periods=61, freq="1min", tz="UTC")
+
+    eur = pd.DataFrame({"timestamp": stamps, "bid": 1.10, "ask": 1.10 + 0.00012})
+    eur.attrs["symbol"] = "EURUSD"
+    jpy = pd.DataFrame({"timestamp": stamps, "bid": 110.0, "ask": 110.0 + 0.012})
+    jpy.attrs["symbol"] = "USDJPY"
+
+    stage = _stage(cfg)
+    assert B.build(eur, "H1", stage).bars.iloc[0]["spread_mean"] == pytest.approx(1.2)
+    assert B.build(jpy, "H1", stage).bars.iloc[0]["spread_mean"] == pytest.approx(1.2)
 
 
 def test_n_m1_bars_ni_dakika_zenye_shughuli(cfg):

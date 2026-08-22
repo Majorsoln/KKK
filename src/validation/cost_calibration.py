@@ -247,9 +247,9 @@ class CostTable:
 # ===========================================================================
 
 
-def measure_execution(ticks, bars, timeframe: str, *, symbol: str,
-                      day_tz: str = "UTC") -> dict[str, float]:
-    """Spread na slippage kwenye kila mpaka wa bar — kutoka ticks, si kudhaniwa."""
+def execution_samples(ticks, bars, timeframe: str, *, symbol: str,
+                      day_tz: str = "UTC"):
+    """Sampuli ghafi za spread na slippage kwenye kila mpaka wa bar."""
     import numpy as np
     import pandas as pd
 
@@ -281,15 +281,84 @@ def measure_execution(ticks, bars, timeframe: str, *, symbol: str,
 
     spread = (ask[fill] - bid[fill]) / pip
     slippage = np.abs(mid[fill] - mid[fill - 1]) / pip
+    return spread, slippage
 
+
+def summarise(spread, slippage) -> dict[str, float]:
+    """Sampuli → takwimu za cell."""
+    import numpy as np
+
+    spread = np.asarray(spread, dtype=float)
+    slippage = np.asarray(slippage, dtype=float)
+    if spread.size == 0:
+        raise CalibrationAError("hakuna sampuli za kufupisha")
     return {
-        "n_points": int(fill.size),
+        "n_points": int(spread.size),
         "spread_mean_pips": float(spread.mean()),
         "spread_p50_pips": float(np.quantile(spread, 0.50)),
         "spread_p95_pips": float(np.quantile(spread, 0.95)),
         "slippage_mean_pips": float(slippage.mean()),
         "slippage_p95_pips": float(np.quantile(slippage, 0.95)),
     }
+
+
+def measure_execution(ticks, bars, timeframe: str, *, symbol: str,
+                      day_tz: str = "UTC") -> dict[str, float]:
+    """Spread na slippage kwenye kila mpaka wa bar — kutoka ticks, si kudhaniwa."""
+    return summarise(
+        *execution_samples(ticks, bars, timeframe, symbol=symbol, day_tz=day_tz)
+    )
+
+
+@dataclass
+class CellSamples:
+    """Mkusanyiko wa sampuli za cell moja, mwezi baada ya mwezi.
+
+    Data ya miaka 10 haiingii kwenye kumbukumbu kwa mara moja. Kwa hiyo kila
+    mwezi unapimwa peke yake na sampuli zinakusanywa; takwimu zinahesabiwa
+    mwishoni, juu ya sampuli **zote**. Hakuna wastani wa wastani hapa —
+    quantile ya quantiles si quantile.
+    """
+
+    symbol: str
+    timeframe: str
+    _spread: list = None
+    _slippage: list = None
+    _atr: list = None
+
+    def __post_init__(self) -> None:
+        self._spread, self._slippage, self._atr = [], [], []
+
+    def add(self, ticks, bars, *, day_tz: str = "UTC") -> "CellSamples":
+        spread, slippage = execution_samples(
+            ticks, bars, self.timeframe, symbol=self.symbol, day_tz=day_tz
+        )
+        self._spread.append(spread)
+        self._slippage.append(slippage)
+        if len(bars) > ATR_WINDOW:
+            self._atr.append(atr_pips(bars, self.symbol))
+        return self
+
+    @property
+    def n_chunks(self) -> int:
+        return len(self._spread)
+
+    def stats(self) -> dict[str, float]:
+        import numpy as np
+
+        if not self._spread:
+            raise CalibrationAError(f"{self.symbol}/{self.timeframe}: hakuna sampuli")
+        return summarise(np.concatenate(self._spread), np.concatenate(self._slippage))
+
+    def atr(self) -> float:
+        """Median ya ATR za vipande — kipimo kimoja cha ukubwa wa mwendo."""
+        import numpy as np
+
+        if not self._atr:
+            raise CalibrationAError(
+                f"{self.symbol}/{self.timeframe}: hakuna kipande chenye bars > {ATR_WINDOW}"
+            )
+        return float(np.median(self._atr))
 
 
 def atr_pips(bars, symbol: str, window: int = ATR_WINDOW) -> float:
@@ -313,13 +382,58 @@ def atr_pips(bars, symbol: str, window: int = ATR_WINDOW) -> float:
     return float(np.median(atr) / pip_size(symbol))
 
 
-def calibrate_cell(*, timeframe: str, ticks, bars, cfg_risk, broker: Broker,
-                   h1_spreads: Sequence[float], m5_spreads: Sequence[float],
+def live_spread_median(h1, m5, cfg, *, step: int = 100) -> float:
+    """`spread_effective` ya RCE ikitathminiwa mara nyingi kwenye historia.
+
+    RCE inaangalia bars 100 za mwisho za H1 na 288 za mwisho za M5 (`risk.yaml`).
+    Kuiita **mara moja** juu ya miaka 9 kungetoa jibu la siku nne za mwisho, na
+    jedwali la calibration lingesema "gharama ya live" wakati likimaanisha
+    "gharama ya wiki iliyopita".
+
+    Kwa hiyo inaitwa kwenye nanga nyingi na median inachukuliwa. Hesabu bado ni
+    ya RCE, kila mara — hakuna inayoandikwa upya hapa (R12).
+    """
+    import numpy as np
+    import pandas as pd
+
+    h1 = pd.Series(h1).dropna()
+    m5 = pd.Series(m5).dropna()
+    if h1.empty:
+        raise CalibrationAError("hakuna spread za H1 — upande wa live hauwezi kupimwa")
+
+    base_window = int(cfg.get("spread_model.base_window", 100))
+    anchors = h1.index[base_window::step]
+    if len(anchors) == 0:
+        anchors = h1.index[-1:]
+
+    values = [
+        spread_effective(
+            h1.loc[:t].to_list(), m5.loc[:t].to_list() if not m5.empty else [], cfg
+        )
+        for t in anchors
+    ]
+    return float(np.median(values))
+
+
+def calibrate_cell(*, timeframe: str, cfg_risk, broker: Broker,
+                   h1_spreads: Sequence[float] = (), m5_spreads: Sequence[float] = (),
+                   live_spread: float | None = None,
+                   ticks=None, bars=None, samples: "CellSamples | None" = None,
                    m5_slippage_estimate: float | None = None,
                    day_tz: str = "UTC") -> CostRow:
-    """Cell moja ya `(pair, TF)`. Upande wa live unatoka RCE, hauhesabiwi hapa (R12)."""
+    """Cell moja ya `(pair, TF)`. Upande wa live unatoka RCE, hauhesabiwi hapa (R12).
+
+    Ingizo la kipimo ni **mojawapo**: `ticks` + `bars` (data ndogo, mara moja) au
+    `samples` (mkusanyiko wa miezi mingi).
+    """
     symbol = broker.symbol
-    measured = measure_execution(ticks, bars, timeframe, symbol=symbol, day_tz=day_tz)
+    if samples is not None:
+        measured, atr = samples.stats(), samples.atr()
+    elif ticks is not None and bars is not None:
+        measured = measure_execution(ticks, bars, timeframe, symbol=symbol, day_tz=day_tz)
+        atr = atr_pips(bars, symbol)
+    else:
+        raise CalibrationAError("toa `ticks` + `bars`, au `samples` — si bila kimoja")
 
     comm = commission_pips(broker.commission_round_turn, broker.pip_value_acct)
     swap = (
@@ -328,7 +442,8 @@ def calibrate_cell(*, timeframe: str, ticks, bars, cfg_risk, broker: Broker,
         if broker.nights > 0 else 0.0
     )
 
-    live_spread = spread_effective(list(h1_spreads), list(m5_spreads), cfg_risk)
+    if live_spread is None:
+        live_spread = spread_effective(list(h1_spreads), list(m5_spreads), cfg_risk)
     live_cap = slippage_cap_pips(broker.order_type, cfg_risk, m5_slippage_estimate)
 
     # §8.1: spread kamili (nusu kuingia + nusu kutoka) + slippage MARA MBILI.
@@ -353,7 +468,7 @@ def calibrate_cell(*, timeframe: str, ticks, bars, cfg_risk, broker: Broker,
         research_cost_pips=float(research),
         live_sizing_cost_pips=float(live_sizing),
         live_check_pips=float(live_check),
-        atr_pips=atr_pips(bars, symbol),
+        atr_pips=float(atr),
     )
 
 

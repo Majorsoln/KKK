@@ -24,6 +24,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from src.rce.cost import pip_size
+
 from .window import Stage
 
 # TF → urefu. `D1` ni ya pekee: mpaka wake ni siku ya BROKER, si ya UTC.
@@ -36,6 +38,7 @@ TIMEFRAMES = (DAILY, "H4", "H2", "H1", "M30", "M15", "M5")
 
 BAR_COLUMNS = (
     "open", "high", "low", "close",
+    # Zote nne ni PIPS (ona `build`), si bei.
     "spread_mean", "spread_p50", "spread_p95", "spread_max",
     "n_ticks", "n_m1_bars",
 )
@@ -93,7 +96,16 @@ def build(frame, timeframe: str, stage: Stage, *, day_tz: str = "UTC") -> BuildR
     work = pd.DataFrame({
         "timestamp": pd.to_datetime(frame["timestamp"], utc=True),
         "mid": (frame["bid"].to_numpy(dtype=float) + frame["ask"].to_numpy(dtype=float)) / 2.0,
-        "spread": frame["ask"].to_numpy(dtype=float) - frame["bid"].to_numpy(dtype=float),
+        # Spread inahifadhiwa kwa **PIPS**, si kwa bei.
+        #
+        # Kila anayeitumia anaidai kwa pips: `spread_effective` ya RCE, `max_spread`
+        # ya `risk.yaml`, `cost_pips`, Calibration A. Ikitolewa kwa bei, kila mmoja
+        # wao anapokea namba ndogo mara 10,000 — na hakuna anayelipuka. RCE
+        # ingeripoti spread ya 0.00 pips, sizing ingetoa lots kubwa mno, na EV
+        # ingekuwa ya bandia bila kosa lolote kuonekana popote.
+        "spread": (
+            frame["ask"].to_numpy(dtype=float) - frame["bid"].to_numpy(dtype=float)
+        ) / pip_size(symbol),
     })
     work["minute"] = work["timestamp"].dt.floor("1min")
 

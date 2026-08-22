@@ -31,6 +31,19 @@ expected_nights:
   intraday_h1:  0.0
   swing_d1:     3.5
 
+# Ukubwa wa mkataba — unatoka MT5 (`symbol_info.trade_contract_size`).
+# Thamani hizi ni za KAWAIDA kwa FX na dhahabu; ZINAHITAJI kuthibitishwa kwa
+# broker wako. `pip_value` ya Calibration A inajengwa juu yake, na `pip_value`
+# isiyo sahihi inatoa `commission_pips` isiyo sahihi -- kosa linaloonekana kama
+# EV, si kama kosa.
+contract_size:
+  default:  100000
+  XAUUSD:   100
+
+# Weka `true` baada ya kulinganisha na MT5. Ikiwa `false`, jedwali la
+# Calibration A linaandikwa likiwa na alama ya `contract_size_confirmed: false`.
+contract_size_confirmed: false
+
 # Sehemu ya usiku hizo zinazoangukia rollover ya Jumatano->Alhamisi (swap x3).
 # 0.2 = mmoja kati ya watano; strategy inayoshikilia wiki nzima ni kubwa zaidi.
 triple_night_share:
