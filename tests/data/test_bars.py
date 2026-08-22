@@ -221,7 +221,7 @@ def test_siku_ya_dst_ina_urefu_wake_halisi(cfg):
     Kutumia `+1 day` kungehesabu bar kuwa imefungwa saa MOJA kabla ya ukweli —
     mara mbili kwa mwaka, kimya kimya.
     """
-    ends = B._bar_ends(
+    ends = B.bar_ends(
         pd.DatetimeIndex([pd.Timestamp("2020-10-24 22:00", tz="UTC")]),
         "D1", "Europe/Berlin",
     )

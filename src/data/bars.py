@@ -132,7 +132,7 @@ def build(frame, timeframe: str, stage: Stage, *, day_tz: str = "UTC") -> BuildR
     # ushahidi huo, bar ya mwisho ni ya nusu — na feature yake ingekuwa
     # imejengwa kwa data ambayo live isingekuwa nayo bado.
     last_tick = work["timestamp"].max()
-    ends = _bar_ends(bars.index, timeframe, day_tz)
+    ends = bar_ends(bars.index, timeframe, day_tz)
     closed = ends <= last_tick
     dropped = bool((~closed).any())
     bars = bars[closed]
@@ -146,7 +146,7 @@ def _localize(naive, tz):
     return naive.dt.tz_localize(tz, ambiguous=False, nonexistent="shift_forward")
 
 
-def _bar_ends(index, timeframe: str, day_tz: str):
+def bar_ends(index, timeframe: str, day_tz: str):
     """Mwisho halisi wa kila bar.
 
     Kwa TF za ndani ya siku, urefu ni thabiti. Kwa `D1` si hivyo: siku ya DST
