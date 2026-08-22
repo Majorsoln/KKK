@@ -92,6 +92,8 @@ def pip_value_usd(symbol: str, contract_size: float, inv) -> tuple[float, str]:
 def main() -> int:
     ap = argparse.ArgumentParser(description="Calibration A")
     ap.add_argument("--root", default=None)
+    ap.add_argument("--provenance", default=None,
+                    help="chagua chanzo kimoja, mf. aggregator au broker")
     ap.add_argument("--symbols", nargs="*", default=None)
     ap.add_argument("--tf", nargs="*", default=None)
     ap.add_argument("--months", type=int, default=0, help="0 = zote")
@@ -121,7 +123,7 @@ def main() -> int:
     print(f"   symbols {len(symbols)} · TF {tfs} · day_tz {day_tz}")
     print(f"   config_hash data {cfg_data.config_hash} · risk {cfg_risk.config_hash}\n")
 
-    inv = discover(root)
+    inv = discover(root, provenance=args.provenance)
     hazipo = [s for s in symbols if s not in inv.symbols]
     if hazipo:
         print(f"   HAZIPO kwenye L0: {hazipo}")
@@ -150,7 +152,16 @@ def main() -> int:
         else:
             pipval, njia = pip_value_usd(symbol, contract, inv)
 
-        samples = {tf: CA.CellSamples(symbol=symbol, timeframe=tf) for tf in tfs}
+        # Kizingiti cha pengo: mpaka wa bar unapoangukia soko lililofungwa,
+        # "tick inayofuata" ni ya Jumapili usiku. Tofauti yake si slippage.
+        # Namba inatoka `data.yaml`, si hapa.
+        gaps = cfg_data.get("quality.max_gap_seconds", {})
+        max_gap = float(gaps.get(symbol, gaps.get("default", 3600)))
+
+        samples = {
+            tf: CA.CellSamples(symbol=symbol, timeframe=tf, max_gap_seconds=max_gap)
+            for tf in tfs
+        }
         spreads_h1: list = []
         spreads_m5: list = []
         n_miezi = n_ticks = 0
@@ -206,6 +217,7 @@ def main() -> int:
         )
 
         print(f"   {symbol}: miezi {n_miezi} · ticks {n_ticks:,} · onyo {onyo} · "
+              f"max_gap {max_gap:.0f}s · "
               f"pip_value ${pipval:.4f} ({njia}) · live_spread {live_spread:.3f} pips "
               f"· {time.time() - anza:.0f}s")
 

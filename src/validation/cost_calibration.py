@@ -104,6 +104,7 @@ class CostRow:
     symbol: str
     timeframe: str
     n_points: int
+    n_dropped_gap: int
 
     # ---- iliyopimwa (ticks halisi) ----
     spread_mean_pips: float
@@ -151,8 +152,9 @@ class CostRow:
 
     def render(self) -> str:
         alama = "OK " if self.ok else "VUNJIKA"
+        pengo = f" -{self.n_dropped_gap:,}" if self.n_dropped_gap else ""
         return (
-            f"{self.symbol:<8} {self.timeframe:<4} n {self.n_points:>7,}  "
+            f"{self.symbol:<8} {self.timeframe:<4} n {self.n_points:>7,}{pengo:<8}  "
             f"research {self.research_cost_pips:>7.3f} pips ({self.research_cost_atr:>5.3f} ATR)  "
             f"live {self.live_sizing_cost_pips:>7.3f}  "
             f"check {self.live_check_pips:>7.3f}  "
@@ -248,8 +250,19 @@ class CostTable:
 
 
 def execution_samples(ticks, bars, timeframe: str, *, symbol: str,
-                      day_tz: str = "UTC"):
-    """Sampuli ghafi za spread na slippage kwenye kila mpaka wa bar."""
+                      day_tz: str = "UTC", max_gap_seconds: float | None = None):
+    """Sampuli ghafi za spread na slippage kwenye kila mpaka wa bar.
+
+    `max_gap_seconds` inatenganisha **utekelezaji** na **soko lililofungwa**.
+
+    Mpaka wa bar unapoangukia Ijumaa usiku, quote inayofuata ni ya Jumapili
+    usiku. Tofauti kati yao si slippage — ni pengo la wikendi, na linaweza kuwa
+    pips 50. Bila kizuizi, mipaka hiyo (asilimia 1 kwa H1, asilimia 20 kwa D1)
+    ingepandisha `slippage_mean` kwa kiasi kikubwa, `research_cost` ingeonekana
+    kubwa kuliko ilivyo, na R16 ingevunjika kwa sababu isiyo ya gharama.
+
+    Kizingiti kinatoka `data.yaml: quality.max_gap_seconds` — si kubuniwa hapa.
+    """
     import numpy as np
     import pandas as pd
 
@@ -279,12 +292,24 @@ def execution_samples(ticks, bars, timeframe: str, *, symbol: str,
             f"{symbol}/{timeframe}: hakuna mpaka wa bar wenye quote pande zote mbili"
         )
 
+    n_dropped = 0
+    if max_gap_seconds is not None:
+        gap = (stamps_ns[fill] - stamps_ns[fill - 1]) / 1e9
+        ndani = gap <= float(max_gap_seconds)
+        n_dropped = int((~ndani).sum())
+        fill = fill[ndani]
+        if fill.size == 0:
+            raise CalibrationAError(
+                f"{symbol}/{timeframe}: kila mpaka uko nje ya session "
+                f"(> {max_gap_seconds}s) — hakuna sampuli ya utekelezaji"
+            )
+
     spread = (ask[fill] - bid[fill]) / pip
     slippage = np.abs(mid[fill] - mid[fill - 1]) / pip
-    return spread, slippage
+    return spread, slippage, n_dropped
 
 
-def summarise(spread, slippage) -> dict[str, float]:
+def summarise(spread, slippage, n_dropped: int = 0) -> dict[str, float]:
     """Sampuli → takwimu za cell."""
     import numpy as np
 
@@ -294,6 +319,7 @@ def summarise(spread, slippage) -> dict[str, float]:
         raise CalibrationAError("hakuna sampuli za kufupisha")
     return {
         "n_points": int(spread.size),
+        "n_dropped_gap": int(n_dropped),
         "spread_mean_pips": float(spread.mean()),
         "spread_p50_pips": float(np.quantile(spread, 0.50)),
         "spread_p95_pips": float(np.quantile(spread, 0.95)),
@@ -303,10 +329,12 @@ def summarise(spread, slippage) -> dict[str, float]:
 
 
 def measure_execution(ticks, bars, timeframe: str, *, symbol: str,
-                      day_tz: str = "UTC") -> dict[str, float]:
+                      day_tz: str = "UTC",
+                      max_gap_seconds: float | None = None) -> dict[str, float]:
     """Spread na slippage kwenye kila mpaka wa bar — kutoka ticks, si kudhaniwa."""
     return summarise(
-        *execution_samples(ticks, bars, timeframe, symbol=symbol, day_tz=day_tz)
+        *execution_samples(ticks, bars, timeframe, symbol=symbol, day_tz=day_tz,
+                           max_gap_seconds=max_gap_seconds)
     )
 
 
@@ -322,6 +350,8 @@ class CellSamples:
 
     symbol: str
     timeframe: str
+    max_gap_seconds: float | None = None
+    n_dropped_gap: int = 0
     _spread: list = None
     _slippage: list = None
     _atr: list = None
@@ -330,11 +360,13 @@ class CellSamples:
         self._spread, self._slippage, self._atr = [], [], []
 
     def add(self, ticks, bars, *, day_tz: str = "UTC") -> "CellSamples":
-        spread, slippage = execution_samples(
-            ticks, bars, self.timeframe, symbol=self.symbol, day_tz=day_tz
+        spread, slippage, dropped = execution_samples(
+            ticks, bars, self.timeframe, symbol=self.symbol, day_tz=day_tz,
+            max_gap_seconds=self.max_gap_seconds,
         )
         self._spread.append(spread)
         self._slippage.append(slippage)
+        self.n_dropped_gap += dropped
         if len(bars) > ATR_WINDOW:
             self._atr.append(atr_pips(bars, self.symbol))
         return self
@@ -348,7 +380,8 @@ class CellSamples:
 
         if not self._spread:
             raise CalibrationAError(f"{self.symbol}/{self.timeframe}: hakuna sampuli")
-        return summarise(np.concatenate(self._spread), np.concatenate(self._slippage))
+        return summarise(np.concatenate(self._spread), np.concatenate(self._slippage),
+                         self.n_dropped_gap)
 
     def atr(self) -> float:
         """Median ya ATR za vipande — kipimo kimoja cha ukubwa wa mwendo."""
@@ -420,6 +453,7 @@ def calibrate_cell(*, timeframe: str, cfg_risk, broker: Broker,
                    live_spread: float | None = None,
                    ticks=None, bars=None, samples: "CellSamples | None" = None,
                    m5_slippage_estimate: float | None = None,
+                   max_gap_seconds: float | None = None,
                    day_tz: str = "UTC") -> CostRow:
     """Cell moja ya `(pair, TF)`. Upande wa live unatoka RCE, hauhesabiwi hapa (R12).
 
@@ -430,7 +464,8 @@ def calibrate_cell(*, timeframe: str, cfg_risk, broker: Broker,
     if samples is not None:
         measured, atr = samples.stats(), samples.atr()
     elif ticks is not None and bars is not None:
-        measured = measure_execution(ticks, bars, timeframe, symbol=symbol, day_tz=day_tz)
+        measured = measure_execution(ticks, bars, timeframe, symbol=symbol,
+                                     day_tz=day_tz, max_gap_seconds=max_gap_seconds)
         atr = atr_pips(bars, symbol)
     else:
         raise CalibrationAError("toa `ticks` + `bars`, au `samples` — si bila kimoja")
@@ -458,6 +493,7 @@ def calibrate_cell(*, timeframe: str, cfg_risk, broker: Broker,
     return CostRow(
         symbol=symbol, timeframe=timeframe,
         n_points=int(measured["n_points"]),
+        n_dropped_gap=int(measured.get("n_dropped_gap", 0)),
         spread_mean_pips=measured["spread_mean_pips"],
         spread_p50_pips=measured["spread_p50_pips"],
         spread_p95_pips=measured["spread_p95_pips"],

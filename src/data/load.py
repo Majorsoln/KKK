@@ -73,9 +73,17 @@ class Partition:
     path: Path
     symbol: str
     size_mb: float
+    provenance: str = ""
+    day: str = ""          # `YYYY-MM-DD` ikiwa njia inaitaja; vinginevyo tupu
+
+    @property
+    def order(self) -> tuple[str, str]:
+        """Ufunguo wa mpangilio: tarehe kwanza, njia kama mrejeshi."""
+        return (self.day or "", str(self.path))
 
     def to_json(self) -> dict[str, Any]:
-        return {"path": str(self.path), "symbol": self.symbol, "size_mb": self.size_mb}
+        return {"path": str(self.path), "symbol": self.symbol, "size_mb": self.size_mb,
+                "provenance": self.provenance, "day": self.day}
 
 
 @dataclass
@@ -90,10 +98,37 @@ class Inventory:
     def symbols(self) -> list[str]:
         return sorted({p.symbol for p in self.partitions})
 
-    def of(self, symbol: str) -> list[Partition]:
+    def provenances(self, symbol: str) -> list[str]:
+        return sorted({p.provenance for p in self.partitions if p.symbol == symbol})
+
+    def raw(self, symbol: str) -> list[Partition]:
+        """Partitions zote za symbol bila kizuizi cha provenance — kwa kuripoti.
+
+        `of()` inakataa vyanzo viwili kwa sababu haipaswi kupima data
+        iliyochanganywa. Ripoti inapaswa **kuionyesha**, kwa hiyo hii ipo.
+        """
         return sorted(
-            (p for p in self.partitions if p.symbol == symbol), key=lambda p: str(p.path)
+            (p for p in self.partitions if p.symbol == symbol), key=lambda p: p.order
         )
+
+    def of(self, symbol: str) -> list[Partition]:
+        """Partitions za symbol, **kwa mpangilio wa tarehe**.
+
+        Kupanga kwa njia ya faili kungetosha kwa chanzo kimoja. Chanzo cha pili
+        kinapoingia — `provenance=broker` ikianza kurekodi kando ya
+        `provenance=aggregator` — njia inaanza na provenance, kwa hiyo mpangilio
+        wa maandishi ungeweka feed nzima ya kwanza kabla ya ya pili, na miaka
+        ingerudi nyuma katikati ya mtiririko. Tarehe ndiyo ukweli, si njia.
+        """
+        mine = [p for p in self.partitions if p.symbol == symbol]
+        vyanzo = {p.provenance for p in mine}
+        if len(vyanzo) > 1:
+            raise LoadError(
+                f"{symbol}: provenance zaidi ya moja ({sorted(vyanzo)}). Data ya vyanzo "
+                f"viwili haichanganywi chini ya symbol moja (data.yaml §2.2). "
+                f"Chagua kimoja: discover(root, provenance=...)"
+            )
+        return sorted(mine, key=lambda p: p.order)
 
     def render(self) -> str:
         lines = [
@@ -102,9 +137,16 @@ class Inventory:
             f"GB {sum(p.size_mb for p in self.partitions) / 1024:.2f}",
         ]
         for symbol in self.symbols:
-            chunks = self.of(symbol)
-            mb = sum(p.size_mb for p in chunks)
-            lines.append(f"   {symbol:<8} faili {len(chunks):>6,}  MB {mb:>10,.0f}")
+            mine = [p for p in self.partitions if p.symbol == symbol]
+            mb = sum(p.size_mb for p in mine)
+            vyanzo = self.provenances(symbol)
+            siku = sorted(p.day for p in mine if p.day)
+            span = f"{siku[0]} -> {siku[-1]}" if siku else "tarehe haiko kwenye njia"
+            alama = " CHANZO ZAIDI YA KIMOJA" if len(vyanzo) > 1 else ""
+            lines.append(
+                f"   {symbol:<8} faili {len(mine):>6,}  MB {mb:>10,.0f}  "
+                f"{'/'.join(v or '-' for v in vyanzo):<12} {span}{alama}"
+            )
         if self.isiyotambulika:
             lines.append(f"   HAIJATAMBULIKA: faili {len(self.isiyotambulika):,}")
             for path in self.isiyotambulika[:5]:
@@ -120,7 +162,8 @@ class Inventory:
         }
 
 
-def discover(root: Path | str, *, symbols: Sequence[str] | None = None) -> Inventory:
+def discover(root: Path | str, *, symbols: Sequence[str] | None = None,
+             provenance: str | None = None) -> Inventory:
     """Tembea mti wa faili, tambua symbol kutoka njia. Hakuna muundo unaodhaniwa."""
     root = Path(root)
     if not root.exists():
@@ -138,11 +181,39 @@ def discover(root: Path | str, *, symbols: Sequence[str] | None = None) -> Inven
             continue
         if ruhusa and symbol not in ruhusa:
             continue
+        tags = _tags_from_path(path, root)
+        if provenance and tags.get("provenance", "") != provenance:
+            continue
         inv.partitions.append(
             Partition(path=path, symbol=symbol,
-                      size_mb=round(path.stat().st_size / 1e6, 3))
+                      size_mb=round(path.stat().st_size / 1e6, 3),
+                      provenance=tags.get("provenance", ""), day=_day_from_tags(tags))
         )
     return inv
+
+
+def _tags_from_path(path: Path, root: Path) -> dict[str, str]:
+    """`key=value` zote zilizo kwenye njia — `provenance=`, `year=`, `month=`, `day=`."""
+    try:
+        rel = path.relative_to(root)
+    except ValueError:
+        rel = path
+    tags: dict[str, str] = {}
+    for piece in rel.parts:
+        if "=" in piece:
+            key, value = piece.split("=", 1)
+            tags[key.strip().lower()] = value.strip()
+    return tags
+
+
+def _day_from_tags(tags: dict[str, str]) -> str:
+    """`YYYY-MM-DD` kutoka `year=`/`month=`/`day=`, ikiwa zote zipo."""
+    try:
+        return "{:04d}-{:02d}-{:02d}".format(
+            int(tags["year"]), int(tags["month"]), int(tags["day"])
+        )
+    except (KeyError, ValueError):
+        return ""
 
 
 def _symbol_from_path(path: Path, root: Path) -> str | None:
@@ -271,17 +342,32 @@ def iter_months(inventory: Inventory, symbol: str, stage: Stage, *,
 
 
 def _grouped_by_month(inventory: Inventory, symbol: str, stage: Stage):
-    """Kusanya partitions hadi mwezi ubadilike, kisha toa."""
+    """Kusanya partitions hadi mwezi ubadilike, kisha toa.
+
+    Mwezi unatoka kwenye **njia** pale `year=`/`month=` zipo — hakuna faili
+    inayosomwa ili kujua ni ya lini. Zisipokuwepo, timestamp ya kwanza
+    inatumika, na hapo faili inasomwa mara moja tu.
+    """
     import pandas as pd
 
     buffer: list[Any] = []
     label: str | None = None
+    lo, hi = str(stage.window.start), str(stage.window.end)
 
     for part in inventory.of(symbol):
+        # Faili iliyo NJE ya dirisha haifunguliwi kabisa. `clip` bado inaendeshwa
+        # baadaye — hii inaondoa kusoma tu, si ukaguzi. Kwa dirisha la utafiti
+        # linaloishia 2024-03 wakati diski ina hadi 2026-08, ni robo ya data
+        # ambayo ingesomwa kisha kutupwa.
+        if part.day and not (lo <= part.day <= hi):
+            continue
+
         frame = read_partition(part.path)
         if frame.empty:
             continue
-        mwezi = pd.Timestamp(frame["timestamp"].iloc[0]).strftime("%Y-%m")
+        mwezi = part.day[:7] if part.day else pd.Timestamp(
+            frame["timestamp"].iloc[0]
+        ).strftime("%Y-%m")
         if label is not None and mwezi != label and buffer:
             yield label, pd.concat(buffer, ignore_index=True)
             buffer = []

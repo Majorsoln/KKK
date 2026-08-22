@@ -45,13 +45,15 @@ def _root(arg: str | None) -> Path:
 def main() -> int:
     ap = argparse.ArgumentParser(description="Angalia L0 kabla ya kupima")
     ap.add_argument("--root", default=None)
+    ap.add_argument("--provenance", default=None,
+                    help="chagua chanzo kimoja, mf. aggregator au broker")
     ap.add_argument("--peek", type=int, default=2, help="faili ngapi za kusoma kwa undani")
     args = ap.parse_args()
 
     root = _root(args.root)
     print(f"ROOT: {root}\n")
 
-    inv = discover(root)
+    inv = discover(root, provenance=args.provenance)
     print(inv.render())
 
     if not inv.partitions:
@@ -87,7 +89,7 @@ def main() -> int:
     print("KIPINDI KWA KILA SYMBOL (faili ya kwanza na ya mwisho)")
     print("=" * 74)
     for symbol in inv.symbols:
-        chunks = inv.of(symbol)
+        chunks = inv.raw(symbol)
         try:
             kwanza = read_partition(chunks[0].path)["timestamp"]
             mwisho = read_partition(chunks[-1].path)["timestamp"]

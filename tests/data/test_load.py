@@ -203,3 +203,73 @@ def test_miezi_ya_nje_ya_dirisha_hazitolewi(tmp_path):
     miezi = [label for label, _, _ in
              L.iter_months(L.discover(root), "EURUSD", STAGE, pip=1e-4)]
     assert miezi == ["2020-01"]
+
+
+# ===========================================================================
+# Provenance — vyanzo viwili havichanganywi
+# ===========================================================================
+
+
+def _hive_provenance(root, prov, symbol="EURUSD", days=("2020-01-02", "2020-01-03")):
+    for day in days:
+        y, m, d = day.split("-")
+        out = root / f"provenance={prov}" / f"symbol={symbol}" / f"year={y}" / f"month={m}" / f"day={d}"
+        out.mkdir(parents=True, exist_ok=True)
+        _frame(start=day, n=300).to_parquet(out / "ticks.parquet", index=False)
+    return root
+
+
+def test_provenance_na_tarehe_zinatoka_kwenye_njia(tmp_path):
+    inv = L.discover(_hive_provenance(tmp_path, "aggregator"))
+    part = inv.of("EURUSD")[0]
+    assert part.provenance == "aggregator"
+    assert part.day == "2020-01-02"
+
+
+def test_vyanzo_viwili_kwa_symbol_moja_vinalipuka(tmp_path):
+    """`data.yaml` §2.2: data ya brokers wawili haichanganywi chini ya tag moja."""
+    _hive_provenance(tmp_path, "aggregator")
+    _hive_provenance(tmp_path, "broker", days=("2020-01-06",))
+    inv = L.discover(tmp_path)
+    assert inv.provenances("EURUSD") == ["aggregator", "broker"]
+    with pytest.raises(L.LoadError, match="provenance zaidi ya moja"):
+        inv.of("EURUSD")
+    assert "CHANZO ZAIDI YA KIMOJA" in inv.render()
+
+
+def test_kuchagua_chanzo_kimoja_kunaruhusu_kupakia(tmp_path):
+    _hive_provenance(tmp_path, "aggregator")
+    _hive_provenance(tmp_path, "broker", days=("2020-01-06",))
+    inv = L.discover(tmp_path, provenance="broker")
+    assert inv.provenances("EURUSD") == ["broker"]
+    assert len(inv.of("EURUSD")) == 1
+
+
+def test_mpangilio_ni_wa_TAREHE_si_wa_njia(tmp_path):
+    """Njia inaanza na provenance; mpangilio wa maandishi ungerudisha miaka nyuma."""
+    _hive_provenance(tmp_path, "zzz_source", days=("2020-01-02",))
+    _hive_provenance(tmp_path, "aaa_source", days=("2020-01-09",))
+    inv = L.discover(tmp_path)
+    siku = [p.day for p in inv.raw("EURUSD")]
+    assert siku == ["2020-01-02", "2020-01-09"]
+
+
+def test_faili_za_nje_ya_dirisha_HAZIFUNGULIWI(tmp_path):
+    """Dirisha likiishia 2020-12 wakati diski ina 2021, robo ya data isingesomwa."""
+    _hive_provenance(tmp_path, "aggregator", days=("2020-01-02", "2021-06-01"))
+    zilizosomwa = []
+    halisi = L.read_partition
+
+    def _rekodi(path, **kw):
+        zilizosomwa.append(str(path))
+        return halisi(path, **kw)
+
+    L.read_partition = _rekodi
+    try:
+        miezi = [label for label, _, _ in
+                 L.iter_months(L.discover(tmp_path), "EURUSD", STAGE, pip=1e-4)]
+    finally:
+        L.read_partition = halisi
+
+    assert miezi == ["2020-01"]
+    assert len(zilizosomwa) == 1 and "2021" not in zilizosomwa[0]

@@ -259,3 +259,67 @@ def test_calibrate_inachapisha_kila_cell(cfg_risk):
         progress=lines.append,
     )
     assert len(lines) == 1 and "EURUSD" in lines[0]
+
+
+# ===========================================================================
+# Pengo la soko lililofungwa si slippage
+# ===========================================================================
+
+
+def _ticks_zenye_wikendi():
+    """Ijumaa nzima, kisha Jumatatu. Mpaka wa H1 wa Ijumaa 23:00 unaruka siku 3."""
+    ijumaa = _ticks(n=60 * 24, seed=11)
+    ijumaa["timestamp"] = pd.date_range("2020-06-05 00:00", periods=len(ijumaa),
+                                        freq="1min", tz="UTC")
+    jumatatu = _ticks(n=60 * 6, seed=12)
+    jumatatu["timestamp"] = pd.date_range("2020-06-08 00:00", periods=len(jumatatu),
+                                          freq="1min", tz="UTC")
+    # Bei ya Jumatatu inafunguka pips 60 juu — pengo halisi la wikendi.
+    jumatatu[["bid", "ask"]] += 60 * PIP
+    return pd.concat([ijumaa, jumatatu], ignore_index=True)
+
+
+def test_pengo_la_wikendi_HALIHESABIWI_kama_slippage():
+    """Bila kizuizi, pips 60 za pengo zingeingia kwenye `slippage_mean`.
+
+    Sio kosa linaloonekana: `research_cost` ingeonekana kubwa kuliko ilivyo, na
+    R16 ingevunjika kwa sababu isiyo ya gharama hata kidogo.
+    """
+    ticks = _ticks_zenye_wikendi()
+    bars = _bars(ticks)
+
+    bila = CA.measure_execution(ticks, bars, "H1", symbol="EURUSD")
+    na = CA.measure_execution(ticks, bars, "H1", symbol="EURUSD", max_gap_seconds=3600)
+
+    assert na["n_dropped_gap"] >= 1
+    assert bila["n_dropped_gap"] == 0
+    assert na["slippage_mean_pips"] < bila["slippage_mean_pips"] / 2
+    assert na["slippage_p95_pips"] < 5.0, "pengo bado liko ndani ya sampuli"
+
+
+def test_idadi_iliyotolewa_inaonekana_kwenye_ripoti(cfg_risk):
+    ticks = _ticks_zenye_wikendi()
+    row = CA.calibrate_cell(
+        timeframe="H1", ticks=ticks, bars=_bars(ticks), cfg_risk=cfg_risk,
+        broker=_broker(), h1_spreads=[1.5] * 100, m5_spreads=[1.5] * 288,
+        max_gap_seconds=3600,
+    )
+    assert row.n_dropped_gap >= 1
+    assert f"-{row.n_dropped_gap}" in row.render()
+    assert row.to_json()["n_dropped_gap"] == row.n_dropped_gap
+
+
+def test_kila_mpaka_ukiwa_nje_ya_session_inalipuka():
+    ticks = _ticks(n=8_000)
+    bars = _bars(ticks)
+    with pytest.raises(CA.CalibrationAError, match="nje ya session"):
+        CA.measure_execution(ticks, bars, "H1", symbol="EURUSD", max_gap_seconds=1e-6)
+
+
+def test_mkusanyiko_unajumlisha_zilizotolewa():
+    ticks = _ticks_zenye_wikendi()
+    bars = _bars(ticks)
+    samples = CA.CellSamples(symbol="EURUSD", timeframe="H1", max_gap_seconds=3600)
+    samples.add(ticks, bars).add(ticks, bars)
+    assert samples.n_chunks == 2
+    assert samples.stats()["n_dropped_gap"] == samples.n_dropped_gap >= 2
