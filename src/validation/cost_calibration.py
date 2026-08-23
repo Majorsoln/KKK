@@ -161,6 +161,17 @@ class CostRow:
             f"sens {self.cost_sensitivity:>5.2f}×  {alama}"
         )
 
+    def render_detail(self) -> str:
+        """Vipengele vinne vya §8.1, kando. Jumla peke yake haisemi kilichovunjika."""
+        return (
+            f"{'':<14}iliyopimwa: spread {self.spread_mean_pips:>7.3f} "
+            f"(p95 {self.spread_p95_pips:>7.3f}) · slip {self.slippage_mean_pips:>6.3f} ×2 "
+            f"(p95 {self.slippage_p95_pips:>6.3f}) · comm {self.commission_pips:>6.3f}\n"
+            f"{'':<14}RCE       : spread {self.live_spread_pips:>7.3f} · "
+            f"cap {self.live_slippage_cap_pips:>6.3f} · comm {self.commission_pips:>6.3f} · "
+            f"ATR {self.atr_pips:>8.1f} pips"
+        )
+
     def to_json(self) -> dict[str, Any]:
         payload = {k: v for k, v in self.__dict__.items()}
         payload.update({
@@ -202,9 +213,12 @@ class CostTable:
             )
         return self
 
-    def render(self) -> str:
+    def render(self, detail: bool = True) -> str:
         lines = [f"CALIBRATION A · cells {len(self.rows)} · {self.created_at}"]
-        lines += ["   " + row.render() for row in self.rows]
+        for row in self.rows:
+            lines.append("   " + row.render())
+            if detail or not row.ok:
+                lines.append(row.render_detail())
         if self.broken:
             lines.append(f"   VUNJIKA: cells {len(self.broken)} zina `live < research` (R16)")
         pengo = [r for r in self.rows if r.rce_slippage_gap_pips > 0]

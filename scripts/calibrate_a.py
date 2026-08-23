@@ -231,6 +231,7 @@ def main() -> int:
             )
             rows.append(row)
             print("      " + row.render())
+            print(row.render_detail())
         print(flush=True)
 
     if not rows:
