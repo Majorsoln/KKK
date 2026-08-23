@@ -278,7 +278,11 @@ class CostTable:
 
 def execution_samples(ticks, bars, timeframe: str, *, symbol: str,
                       day_tz: str = "UTC", max_gap_seconds: float | None = None):
-    """Sampuli ghafi za spread na slippage kwenye kila mpaka wa bar.
+    """Sampuli ghafi kwenye kila mpaka wa bar.
+
+    Rudi na `(spread, slippage, n_dropped, ends)` — `ends` ni muda wa kila mpaka
+    uliobaki, ili kipimo cha **saa ya siku** kiweze kutumia sampuli zile zile
+    badala ya kuzihesabu upya kwa njia yake (`cost_by_hour`).
 
     `max_gap_seconds` inatenganisha **utekelezaji** na **soko lililofungwa**.
 
@@ -314,6 +318,7 @@ def execution_samples(ticks, bars, timeframe: str, *, symbol: str,
     # kuvijaza kwa jirani kungebuni bei ambayo haikuwahi kuwepo.
     halali = (fill > 0) & (fill < len(stamps))
     fill = fill[halali]
+    ends = ends[halali]
     if fill.size == 0:
         raise CalibrationAError(
             f"{symbol}/{timeframe}: hakuna mpaka wa bar wenye quote pande zote mbili"
@@ -325,10 +330,11 @@ def execution_samples(ticks, bars, timeframe: str, *, symbol: str,
         ndani = gap <= float(max_gap_seconds)
         n_dropped = int((~ndani).sum())
         fill = fill[ndani]
+        ends = ends[ndani]
 
     spread = (ask[fill] - bid[fill]) / pip
     slippage = np.abs(mid[fill] - mid[fill - 1]) / pip
-    return spread, slippage, n_dropped
+    return spread, slippage, n_dropped, ends
 
 
 def summarise(spread, slippage, n_dropped: int = 0) -> dict[str, float]:
@@ -354,10 +360,11 @@ def measure_execution(ticks, bars, timeframe: str, *, symbol: str,
                       day_tz: str = "UTC",
                       max_gap_seconds: float | None = None) -> dict[str, float]:
     """Spread na slippage kwenye kila mpaka wa bar — kutoka ticks, si kudhaniwa."""
-    return summarise(
-        *execution_samples(ticks, bars, timeframe, symbol=symbol, day_tz=day_tz,
-                           max_gap_seconds=max_gap_seconds)
+    spread, slippage, dropped, _ = execution_samples(
+        ticks, bars, timeframe, symbol=symbol, day_tz=day_tz,
+        max_gap_seconds=max_gap_seconds,
     )
+    return summarise(spread, slippage, dropped)
 
 
 @dataclass
@@ -391,7 +398,7 @@ class CellSamples:
         ambayo ni ya mwezi mmoja. Inahesabiwa (`n_vipande_tupu`) na kuonekana.
         Kosa linakuja mwishoni ikiwa cell NZIMA haina sampuli.
         """
-        spread, slippage, dropped = execution_samples(
+        spread, slippage, dropped, _ = execution_samples(
             ticks, bars, self.timeframe, symbol=self.symbol, day_tz=day_tz,
             max_gap_seconds=self.max_gap_seconds,
         )
