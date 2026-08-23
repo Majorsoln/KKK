@@ -103,6 +103,18 @@ class Inventory:
     root: Path
     partitions: list[Partition] = field(default_factory=list)
     isiyotambulika: list[Path] = field(default_factory=list)
+    zilizotolewa: list[tuple] = field(default_factory=list)   # (path, Exclusion)
+
+    def matched(self, kifungu: "Exclusion") -> int:
+        """Faili ngapi kifungu hiki kimezitoa. Sifuri = kifungu hakifanyi kazi."""
+        return sum(1 for _, e in self.zilizotolewa if e is kifungu)
+
+    @property
+    def excluded_summary(self) -> dict[str, int]:
+        out: dict[str, int] = {}
+        for _, kifungu in self.zilizotolewa:
+            out[kifungu.render()] = out.get(kifungu.render(), 0) + 1
+        return out
 
     @property
     def symbols(self) -> list[str]:
@@ -226,8 +238,47 @@ class Inventory:
         }
 
 
+@dataclass(frozen=True)
+class Exclusion:
+    """Kifungu cha `data.yaml: quality.excluded_ranges` — uamuzi wa PD, si check.
+
+    Checks za §4.3 zinakamata siku moja moja; zinashindwa pale kasoro ni ya
+    **kipindi**. Kifungu hiki ndicho jibu, na kina sababu iliyoandikwa. Kwa hiyo
+    kinaingia `config_hash`, na kupuuza kwake si uzembe — ni kutumia dataset
+    tofauti na iliyoidhinishwa.
+    """
+
+    symbols: frozenset[str]
+    start: str
+    end: str
+    reason: str = ""
+
+    def covers(self, symbol: str, period: str) -> bool:
+        if symbol.upper() not in self.symbols or not period:
+            return False
+        n = len(period)
+        return self.start[:n] <= period <= self.end[:n]
+
+    def render(self) -> str:
+        return (f"{'/'.join(sorted(self.symbols))} · {self.start} -> {self.end}"
+                f"{' · ' + self.reason.split('.')[0] if self.reason else ''}")
+
+
+def load_exclusions(cfg) -> list[Exclusion]:
+    """Vifungu vya `quality.excluded_ranges`, kama vilivyoandikwa."""
+    out = []
+    for item in (cfg.get("quality.excluded_ranges", []) or []):
+        out.append(Exclusion(
+            symbols=frozenset(s.upper() for s in item.get("symbols", [])),
+            start=str(item["from"]), end=str(item["to"]),
+            reason=str(item.get("reason", "")).strip(),
+        ))
+    return out
+
+
 def discover(root: Path | str, *, symbols: Sequence[str] | None = None,
-             provenance: str | None = None) -> Inventory:
+             provenance: str | None = None,
+             exclusions: Sequence[Exclusion] = ()) -> Inventory:
     """Tembea mti wa faili, tambua symbol kutoka njia. Hakuna muundo unaodhaniwa."""
     root = Path(root)
     if not root.exists():
@@ -249,6 +300,10 @@ def discover(root: Path | str, *, symbols: Sequence[str] | None = None,
         if provenance and tags.get("provenance", "") != provenance:
             continue
         period, shaka = _period_from_tags(tags)
+        kifungu = next((e for e in exclusions if e.covers(symbol, period)), None)
+        if kifungu is not None:
+            inv.zilizotolewa.append((path, kifungu))
+            continue
         inv.partitions.append(
             Partition(path=path, symbol=symbol,
                       size_mb=round(path.stat().st_size / 1e6, 3),

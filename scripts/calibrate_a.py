@@ -31,7 +31,9 @@ REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO))
 
 from src.data.bars import TIMEFRAMES, build  # noqa: E402
-from src.data.load import LoadError, discover, iter_months, read_partition  # noqa: E402
+from src.data.load import (  # noqa: E402
+    LoadError, discover, iter_months, load_exclusions, read_partition,
+)
 from src.data.window import declare, research_window  # noqa: E402
 from src.rce.config import load_config  # noqa: E402
 from src.rce.cost import SymbolSpec, pip_size  # noqa: E402
@@ -83,10 +85,10 @@ def pip_value_usd(symbol: str, contract_size: float, inv) -> tuple[float, str]:
     if rate:
         return kwa_quote * rate, f"{quote}USD={rate:.5f}"
 
-    raise SystemExit(
-        f"{symbol}: hakuna data ya kubadilisha {quote} kuwa USD. "
-        f"Pakia USD{quote} au {quote}USD, au toa --pip-value {symbol}=<thamani>"
-    )
+    # Symbol moja isiyoweza kubadilishwa haiui run nzima — inarukwa na kutajwa.
+    # Kusimamisha kila kitu kungetupa saa za kazi za symbols zilizobaki.
+    return None, (f"HAKUNA kiwango cha {quote}->USD (pakia USD{quote} au {quote}USD, "
+                  f"au toa --pip-value {symbol}=<thamani>)")
 
 
 def main() -> int:
@@ -99,6 +101,8 @@ def main() -> int:
     ap.add_argument("--months", type=int, default=0, help="0 = zote")
     ap.add_argument("--out", default=None)
     ap.add_argument("--pip-value", nargs="*", default=[], metavar="SYM=VAL")
+    ap.add_argument("--resume", action="store_true",
+                    help="ruka symbols zilizoshakamilika kwenye faili la --out")
     ap.add_argument("--strict-quality", action="store_true",
                     help="simamisha ikiwa ukaguzi wa §4.3 unashindwa kwa mwezi wowote")
     args = ap.parse_args()
@@ -123,7 +127,15 @@ def main() -> int:
     print(f"   symbols {len(symbols)} · TF {tfs} · day_tz {day_tz}")
     print(f"   config_hash data {cfg_data.config_hash} · risk {cfg_risk.config_hash}\n")
 
-    inv = discover(root, provenance=args.provenance)
+    vifungu = load_exclusions(cfg_data)
+    inv = discover(root, provenance=args.provenance, exclusions=vifungu)
+    if vifungu:
+        print("   VIFUNGU vya `quality.excluded_ranges` (uamuzi wa PD, DF-05):")
+        for kifungu in vifungu:
+            n = inv.matched(kifungu)
+            alama = "" if n else "   HAKIJAGUSA FAILI HATA MOJA"
+            print(f"      faili {n:>5,}  {kifungu.render()}{alama}")
+        print()
     hazipo = [s for s in symbols if s not in inv.symbols]
     if hazipo:
         print(f"   HAZIPO kwenye L0: {hazipo}")
@@ -142,7 +154,38 @@ def main() -> int:
         print("   ONYO: `contract_size_confirmed: false` kwenye broker_costs.yaml.\n"
               "         `pip_value` inategemea namba isiyothibitishwa kwa MT5.\n")
 
-    rows = []
+    out = Path(args.out) if args.out else Path(
+        os.environ.get("ELITEFX_RESEARCH_ROOT", REPO / "research")
+    ) / "reports" / "calibration_a.json"
+
+    rows: list = []
+    if args.resume and out.exists():
+        rows = list(CA.CostTable.read(out).rows)
+        zilizopo = {r.symbol for r in rows}
+        ruka = [s for s in symbols if s in zilizopo]
+        if ruka:
+            print(f"   RESUME: symbols {len(ruka)} zimeshakamilika, zinarukwa: "
+                  f"{', '.join(ruka)}\n")
+        symbols = [s for s in symbols if s not in zilizopo]
+        if not symbols:
+            print("   hakuna symbol iliyobaki.")
+
+    def hifadhi():
+        """Andika baada ya KILA symbol. Run ya saa nne ikikatizwa, kilichopimwa kinabaki."""
+        jedwali = CA.CostTable(
+            rows=tuple(rows),
+            created_at=datetime.now(timezone.utc).isoformat(timespec="seconds"),
+            source=f"L0 {root} · stage {stage.name}",
+            config_hash=f"data={cfg_data.config_hash} risk={cfg_risk.config_hash}",
+        )
+        payload = jedwali.to_json()
+        payload["contract_size_confirmed"] = confirmed
+        payload["provenance"] = args.provenance or "(zote)"
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text(json.dumps(payload, indent=2, default=str) + "\n",
+                       encoding="utf-8", newline="\n")
+        return jedwali
+
     for symbol in symbols:
         anza = time.time()
         pip = pip_size(symbol)
@@ -151,6 +194,9 @@ def main() -> int:
             pipval, njia = overrides[symbol], "--pip-value"
         else:
             pipval, njia = pip_value_usd(symbol, contract, inv)
+            if pipval is None:
+                print(f"   {symbol}: imerukwa — {njia}\n")
+                continue
 
         # Kizingiti cha pengo: mpaka wa bar unapoangukia soko lililofungwa,
         # "tick inayofuata" ni ya Jumapili usiku. Tofauti yake si slippage.
@@ -232,33 +278,28 @@ def main() -> int:
             rows.append(row)
             print("      " + row.render())
             print(row.render_detail())
+        hifadhi()
         print(flush=True)
 
     if not rows:
         raise SystemExit("hakuna cell iliyopimwa")
 
-    table = CA.CostTable(
-        rows=tuple(rows),
-        created_at=datetime.now(timezone.utc).isoformat(timespec="seconds"),
-        source=f"L0 {root} · stage {stage.name}",
-        config_hash=f"data={cfg_data.config_hash} risk={cfg_risk.config_hash}",
-    )
-
-    out = Path(args.out) if args.out else Path(
-        os.environ.get("ELITEFX_RESEARCH_ROOT", REPO / "research")
-    ) / "reports" / "calibration_a.json"
-    payload = table.to_json()
-    payload["contract_size_confirmed"] = confirmed
-    out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(
-        json.dumps(payload, indent=2, default=str) + "\n",
-        encoding="utf-8", newline="\n",
-    )
+    table = hifadhi()
 
     print("=" * 78)
     print(table.render())
     print("=" * 78)
     print(f"ushahidi: {out}")
+
+    # Slippage ILIYOPIMWA kwa kila symbol — msingi wa cap, si pendekezo la
+    # kubuni. §2: kila namba inayoingia kwenye uamuzi inapimwa kwanza.
+    print("\nSLIPPAGE ILIYOPIMWA (p95 kubwa kuliko zote kati ya TF)")
+    print(f"   {'symbol':<8} {'mean':>8} {'p95':>8} {'cap ya sasa':>12}")
+    for symbol in sorted({r.symbol for r in table.rows}):
+        zake = [r for r in table.rows if r.symbol == symbol]
+        print(f"   {symbol:<8} {max(r.slippage_mean_pips for r in zake):>8.3f} "
+              f"{max(r.slippage_p95_pips for r in zake):>8.3f} "
+              f"{zake[0].live_slippage_cap_pips:>12.3f}")
     if table.broken:
         print("R16 IMEVUNJIKA — injini haiendelei hadi hii itatuliwe.")
         return 2

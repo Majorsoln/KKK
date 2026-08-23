@@ -312,11 +312,6 @@ def execution_samples(ticks, bars, timeframe: str, *, symbol: str,
         ndani = gap <= float(max_gap_seconds)
         n_dropped = int((~ndani).sum())
         fill = fill[ndani]
-        if fill.size == 0:
-            raise CalibrationAError(
-                f"{symbol}/{timeframe}: kila mpaka uko nje ya session "
-                f"(> {max_gap_seconds}s) — hakuna sampuli ya utekelezaji"
-            )
 
     spread = (ask[fill] - bid[fill]) / pip
     slippage = np.abs(mid[fill] - mid[fill - 1]) / pip
@@ -366,6 +361,7 @@ class CellSamples:
     timeframe: str
     max_gap_seconds: float | None = None
     n_dropped_gap: int = 0
+    n_vipande_tupu: int = 0
     _spread: list = None
     _slippage: list = None
     _atr: list = None
@@ -374,13 +370,24 @@ class CellSamples:
         self._spread, self._slippage, self._atr = [], [], []
 
     def add(self, ticks, bars, *, day_tz: str = "UTC") -> "CellSamples":
+        """Ongeza kipande kimoja.
+
+        Kipande kisicho na mpaka hata mmoja halali **si kosa la kufa nacho**.
+        Mwezi mmoja wa D1 unaweza kuwa na mipaka yote ikianguka kwenye pengo la
+        feed; kusimamisha run nzima hapo kungetupa saa za kazi kwa taarifa
+        ambayo ni ya mwezi mmoja. Inahesabiwa (`n_vipande_tupu`) na kuonekana.
+        Kosa linakuja mwishoni ikiwa cell NZIMA haina sampuli.
+        """
         spread, slippage, dropped = execution_samples(
             ticks, bars, self.timeframe, symbol=self.symbol, day_tz=day_tz,
             max_gap_seconds=self.max_gap_seconds,
         )
+        self.n_dropped_gap += dropped
+        if len(spread) == 0:
+            self.n_vipande_tupu += 1
+            return self
         self._spread.append(spread)
         self._slippage.append(slippage)
-        self.n_dropped_gap += dropped
         if len(bars) > ATR_WINDOW:
             self._atr.append(atr_pips(bars, self.symbol))
         return self
@@ -393,7 +400,10 @@ class CellSamples:
         import numpy as np
 
         if not self._spread:
-            raise CalibrationAError(f"{self.symbol}/{self.timeframe}: hakuna sampuli")
+            raise CalibrationAError(
+                f"{self.symbol}/{self.timeframe}: hakuna sampuli hata moja "
+                f"({self.n_vipande_tupu} vipande, mipaka {self.n_dropped_gap} nje ya session)"
+            )
         return summarise(np.concatenate(self._spread), np.concatenate(self._slippage),
                          self.n_dropped_gap)
 

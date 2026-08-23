@@ -367,3 +367,62 @@ def test_chanzo_kikichaguliwa_mwingiliano_hauzuii(tmp_path):
     _hive_provenance(tmp_path, "broker", days=("2020-01-03",))
     inv = L.discover(tmp_path, provenance="aggregator")
     assert len(inv.of("EURUSD")) == 2
+
+
+# ===========================================================================
+# `quality.excluded_ranges` — uamuzi wa PD, si check
+# ===========================================================================
+
+
+def test_kifungu_kinatoa_partitions_za_kipindi(tmp_path):
+    """Checks zinakamata siku moja moja; zinashindwa pale kasoro ni ya KIPINDI."""
+    root = tmp_path / "l0"
+    for label in ("2020-01", "2020-06", "2021-01"):
+        y, m = label.split("-")
+        out = root / "symbol=EURCHF" / f"year={y}" / f"month={m}"
+        out.mkdir(parents=True)
+        _frame(start=f"{label}-01").to_parquet(out / f"ticks-{label}.parquet", index=False)
+
+    kifungu = L.Exclusion(symbols=frozenset({"EURCHF"}), start="2020-01-01",
+                          end="2020-12-31", reason="feed ilipungua")
+    inv = L.discover(root, exclusions=[kifungu])
+    assert [p.period for p in inv.raw("EURCHF")] == ["2021-01"]
+    assert len(inv.zilizotolewa) == 2
+    assert "EURCHF" in next(iter(inv.excluded_summary))
+
+
+def test_kifungu_hakigusi_symbols_zisizotajwa(tmp_path):
+    root = tmp_path / "l0"
+    for symbol in ("EURUSD", "EURCHF"):
+        out = root / f"symbol={symbol}" / "year=2020" / "month=01"
+        out.mkdir(parents=True)
+        _frame().to_parquet(out / "ticks-2020-01.parquet", index=False)
+
+    kifungu = L.Exclusion(symbols=frozenset({"EURCHF"}), start="2000-01-01", end="2099-12-31")
+    inv = L.discover(root, exclusions=[kifungu])
+    assert inv.symbols == ["EURUSD"]
+
+
+def test_kifungu_HAKIWEZI_kutumika_pasipo_tarehe_kwenye_njia(tmp_path):
+    """Partition isiyo na tarehe kwenye njia haiwezi kutolewa na kifungu cha tarehe.
+
+    Si kimya: `matched()` inarudisha sifuri, na script inatoa onyo. Kifungu
+    kilichoidhinishwa kisichogusa faili hata moja ni kifungu kisichofanya kazi.
+    """
+    root = _tree(tmp_path, "hive", symbols=("EURCHF",))
+    kifungu = L.Exclusion(symbols=frozenset({"EURCHF"}), start="2000-01-01", end="2099-12-31")
+    inv = L.discover(root, exclusions=[kifungu])
+    assert inv.symbols == ["EURCHF"]
+    assert inv.matched(kifungu) == 0
+
+
+def test_vifungu_vinasomwa_kutoka_config(cfg):
+    """DF-05: EURCHF/GBPJPY/XAUUSD 2023 — kimeidhinishwa na PD, kiko `data.yaml`."""
+    vifungu = L.load_exclusions(cfg)
+    assert vifungu, "`quality.excluded_ranges` haikusomwa"
+    kifungu = vifungu[0]
+    assert kifungu.symbols == frozenset({"EURCHF", "GBPJPY", "XAUUSD"})
+    assert kifungu.covers("EURCHF", "2023-04")
+    assert kifungu.covers("GBPJPY", "2023-07-15")
+    assert not kifungu.covers("EURUSD", "2023-04")
+    assert not kifungu.covers("EURCHF", "2024-01")

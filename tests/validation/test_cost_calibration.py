@@ -309,11 +309,29 @@ def test_idadi_iliyotolewa_inaonekana_kwenye_ripoti(cfg_risk):
     assert row.to_json()["n_dropped_gap"] == row.n_dropped_gap
 
 
-def test_kila_mpaka_ukiwa_nje_ya_session_inalipuka():
+def test_kipande_kisicho_na_mpaka_halali_HAKIUI_run():
+    """Mwezi mmoja usio na mpaka halali si kosa la kufa nalo.
+
+    Mipaka yote ya D1 ya mwezi mmoja inaweza kuanguka kwenye pengo la feed.
+    Kusimamisha run nzima hapo kungetupa saa za kazi kwa taarifa ya mwezi mmoja.
+    """
     ticks = _ticks(n=8_000)
     bars = _bars(ticks)
+    nzuri = CA.CellSamples(symbol="EURUSD", timeframe="H1", max_gap_seconds=3600)
+    nzuri.add(ticks, bars)
+
+    kikavu = CA.CellSamples(symbol="EURUSD", timeframe="H1", max_gap_seconds=1e-6)
+    kikavu.add(ticks, bars)
+    assert kikavu.n_vipande_tupu == 1 and kikavu.n_chunks == 0
+
+
+def test_cell_NZIMA_isiyo_na_sampuli_ndiyo_inalipuka():
+    """Kosa linakuja mwishoni, si katikati — na linahesabu kilichotokea."""
+    ticks = _ticks(n=8_000)
+    samples = CA.CellSamples(symbol="EURUSD", timeframe="H1", max_gap_seconds=1e-6)
+    samples.add(ticks, _bars(ticks))
     with pytest.raises(CA.CalibrationAError, match="nje ya session"):
-        CA.measure_execution(ticks, bars, "H1", symbol="EURUSD", max_gap_seconds=1e-6)
+        samples.stats()
 
 
 def test_mkusanyiko_unajumlisha_zilizotolewa():
