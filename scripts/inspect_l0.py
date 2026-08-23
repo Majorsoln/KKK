@@ -86,7 +86,24 @@ def main() -> int:
               f"{((out['ask'] - out['bid']).median() / pip_size(part.symbol)):.2f}")
 
     print("\n" + "=" * 74)
-    print("KIPINDI KWA KILA SYMBOL (faili ya kwanza na ya mwisho)")
+    print("PROVENANCE — chanzo kwa chanzo, symbol kwa symbol")
+    print("=" * 74)
+    for symbol in inv.symbols:
+        mine = inv.raw(symbol)
+        for prov in inv.provenances(symbol):
+            zake = [p for p in mine if p.provenance == prov]
+            zenye_tarehe = [p.day for p in zake if p.day]
+            span = (f"{min(zenye_tarehe)} -> {max(zenye_tarehe)}"
+                    if zenye_tarehe else "tarehe HAIKO kwenye njia")
+            print(f"   {symbol:<8} {prov or '(hakuna)':<12} faili {len(zake):>6,}  "
+                  f"MB {sum(p.size_mb for p in zake):>9,.0f}  {span}")
+            print(f"      {zake[0].path.relative_to(root)}")
+            if len(zake) > 1:
+                print(f"      {zake[-1].path.relative_to(root)}")
+
+    print("\n" + "=" * 74)
+    print("KIPINDI KWA KILA SYMBOL — kutoka NDANI ya faili ya kwanza na ya mwisho")
+    print("(faili zisizo na tarehe kwenye njia zinapangwa mwanzoni)")
     print("=" * 74)
     for symbol in inv.symbols:
         chunks = inv.raw(symbol)
