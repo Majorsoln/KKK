@@ -503,7 +503,9 @@ def calibrate_cell(*, timeframe: str, cfg_risk, broker: Broker,
 
     if live_spread is None:
         live_spread = spread_effective(list(h1_spreads), list(m5_spreads), cfg_risk)
-    live_cap = slippage_cap_pips(broker.order_type, cfg_risk, m5_slippage_estimate)
+    live_cap = slippage_cap_pips(
+        broker.order_type, cfg_risk, m5_slippage_estimate, symbol=symbol
+    )
 
     # §8.1: spread kamili (nusu kuingia + nusu kutoka) + slippage MARA MBILI.
     research = (

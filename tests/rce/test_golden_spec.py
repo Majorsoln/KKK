@@ -200,3 +200,72 @@ def test_rce09_pip_size_ya_symbols():
     assert pip_size("XAUUSD") == 0.01
     assert pip_size("EURUSD") == 0.0001
     assert pip_size("GBPUSD") == 0.0001
+
+
+# ===========================================================================
+# Cap ya kila symbol — spec §3.2 (PD 2026-08-23)
+# ===========================================================================
+
+
+class _Cfg:
+    """Config ndogo ya kupima muundo wa cap pekee."""
+
+    def __init__(self, caps, dynamic=True):
+        self._caps = caps
+        self._dynamic = dynamic
+
+    def get(self, key, default=None):
+        if key == "slippage_cap_pips":
+            return self._caps
+        if key == "slippage_cap_dynamic":
+            return self._dynamic
+        return default
+
+
+def test_muundo_wa_namba_moja_bado_unafanya_kazi(risk_cfg):
+    """`risk.yaml` ya sasa haibadiliki; cap ya kila symbol ni ya hiari."""
+    assert slippage_cap_pips("market", risk_cfg) == pytest.approx(0.1)
+    assert slippage_cap_pips("market", risk_cfg, symbol="XAUUSD") == pytest.approx(0.1)
+
+
+def test_jedwali_la_symbols_linatoa_cap_ya_symbol():
+    """Pips 0.1 ni point 1 kwa EURUSD na $0.001 kwa XAUUSD — chini ya tick moja."""
+    cfg = _Cfg({"market": {"default": 0.1, "XAUUSD": 12.0}, "stop": 0.3})
+    assert slippage_cap_pips("market", cfg, symbol="EURUSD") == pytest.approx(0.1)
+    assert slippage_cap_pips("market", cfg, symbol="XAUUSD") == pytest.approx(12.0)
+    assert slippage_cap_pips("market", cfg, symbol="xauusd") == pytest.approx(12.0)
+
+
+def test_jedwali_bila_symbol_LINALIPUKA():
+    """Kurudisha `default` kimya kungetoa cap ya EURUSD kwa dhahabu.
+
+    Kosa hilo halionekani hadi orders zianze kukataliwa live — na hapo hakuna
+    kinachoelekeza kwenye chanzo chake.
+    """
+    cfg = _Cfg({"market": {"default": 0.1, "XAUUSD": 12.0}, "stop": 0.3})
+    with pytest.raises(ValueError, match="symbol"):
+        slippage_cap_pips("market", cfg)
+
+
+def test_jedwali_bila_default_wala_symbol_linalipuka():
+    cfg = _Cfg({"market": {"XAUUSD": 12.0}, "stop": 0.3})
+    with pytest.raises(ValueError, match="default"):
+        slippage_cap_pips("market", cfg, symbol="EURUSD")
+
+
+def test_cap_ya_symbol_bado_INABANA_TU():
+    """§3.2: `min`, si `max`. Dynamic inaweza kubana cap ya symbol, si kuilegeza."""
+    cfg = _Cfg({"market": {"default": 0.1, "XAUUSD": 12.0}, "stop": 0.3})
+    assert slippage_cap_pips("market", cfg, dynamic_estimate=3.0,
+                             symbol="XAUUSD") == pytest.approx(3.0)
+    assert slippage_cap_pips("market", cfg, dynamic_estimate=50.0,
+                             symbol="XAUUSD") == pytest.approx(12.0)
+
+
+def test_deviation_ya_dhahabu_si_SIFURI_ikiwa_na_cap_yake():
+    """Kwa cap 0.1, `order.deviation` ya XAUUSD ni points 0 — haijazi kamwe."""
+    from src.rce.cost import order_deviation_points
+
+    assert order_deviation_points(0.1, "XAUUSD", 0.01) == 0
+    assert order_deviation_points(12.0, "XAUUSD", 0.01) == 12
+    assert order_deviation_points(0.1, "EURUSD", 0.00001) == 1
