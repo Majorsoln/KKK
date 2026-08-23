@@ -320,7 +320,7 @@ def test_faili_yenye_tarehe_isiyosomeka_INAZUIA_kupakia(tmp_path):
 
 def test_vipindi_vinavyojirudia_VINAZUIA_kupakia(tmp_path):
     root = tmp_path / "l0"
-    for n, jina in enumerate(("a", "b")):
+    for jina in ("a", "b"):
         out = root / "symbol=EURUSD" / "year=2020" / "month=01" / "day=02"
         out.mkdir(parents=True, exist_ok=True)
         _frame(start="2020-01-02", n=300).to_parquet(out / f"{jina}.parquet", index=False)
@@ -345,3 +345,25 @@ def test_faili_ya_MWEZI_wa_mwisho_wa_dirisha_haitupwi(tmp_path):
 
     miezi = [lbl for lbl, _, _ in L.iter_months(L.discover(root), "EURUSD", STAGE, pip=1e-4)]
     assert miezi == ["2020-12"]
+
+
+def test_mwingiliano_wa_vyanzo_SI_kipindi_kinachojirudia(tmp_path):
+    """Siku ile ile kwenye feed mbili si kosa — ni uamuzi wa chanzo.
+
+    Recorder inapoanza wakati aggregator bado inaendelea, siku chache
+    zinaandikwa mara mbili. Kuziita "zinajirudia" kungefanya onyo la kweli
+    (partition mbili za siku moja ndani ya chanzo kimoja) lisisikike.
+    """
+    _hive_provenance(tmp_path, "aggregator", days=("2020-01-02", "2020-01-03"))
+    _hive_provenance(tmp_path, "broker", days=("2020-01-03",))
+    inv = L.discover(tmp_path)
+
+    assert inv.duplicates("EURUSD") == []
+    assert inv.overlaps("EURUSD") == ["2020-01-03"]
+
+
+def test_chanzo_kikichaguliwa_mwingiliano_hauzuii(tmp_path):
+    _hive_provenance(tmp_path, "aggregator", days=("2020-01-02", "2020-01-03"))
+    _hive_provenance(tmp_path, "broker", days=("2020-01-03",))
+    inv = L.discover(tmp_path, provenance="aggregator")
+    assert len(inv.of("EURUSD")) == 2

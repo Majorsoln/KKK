@@ -162,12 +162,31 @@ class Inventory:
         return sorted(mine, key=lambda p: p.order)
 
     def duplicates(self, symbol: str) -> list[str]:
-        """Vipindi vinavyoonekana zaidi ya mara moja kwa symbol moja."""
-        seen: dict[str, int] = {}
+        """Vipindi vinavyojirudia **ndani ya chanzo kimoja** — partition mbili za siku moja.
+
+        Ndani ya chanzo kimoja, kipindi kinachojirudia ni kosa: ticks za siku
+        hiyo zingehesabiwa maradufu. **Kati** ya vyanzo si kosa — ni mwingiliano,
+        na unatatuliwa kwa kuchagua chanzo (`overlaps`).
+        """
+        seen: dict[tuple[str, str], int] = {}
         for p in self.partitions:
             if p.symbol == symbol and p.period:
-                seen[p.period] = seen.get(p.period, 0) + 1
-        return sorted(k for k, n in seen.items() if n > 1)
+                key = (p.provenance, p.period)
+                seen[key] = seen.get(key, 0) + 1
+        return sorted({period for (_, period), n in seen.items() if n > 1})
+
+    def overlaps(self, symbol: str) -> list[str]:
+        """Vipindi vilivyopo kwenye vyanzo ZAIDI ya kimoja.
+
+        Si kosa: recorder inapoanza kurekodi wakati aggregator bado inaendelea,
+        siku chache zinaandikwa mara mbili kwa vyanzo tofauti. Ni taarifa
+        inayohitaji uamuzi — chanzo kipi ndicho ukweli kwa siku hizo.
+        """
+        kwa_kipindi: dict[str, set[str]] = {}
+        for p in self.partitions:
+            if p.symbol == symbol and p.period:
+                kwa_kipindi.setdefault(p.period, set()).add(p.provenance)
+        return sorted(k for k, v in kwa_kipindi.items() if len(v) > 1)
 
     @property
     def zenye_shaka(self) -> list[Partition]:

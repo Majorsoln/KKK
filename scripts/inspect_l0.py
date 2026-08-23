@@ -113,7 +113,20 @@ def main() -> int:
         for part in inv.zenye_shaka[:20]:
             print(f"   tarehe haisomeki: {part.path.relative_to(root)}")
         for sym, vipindi in pacha.items():
-            print(f"   {sym}: vipindi vinajirudia — {', '.join(vipindi[:5])}")
+            print(f"   {sym}: vipindi vinajirudia ndani ya chanzo kimoja — "
+                  f"{', '.join(vipindi[:5])}")
+
+    mwingiliano = {sym: inv.overlaps(sym) for sym in inv.symbols}
+    mwingiliano = {k: v for k, v in mwingiliano.items() if v}
+    if mwingiliano:
+        print("\n" + "=" * 74)
+        print("MWINGILIANO WA VYANZO — si kosa; ni uamuzi")
+        print("=" * 74)
+        print("   Vipindi vilivyoandikwa na vyanzo VIWILI. Chagua kimoja kwa --provenance;")
+        print("   feed mbili haziunganishwi (data.yaml §2.2).")
+        for sym, vipindi in mwingiliano.items():
+            print(f"   {sym:<8} vipindi {len(vipindi):>3}  "
+                  f"{vipindi[0]} -> {vipindi[-1]}")
 
     print("\n" + "=" * 74)
     print("KIPINDI KWA KILA SYMBOL — kutoka NDANI ya faili ya kwanza na ya mwisho")
