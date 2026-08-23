@@ -74,16 +74,26 @@ class Partition:
     symbol: str
     size_mb: float
     provenance: str = ""
-    day: str = ""          # `YYYY-MM-DD` ikiwa njia inaitaja; vinginevyo tupu
+
+    # Kipindi kwa **usahihi ulioandikwa kwenye njia**: `YYYY-MM-DD`, `YYYY-MM`,
+    # `YYYY`, au tupu. Partitions za kila siku na za kila mwezi zinaishi pamoja
+    # kwenye L0 moja (`day=04/` dhidi ya `ticks-2016-01.parquet`), kwa hiyo
+    # kudai usahihi wa siku kwa zote kungefanya nusu yao zionekane hazina tarehe.
+    period: str = ""
+    shaka: bool = False    # tag ya tarehe ipo lakini haisomeki
 
     @property
     def order(self) -> tuple[str, str]:
-        """Ufunguo wa mpangilio: tarehe kwanza, njia kama mrejeshi."""
-        return (self.day or "", str(self.path))
+        """Ufunguo wa mpangilio: kipindi kwanza, njia kama mrejeshi."""
+        return (self.period or "", str(self.path))
+
+    @property
+    def month(self) -> str:
+        return self.period[:7] if len(self.period) >= 7 else ""
 
     def to_json(self) -> dict[str, Any]:
         return {"path": str(self.path), "symbol": self.symbol, "size_mb": self.size_mb,
-                "provenance": self.provenance, "day": self.day}
+                "provenance": self.provenance, "period": self.period, "shaka": self.shaka}
 
 
 @dataclass
@@ -128,7 +138,40 @@ class Inventory:
                 f"viwili haichanganywi chini ya symbol moja (data.yaml §2.2). "
                 f"Chagua kimoja: discover(root, provenance=...)"
             )
+
+        # Faili yenye tarehe isiyosomeka haiwezi kuwekwa kwenye muda, na
+        # Calibration A inaweka kila kitu kwenye muda. Karibu daima ni nakala ya
+        # siku iliyopo tayari — ikipakiwa, ticks za siku hiyo zinahesabiwa
+        # maradufu, na spread yake inapata uzito maradufu bila kosa kuonekana.
+        zenye_shaka = [p for p in mine if p.shaka]
+        if zenye_shaka:
+            orodha = "\n      ".join(str(p.path) for p in zenye_shaka[:10])
+            raise LoadError(
+                f"{symbol}: faili {len(zenye_shaka)} zina tarehe isiyosomeka kwenye njia:\n"
+                f"      {orodha}\n"
+                f"   Kwa kawaida ni nakala (`day=29 (1)`). Ziondoe au zitaje upya, "
+                f"kisha endesha tena."
+            )
+
+        pacha = self.duplicates(symbol)
+        if pacha:
+            raise LoadError(
+                f"{symbol}: vipindi vinajirudia ({', '.join(pacha[:5])}). Partition mbili "
+                f"za kipindi kile kile zingehesabu ticks zake maradufu."
+            )
         return sorted(mine, key=lambda p: p.order)
+
+    def duplicates(self, symbol: str) -> list[str]:
+        """Vipindi vinavyoonekana zaidi ya mara moja kwa symbol moja."""
+        seen: dict[str, int] = {}
+        for p in self.partitions:
+            if p.symbol == symbol and p.period:
+                seen[p.period] = seen.get(p.period, 0) + 1
+        return sorted(k for k, n in seen.items() if n > 1)
+
+    @property
+    def zenye_shaka(self) -> list[Partition]:
+        return [p for p in self.partitions if p.shaka]
 
     def render(self) -> str:
         lines = [
@@ -140,9 +183,11 @@ class Inventory:
             mine = [p for p in self.partitions if p.symbol == symbol]
             mb = sum(p.size_mb for p in mine)
             vyanzo = self.provenances(symbol)
-            siku = sorted(p.day for p in mine if p.day)
-            span = f"{siku[0]} -> {siku[-1]}" if siku else "tarehe haiko kwenye njia"
+            vipindi = sorted(p.period for p in mine if p.period)
+            span = f"{vipindi[0]} -> {vipindi[-1]}" if vipindi else "tarehe haiko kwenye njia"
             alama = " CHANZO ZAIDI YA KIMOJA" if len(vyanzo) > 1 else ""
+            if any(p.shaka for p in mine):
+                alama += " TAREHE ISIYOSOMEKA"
             lines.append(
                 f"   {symbol:<8} faili {len(mine):>6,}  MB {mb:>10,.0f}  "
                 f"{'/'.join(v or '-' for v in vyanzo):<12} {span}{alama}"
@@ -184,10 +229,11 @@ def discover(root: Path | str, *, symbols: Sequence[str] | None = None,
         tags = _tags_from_path(path, root)
         if provenance and tags.get("provenance", "") != provenance:
             continue
+        period, shaka = _period_from_tags(tags)
         inv.partitions.append(
             Partition(path=path, symbol=symbol,
                       size_mb=round(path.stat().st_size / 1e6, 3),
-                      provenance=tags.get("provenance", ""), day=_day_from_tags(tags))
+                      provenance=tags.get("provenance", ""), period=period, shaka=shaka)
         )
     return inv
 
@@ -206,14 +252,38 @@ def _tags_from_path(path: Path, root: Path) -> dict[str, str]:
     return tags
 
 
-def _day_from_tags(tags: dict[str, str]) -> str:
-    """`YYYY-MM-DD` kutoka `year=`/`month=`/`day=`, ikiwa zote zipo."""
-    try:
-        return "{:04d}-{:02d}-{:02d}".format(
-            int(tags["year"]), int(tags["month"]), int(tags["day"])
-        )
-    except (KeyError, ValueError):
-        return ""
+_ISO_DAY = re.compile(r"\d{4}-\d{2}-\d{2}")
+
+
+def _period_from_tags(tags: dict[str, str]) -> tuple[str, bool]:
+    """Kipindi kutoka njia, kwa usahihi wowote uliopo. Rudi na `(kipindi, shaka)`.
+
+    Miundo miwili inaonekana kwenye L0 moja:
+
+    ```
+    year=2016/month=01/day=04/ticks.parquet   ->  2016-01-04
+    year=2016/month=01/ticks-2016-01.parquet  ->  2016-01
+    date=2026-04-27/ticks.parquet             ->  2026-04-27
+    ```
+
+    `shaka` inawaka pale tag ipo lakini haisomeki — mf. `day=29 (1)`, ambayo ni
+    nakala ya Windows. Faili ya namna hiyo si "isiyo na tarehe"; ni faili ambayo
+    tarehe yake **inaonekana lakini si ya kuaminika**, na kwa kawaida ni siku ile
+    ile mara mbili. Ikipakiwa kimya, ticks za siku hiyo zinahesabiwa maradufu.
+    """
+    if "date" in tags:
+        value = tags["date"].strip()
+        return (value, False) if _ISO_DAY.fullmatch(value) else ("", True)
+
+    pieces: list[str] = []
+    for key, width in (("year", 4), ("month", 2), ("day", 2)):
+        if key not in tags:
+            break
+        raw = tags[key].strip()
+        if not raw.isdigit():
+            return "-".join(pieces), True
+        pieces.append(raw.zfill(width))
+    return "-".join(pieces), False
 
 
 def _symbol_from_path(path: Path, root: Path) -> str | None:
@@ -359,13 +429,19 @@ def _grouped_by_month(inventory: Inventory, symbol: str, stage: Stage):
         # baadaye — hii inaondoa kusoma tu, si ukaguzi. Kwa dirisha la utafiti
         # linaloishia 2024-03 wakati diski ina hadi 2026-08, ni robo ya data
         # ambayo ingesomwa kisha kutupwa.
-        if part.day and not (lo <= part.day <= hi):
-            continue
+        #
+        # Ulinganisho ni kwa **usahihi wa kipindi chenyewe**: faili ya mwezi
+        # `2024-03` inalinganishwa na `2024-03`, si na `2024-03-31`. Kudai
+        # usahihi wa siku kungetupa mwezi mzima wa mwisho wa dirisha.
+        if part.period:
+            n = len(part.period)
+            if not (lo[:n] <= part.period <= hi[:n]):
+                continue
 
         frame = read_partition(part.path)
         if frame.empty:
             continue
-        mwezi = part.day[:7] if part.day else pd.Timestamp(
+        mwezi = part.month or pd.Timestamp(
             frame["timestamp"].iloc[0]
         ).strftime("%Y-%m")
         if label is not None and mwezi != label and buffer:

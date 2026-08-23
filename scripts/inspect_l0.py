@@ -92,14 +92,28 @@ def main() -> int:
         mine = inv.raw(symbol)
         for prov in inv.provenances(symbol):
             zake = [p for p in mine if p.provenance == prov]
-            zenye_tarehe = [p.day for p in zake if p.day]
-            span = (f"{min(zenye_tarehe)} -> {max(zenye_tarehe)}"
-                    if zenye_tarehe else "tarehe HAIKO kwenye njia")
+            vipindi = [p.period for p in zake if p.period]
+            span = (f"{min(vipindi)} -> {max(vipindi)}"
+                    if vipindi else "tarehe HAIKO kwenye njia")
+            shaka = sum(1 for p in zake if p.shaka)
+            if shaka:
+                span += f"   TAREHE ISIYOSOMEKA: {shaka}"
             print(f"   {symbol:<8} {prov or '(hakuna)':<12} faili {len(zake):>6,}  "
                   f"MB {sum(p.size_mb for p in zake):>9,.0f}  {span}")
             print(f"      {zake[0].path.relative_to(root)}")
             if len(zake) > 1:
                 print(f"      {zake[-1].path.relative_to(root)}")
+
+    pacha = {sym: inv.duplicates(sym) for sym in inv.symbols}
+    pacha = {k: v for k, v in pacha.items() if v}
+    if pacha or inv.zenye_shaka:
+        print("\n" + "=" * 74)
+        print("MATATIZO YANAYOZUIA KUPAKIA")
+        print("=" * 74)
+        for part in inv.zenye_shaka[:20]:
+            print(f"   tarehe haisomeki: {part.path.relative_to(root)}")
+        for sym, vipindi in pacha.items():
+            print(f"   {sym}: vipindi vinajirudia — {', '.join(vipindi[:5])}")
 
     print("\n" + "=" * 74)
     print("KIPINDI KWA KILA SYMBOL — kutoka NDANI ya faili ya kwanza na ya mwisho")

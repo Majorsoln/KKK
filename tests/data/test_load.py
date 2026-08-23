@@ -223,7 +223,7 @@ def test_provenance_na_tarehe_zinatoka_kwenye_njia(tmp_path):
     inv = L.discover(_hive_provenance(tmp_path, "aggregator"))
     part = inv.of("EURUSD")[0]
     assert part.provenance == "aggregator"
-    assert part.day == "2020-01-02"
+    assert part.period == "2020-01-02"
 
 
 def test_vyanzo_viwili_kwa_symbol_moja_vinalipuka(tmp_path):
@@ -250,7 +250,7 @@ def test_mpangilio_ni_wa_TAREHE_si_wa_njia(tmp_path):
     _hive_provenance(tmp_path, "zzz_source", days=("2020-01-02",))
     _hive_provenance(tmp_path, "aaa_source", days=("2020-01-09",))
     inv = L.discover(tmp_path)
-    siku = [p.day for p in inv.raw("EURUSD")]
+    siku = [p.period for p in inv.raw("EURUSD")]
     assert siku == ["2020-01-02", "2020-01-09"]
 
 
@@ -273,3 +273,75 @@ def test_faili_za_nje_ya_dirisha_HAZIFUNGULIWI(tmp_path):
 
     assert miezi == ["2020-01"]
     assert len(zilizosomwa) == 1 and "2021" not in zilizosomwa[0]
+
+
+# ===========================================================================
+# Miundo mitatu ya tarehe kwenye njia moja ya L0
+# ===========================================================================
+
+
+def test_kipindi_kwa_usahihi_wa_SIKU():
+    assert L._period_from_tags({"year": "2016", "month": "01", "day": "04"}) == ("2016-01-04", False)
+
+
+def test_kipindi_kwa_usahihi_wa_MWEZI():
+    """Partitions za kila mwezi zinaishi pamoja na za kila siku kwenye L0 moja.
+
+    Kudai usahihi wa siku kwa zote kungefanya nusu yao zionekane hazina tarehe —
+    na kila moja ingesomwa hata ikiwa nje ya dirisha.
+    """
+    assert L._period_from_tags({"year": "2016", "month": "01"}) == ("2016-01", False)
+
+
+def test_kipindi_kwa_tag_ya_date():
+    assert L._period_from_tags({"date": "2026-04-27"}) == ("2026-04-27", False)
+
+
+def test_tarehe_isiyosomeka_inawasha_SHAKA():
+    """`day=29 (1)` ni nakala ya Windows, si tarehe."""
+    period, shaka = L._period_from_tags({"year": "2023", "month": "08", "day": "29 (1)"})
+    assert shaka is True and period == "2023-08"
+    assert L._period_from_tags({"date": "juzi"}) == ("", True)
+
+
+def test_faili_yenye_tarehe_isiyosomeka_INAZUIA_kupakia(tmp_path):
+    """Nakala ikipakiwa kimya, ticks za siku hiyo zinahesabiwa maradufu."""
+    root = tmp_path / "l0"
+    for jina in ("day=02", "day=02 (1)"):
+        out = root / "symbol=EURUSD" / "year=2020" / "month=01" / jina
+        out.mkdir(parents=True)
+        _frame(start="2020-01-02", n=300).to_parquet(out / "ticks.parquet", index=False)
+
+    inv = L.discover(root)
+    assert len(inv.zenye_shaka) == 1
+    with pytest.raises(L.LoadError, match="isiyosomeka"):
+        inv.of("EURUSD")
+
+
+def test_vipindi_vinavyojirudia_VINAZUIA_kupakia(tmp_path):
+    root = tmp_path / "l0"
+    for n, jina in enumerate(("a", "b")):
+        out = root / "symbol=EURUSD" / "year=2020" / "month=01" / "day=02"
+        out.mkdir(parents=True, exist_ok=True)
+        _frame(start="2020-01-02", n=300).to_parquet(out / f"{jina}.parquet", index=False)
+
+    inv = L.discover(root)
+    assert inv.duplicates("EURUSD") == ["2020-01-02"]
+    with pytest.raises(L.LoadError, match="vinajirudia"):
+        inv.of("EURUSD")
+
+
+def test_faili_ya_MWEZI_wa_mwisho_wa_dirisha_haitupwi(tmp_path):
+    """Mwezi `2020-12` dhidi ya mpaka `2020-12-31`: ulinganisho ni wa usahihi ULE ULE.
+
+    Kudai `2020-12 <= 2020-12-31` kwa maandishi kungetupa mwezi mzima wa mwisho.
+    """
+    root = tmp_path / "l0"
+    for label in ("2020-12", "2021-01"):
+        y, m = label.split("-")
+        out = root / "symbol=EURUSD" / f"year={y}" / f"month={m}"
+        out.mkdir(parents=True)
+        _frame(start=f"{label}-01").to_parquet(out / f"ticks-{label}.parquet", index=False)
+
+    miezi = [lbl for lbl, _, _ in L.iter_months(L.discover(root), "EURUSD", STAGE, pip=1e-4)]
+    assert miezi == ["2020-12"]
