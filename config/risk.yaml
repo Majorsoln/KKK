@@ -42,7 +42,33 @@ correlation_groups:
 # SLIPPAGE = CAP, si utabiri (spec §3.2). Cap = dhana ILE ILE ya backtest ->
 # slippage ya live HAIWEZI kuvuka iliyothibitishwa. Order isiyoweza kujaza ndani ya cap HAIJAZI.
 slippage_cap_pips:                # KIKOMO CHA JUU — cap inaweza KUBANA (M5 vol), HAIWEZI KULEGEA
-  market:  0.1                    # = SLIP_MARKET ya episodes()
+  # CAP YA KILA SYMBOL (PD 2026-08-23). Namba zinatoka CALIBRATION A, si kwa
+  # kudhania: `p95` ya |mwendo| kati ya quote ya uamuzi na quote ya kujaza,
+  # kwenye mipaka ya bar za H1, miaka 8 (research/reports/calibration_a.json).
+  #
+  # H1 kwa sababu R11 inafunga entry hapo. Kutumia `p95` ya D1 kungeweka cap
+  # mara 2-10 pana bila sababu — mpaka wa D1 ni rollover, si saa ya kutrade.
+  #
+  # Pips 0.1 kwa VYOTE ilikuwa haiwezekani: `deviation = cap x (PipSize/point)`,
+  # kwa hiyo XAUUSD ilipata POINTS 0 — inajaza kwa bei iliyoombwa haswa au
+  # haijazi kabisa. Slippage yake iliyopimwa ni pips 5.5 (p95 12.0).
+  market:
+    default:  0.5                 # symbol isiyo kwenye orodha -> kihafidhina
+    EURUSD:   0.3                 # p95 iliyopimwa 0.300
+    USDJPY:   0.3                 # 0.300
+    AUDUSD:   0.3                 # 0.300
+    EURGBP:   0.3                 # 0.300
+    USDCHF:   0.4                 # 0.350
+    NZDUSD:   0.4                 # 0.350
+    USDCAD:   0.4                 # 0.400
+    EURJPY:   0.4                 # 0.400
+    EURCHF:   0.4                 # 0.400
+    GBPUSD:   0.5                 # 0.450
+    GBPJPY:   0.7                 # 0.700
+    XAUUSD:  12.0                 # 12.000
+  # `stop` HAIJAPIMWA. Calibration A inapima mipaka ya bar (market-style fills);
+  # stop orders zina tabia yake. Inabaki namba moja hadi ipimwe, na stop orders
+  # hazitumiki kwenye mzunguko huu.
   stop:    0.3                    # = SLIP_STOP ya episodes()
 slippage_cap_dynamic:  true       # cap = min(dynamic(M5_vol), thamani hapo juu)
 fill_rate_min:         0.60       # chini ya hii -> ONYO: cap ngumu, strategy inatofautiana na utafiti

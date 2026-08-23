@@ -119,12 +119,14 @@ def main() -> int:
         raise SystemExit(f"TF hazijulikani: {mbaya} — zinazoruhusiwa {TIMEFRAMES}")
 
     day_tz = str(cfg_data.get("timezone.day_reset_tz", "UTC"))
+    decision_tf = str(cfg_data.get("bars.decision_tf", "H1"))
     stage = declare("calibration_a", "DOCTRINE §8.3 — gharama halisi dhidi ya kadirio",
                     research_window(cfg_data), cfg=cfg_data)
 
     print(f"CALIBRATION A · {stage.window.start} -> {stage.window.end}")
     print(f"   root {root}")
-    print(f"   symbols {len(symbols)} · TF {tfs} · day_tz {day_tz}")
+    print(f"   symbols {len(symbols)} · TF {tfs} · day_tz {day_tz} · "
+          f"decision_tf {decision_tf} (R11)")
     print(f"   config_hash data {cfg_data.config_hash} · risk {cfg_risk.config_hash}\n")
 
     vifungu = load_exclusions(cfg_data)
@@ -300,10 +302,24 @@ def main() -> int:
         print(f"   {symbol:<8} {max(r.slippage_mean_pips for r in zake):>8.3f} "
               f"{max(r.slippage_p95_pips for r in zake):>8.3f} "
               f"{zake[0].live_slippage_cap_pips:>12.3f}")
-    if table.broken:
-        print("R16 IMEVUNJIKA — injini haiendelei hadi hii itatuliwe.")
+    # R16 inasimamia TF ya UTEKELEZAJI. Cells za TF nyingine zinaripotiwa
+    # kama diagnostic — zina taarifa ya kweli, lakini si za kitu tunachotrade.
+    ndani = table.broken_at(decision_tf)
+    nje = [r for r in table.broken if r.timeframe != decision_tf]
+    if nje:
+        print(f"\nDIAGNOSTIC · cells {len(nje)} za TF zisizo za utekelezaji zina "
+              f"`live < research`:")
+        kwa_tf: dict[str, list] = {}
+        for r in nje:
+            kwa_tf.setdefault(r.timeframe, []).append(r.symbol)
+        for tf, wote in sorted(kwa_tf.items()):
+            print(f"   {tf:<4} {len(wote):>2}/{len(symbols)} symbols: {', '.join(sorted(wote))}")
+
+    if ndani:
+        print(f"\nR16 IMEVUNJIKA kwenye {decision_tf} "
+              f"({', '.join(r.symbol for r in ndani)}) — injini haiendelei.")
         return 2
-    print("R16 sawa: `live >= research` kwenye kila cell.")
+    print(f"\nR16 sawa kwenye {decision_tf}: `live >= research` kwenye kila symbol.")
     return 0
 
 

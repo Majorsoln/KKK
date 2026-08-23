@@ -140,9 +140,12 @@ def test_live_spread_ni_ILE_ILE_ya_rce(cfg_risk):
 
 
 def test_slippage_cap_inatoka_risk_yaml(cfg_risk):
+    """Cap ni ya kila symbol (RCE §3.2); Calibration A inaisoma kwa symbol yake."""
+    from src.rce.cost import slippage_cap_pips
+
     row = _cell(cfg_risk)
     assert row.live_slippage_cap_pips == pytest.approx(
-        float(cfg_risk.get("slippage_cap_pips")["market"])
+        slippage_cap_pips("market", cfg_risk, symbol="EURUSD")
     )
 
 
@@ -341,3 +344,43 @@ def test_mkusanyiko_unajumlisha_zilizotolewa():
     samples.add(ticks, bars).add(ticks, bars)
     assert samples.n_chunks == 2
     assert samples.stats()["n_dropped_gap"] == samples.n_dropped_gap >= 2
+
+
+# ===========================================================================
+# R16 inasimamia TF ya UTEKELEZAJI (R11 inafunga H1)
+# ===========================================================================
+
+
+def _row(symbol="EURUSD", timeframe="H1", *, research=1.0, check=2.0) -> CA.CostRow:
+    return CA.CostRow(
+        symbol=symbol, timeframe=timeframe, n_points=100, n_dropped_gap=0,
+        spread_mean_pips=0.4, spread_p50_pips=0.4, spread_p95_pips=1.0,
+        slippage_mean_pips=0.1, slippage_p95_pips=0.3,
+        commission_pips=0.7, swap_pips=0.0,
+        live_spread_pips=0.8, live_slippage_cap_pips=0.3,
+        research_cost_pips=research, live_sizing_cost_pips=check - 0.3,
+        live_check_pips=check, atr_pips=13.0,
+    )
+
+
+def test_cell_ya_D1_iliyovunjika_haisimamishi_utekelezaji_wa_H1():
+    """Mpaka wa D1 ni rollover — spread yake ni mara 1.6-4.4 ya ya H1.
+
+    Ni taarifa ya kweli, lakini si ya kitu tunachokitrade. Kuchanganya mbili
+    hizo kungefanya kimoja kati ya viwili: kusimamisha injini kwa TF
+    isiyotekelezwa, au kulegeza R16 hadi isishike kitu.
+    """
+    table = CA.CostTable(rows=(
+        _row("EURUSD", "H1", research=1.0, check=2.0),
+        _row("EURUSD", "D1", research=3.0, check=2.0),
+    ))
+    assert len(table.broken) == 1
+    assert table.broken_at("H1") == ()
+    assert len(table.broken_at("D1")) == 1
+
+
+def test_cell_ya_H1_iliyovunjika_INASIMAMISHA():
+    table = CA.CostTable(rows=(_row("XAUUSD", "H1", research=9.0, check=2.0),))
+    assert len(table.broken_at("H1")) == 1
+    with pytest.raises(CA.CalibrationAError, match="R16"):
+        table.assert_ok()

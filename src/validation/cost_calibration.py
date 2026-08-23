@@ -204,6 +204,19 @@ class CostTable:
     def broken(self) -> tuple[CostRow, ...]:
         return tuple(row for row in self.rows if not row.ok)
 
+    def broken_at(self, timeframe: str) -> tuple[CostRow, ...]:
+        """Cells zilizovunjika kwenye TF ya **utekelezaji** pekee.
+
+        R16 inasimamia gharama ya kutekeleza, na R11 inafunga entry H1. Cell ya
+        D1 iliyovunjika inasema kitu cha kweli — mpaka wa D1 ni rollover, na
+        spread yake ni mara 1.6–4.4 ya ya H1 kwenye symbols ZOTE 12 — lakini
+        haisemi kwamba gharama ya kile tunachokitrade imekadiriwa vibaya.
+
+        Kuchanganya mbili hizo kungefanya kimoja kati ya viwili: kusimamisha
+        injini kwa TF isiyotekelezwa, au kulegeza R16 hadi isishike kitu.
+        """
+        return tuple(r for r in self.broken if r.timeframe == timeframe)
+
     def assert_ok(self) -> "CostTable":
         """R16 — calibration ikivunjika, injini inasimama. Haiendelei kwa onyo."""
         if self.broken:

@@ -109,7 +109,8 @@ def test_rce04_cap_inabana_tu(risk_cfg):
 def test_rce04_cap_hailegei_soko_likichafuka(risk_cfg):
     """Spec §3.2: cap **HAIZIDI** dhana ya backtest — dhamana ya live ≤ backtest."""
     assert slippage_cap_pips("stop", risk_cfg, dynamic_estimate=5.0) == pytest.approx(0.3)
-    assert slippage_cap_pips("market", risk_cfg, dynamic_estimate=5.0) == pytest.approx(0.1)
+    assert slippage_cap_pips("market", risk_cfg, dynamic_estimate=5.0,
+                             symbol="EURUSD") == pytest.approx(0.3)
 
 
 def test_rce04_deviation_ni_points_si_pips():
@@ -222,10 +223,32 @@ class _Cfg:
         return default
 
 
-def test_muundo_wa_namba_moja_bado_unafanya_kazi(risk_cfg):
-    """`risk.yaml` ya sasa haibadiliki; cap ya kila symbol ni ya hiari."""
-    assert slippage_cap_pips("market", risk_cfg) == pytest.approx(0.1)
-    assert slippage_cap_pips("market", risk_cfg, symbol="XAUUSD") == pytest.approx(0.1)
+def test_muundo_wa_namba_moja_bado_unafanya_kazi():
+    """Muundo wa zamani bado unafanya kazi — jedwali ni la HIARI, si la lazima.
+
+    `risk.yaml` yenyewe sasa ina jedwali (PD 2026-08-23), lakini config yoyote
+    ya namba moja lazima iendelee kufanya kazi bila mabadiliko.
+    """
+    cfg = _Cfg({"market": 0.1, "stop": 0.3})
+    assert slippage_cap_pips("market", cfg) == pytest.approx(0.1)
+    assert slippage_cap_pips("market", cfg, symbol="XAUUSD") == pytest.approx(0.1)
+
+
+def test_risk_yaml_ina_cap_ya_kila_symbol(risk_cfg):
+    """Namba zinatoka Calibration A (p95 ya H1), si kwa kudhania — §2."""
+    assert slippage_cap_pips("market", risk_cfg, symbol="EURUSD") == pytest.approx(0.3)
+    assert slippage_cap_pips("market", risk_cfg, symbol="GBPJPY") == pytest.approx(0.7)
+    assert slippage_cap_pips("market", risk_cfg, symbol="XAUUSD") == pytest.approx(12.0)
+    # Symbol isiyo kwenye orodha inapata `default` ya kihafidhina.
+    assert slippage_cap_pips("market", risk_cfg, symbol="EURAUD") == pytest.approx(0.5)
+
+
+def test_deviation_ya_dhahabu_si_sifuri_tena(risk_cfg):
+    """Kabla ya cap ya kila symbol, XAUUSD ilipata `order.deviation` = points 0."""
+    from src.rce.cost import order_deviation_points
+
+    cap = slippage_cap_pips("market", risk_cfg, symbol="XAUUSD")
+    assert order_deviation_points(cap, "XAUUSD", 0.01) > 0
 
 
 def test_jedwali_la_symbols_linatoa_cap_ya_symbol():
