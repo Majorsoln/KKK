@@ -404,6 +404,45 @@ nafuu na linakata wagombea wengi kwa hesabu ya mstari mmoja — thamani yake ni
 
 ---
 
+### 8.5 R16 inasimamia TF ya UTEKELEZAJI (Calibration A, 2026-08-23)
+
+Calibration A ya kwanza — cells 84, symbols 12, TF 7, ticks bilioni ~2.7, miaka 8
+(`research/reports/calibration_a.json`) — ilitoa matokeo yenye muundo mmoja
+usiobadilika:
+
+| | matokeo |
+|---|---|
+| **H1** (TF ya utekelezaji) | `live ≥ research` kwenye symbols **12/12**, `sens` 1.09–1.52 |
+| **D1** | `live < research` kwenye **11/12** |
+| M5 · M15 · M30 · H2 · H4 | zote zinapita |
+
+Sababu ni **saa, si timeframe**. Mpaka wa bar ya D1 ni saa sita usiku ya seva —
+rollover ya kila siku, wakati spread ni pana zaidi. Spread iliyopimwa kwenye
+mpaka wa D1 dhidi ya ya H1, symbol kwa symbol:
+
+```
+AUDUSD 1.64×  NZDUSD 1.87×  USDCAD 2.39×  EURGBP 2.42×  GBPUSD 2.59×
+USDJPY 2.64×  EURJPY 2.60×  EURUSD 2.65×  USDCHF 3.29×  GBPJPY 4.11×
+EURCHF 4.35×  XAUUSD 2.36×                              (kati: 2.60×)
+```
+
+`spread_effective` ya RCE inachukua wastani wa **saa zote**, kwa hiyo inadharau
+gharama ya kutekeleza saa hiyo mahususi. Hiyo si kasoro ya RCE wala ya kipimo;
+ni ukweli kuhusu soko ambao kipimo cha wastani hauwezi kuubeba.
+
+**Uamuzi:** R16 inatathminiwa kwenye `bars.decision_tf` (H1, kwa R11). Cells za TF
+nyingine zinaripotiwa kama **diagnostic** — zina taarifa ya kweli, lakini si za
+kitu kinachotekelezwa. Kuchanganya mbili hizo kungefanya kimoja kati ya viwili:
+kusimamisha injini kwa TF isiyotekelezwa, au kulegeza R16 hadi isishike kitu.
+
+**Kilichokataliwa:** cap ya slippage ingeweza kupandishwa hadi D1 ipite. Pengo la
+D1 ni la **spread**; kuliziba kwa namba ya **slippage** kungekuwa ni kufanya
+hesabu itoe jibu badala ya kupima. Ushahidi kwamba kuepuka huko kulikuwa sahihi:
+caps zilipopandishwa (0.1 → 0.3–12.0, zote kutoka kipimo), D1 iliendelea kuvunjika
+kwenye 11/12.
+
+---
+
 ## 9. SAKAFU YA KELELE — kizingiti kinapimwa, hakidhaniwi
 
 ### 9.1 Tatizo, kwa hesabu
@@ -1087,9 +1126,21 @@ higher_is : neutral
 inputs    : gross_edge, research_cost, live_sizing_cost
 formula   : (gross_edge ÷ research_cost) ÷ (gross_edge ÷ live_sizing_cost)
           = live_sizing_cost ÷ research_cost
-range     : [1, ∞)   ...kwa sababu live ≥ research (R16)
+range     : [1, ∞) kwenye TF ya utekelezaji; chini ya 1 inawezekana kwingine
 higher_is : worse    ...juu = strategy inategemea gharama kubaki nzuri
 ```
+
+**Marekebisho (2026-08-23).** Toleo la kwanza lilidai `[1, ∞)` "kwa sababu
+live ≥ research (R16)". Dai hilo halikuwa sahihi baada ya §8.2 kugawanya gharama
+kuwa namba **tatu**: R16 inalinganisha `live_check` (slippage mara mbili) na
+`research`, wakati `cost_sensitivity` inatumia `live_sizing` (slippage mara moja,
+kama RCE inavyohesabu). Kwa hiyo `sens < 1` inawezekana bila R16 kuvunjika —
+pengo ni slippage ya kutoka ambayo sizing haihesabu.
+
+Calibration A ya 2026-08-23 inaonyesha mgawanyo huu: kwenye **H1** (TF ya
+utekelezaji) `sens` ni 1.09–1.52 kwenye symbols zote 12; kwenye **D1** inashuka
+hadi 0.36. Kikomo cha chini kinashikilia pale kinapohitajika, na kinaanguka pale
+tu ambapo hatutekelezi.
 
 **`path_dependence`** · PRIMARY (onyo, §1.2)
 
