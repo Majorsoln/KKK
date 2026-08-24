@@ -441,6 +441,59 @@ hesabu itoe jibu badala ya kupima. Ushahidi kwamba kuepuka huko kulikuwa sahihi:
 caps zilipopandishwa (0.1 → 0.3–12.0, zote kutoka kipimo), D1 iliendelea kuvunjika
 kwenye 11/12.
 
+### 8.6 Gharama inategemea SAA, na kiasi ni kikubwa (2026-08-23)
+
+§8.5 ilionyesha mpaka wa D1 una spread mara 1.6–4.4 ya ya H1. Swali lililofuata
+lilikuwa: *jambo lile lile linatokea kiasi gani NDANI ya H1?* Kipimo kwa saa ya
+siku, mipaka ya H1, miaka 8 (`research/reports/cost_by_hour.json`):
+
+```
+ukali = spread ya saa mbaya kuliko zote ÷ median ya saa zote
+
+USDJPY 7.70×   EURJPY 7.53×   EURUSD 6.69×   EURCHF 5.98×   EURGBP 5.37×
+GBPJPY 5.29×   GBPUSD 5.01×   NZDUSD 4.93×   USDCHF 4.81×   AUDUSD 3.96×
+USDCAD 3.52×   XAUUSD 2.52×
+```
+
+**Kubwa kuliko athari ya D1.** Kutrade saa hiyo kunagharimu mara 2.5–7.7 ya
+gharama ya kawaida ya symbol ile ile. Jedwali linalochukua wastani wa saa 24
+linaificha kabisa — na hakuna sehemu ya injini inayoijua kwa sasa.
+
+**Maana:** saa ya utekelezaji ni **taarifa ya gharama**, si mapambo. Inapaswa
+kuwa feature ya dataset (§14) ili model iweze kujifunza kuiepuka. Lango la
+`max_spread` la RCE linakinga kwa sehemu — spread ya saa hiyo ni mara 5–8, kwa
+hiyo litakataa nyingi — lakini symbols **saba kati ya 12** hazina `max_spread`
+kwenye `risk.yaml`, na `gate.py:125` inaruka ukaguzi pale symbol haipo. Ledger ya
+§11.2 itaonyesha hilo kama `REJECT_MAX_SPREAD` dhidi ya kimya.
+
+---
+
+**`broker_server_tz` imethibitishwa — na imefichua tofauti kati ya feed mbili.**
+
+Kipimo kilifanywa mara mbili: kwa saa za UTC na kwa saa za `broker_server_tz`.
+Rollover ni tukio la seva, kwa hiyo hukaa saa ile ile ya **ndani** mwaka mzima na
+huhama kati ya UTC 21:00 na 22:00 kwa DST. Mgawanyo wa ndani ukiwa mkali zaidi,
+tz inathibitishwa.
+
+| toleo la chanzo | symbols | saa ya Berlin | tz kali zaidi |
+|---|---|---|---|
+| **A** | 9 | **23** kwa zote | **Berlin 9/9** |
+| **B** (EURCHF · GBPJPY · XAUUSD) | 3 | **0** kwa zote | **UTC 3/3** |
+
+Mgawanyo unalingana **kabisa** na `source.schema_variants` ya `data.yaml`.
+Ufafanuzi unaolingana na namba: Toleo A linafuata saa ya ndani inayohama na DST
+(kwa hiyo Berlin ni mkali), wakati Toleo B linatua kwenye saa **thabiti ya UTC**
+(kwa hiyo Berlin inaisambaza kati ya 23 na 00, na UTC ndiyo mkali).
+
+Yaani feeds mbili **hazitumii mkataba mmoja wa muda**. Kwa Toleo A,
+`broker_server_tz: Europe/Berlin` ni sahihi. Kwa Toleo B, haitumiki — na sheria
+yoyote ya saa itakayoandikwa kwa Berlin itakosea kwa symbols hizo tatu kwa saa
+moja, nusu ya mwaka.
+
+**Hii ni ya kuthibitishwa kwa broker kabla sheria ya saa haijaandikwa.** Ni tofauti
+ya chanzo, si ya soko: EURCHF na GBPJPY ni crosses za kawaida, hazina sababu ya
+kuwa na rollover tofauti na EURUSD.
+
 ---
 
 ## 9. SAKAFU YA KELELE — kizingiti kinapimwa, hakidhaniwi
