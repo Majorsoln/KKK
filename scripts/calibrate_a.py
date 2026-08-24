@@ -41,13 +41,30 @@ from src.validation import cost_calibration as CA  # noqa: E402
 
 
 def _root(arg: str | None) -> Path:
+    """Njia ya L0. Mpangilio: `--root`, kisha env, kisha `<repo>/research`.
+
+    Rejea ya mwisho si dhana: inatumika **tu** ikiwa folda ipo kweli, na njia
+    iliyochaguliwa inachapishwa. Bila yake, kila terminal mpya inadai
+    `call scripts\\env.local.bat` kabla ya chochote — kikwazo kinachojirudia
+    bila kulinda kitu.
+    """
     if arg:
         return Path(arg)
     env = os.environ.get("ELITEFX_L0_ROOT") or os.environ.get("ELITEFX_RESEARCH_ROOT")
-    if not env:
-        raise SystemExit("Weka `ELITEFX_RESEARCH_ROOT` au tumia --root")
-    path = Path(env)
-    return path if path.name == "L0_raw" else path / "data" / "L0_raw"
+    if env:
+        path = Path(env)
+        return path if path.name == "L0_raw" else path / "data" / "L0_raw"
+
+    ndani = REPO / "research" / "data" / "L0_raw"
+    if ndani.exists():
+        return ndani
+    raise SystemExit(
+        "Data ya L0 haijapatikana. Chagua mojawapo:\n"
+        f"   --root <njia>\n"
+        "   set ELITEFX_RESEARCH_ROOT=<njia ya research>\n"
+        "   call scripts\\env.local.bat\n"
+        f"   au weka data kwenye {ndani}"
+    )
 
 
 def _median_mid(inv, symbol: str) -> float | None:
