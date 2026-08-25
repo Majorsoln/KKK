@@ -16,13 +16,20 @@ Hakuna njia ya mkato: `--replicates` chini ya 50 inakataliwa na
 `noise_floor.MIN_REPLICATES` kwa sababu p95 ya pointi 20 ni thamani ya pili kwa
 ukubwa — jina lake ni percentile, tabia yake ni `max`.
 
-`--dry-run` inapima run MOJA na kutabiri muda wa jumla kabla ya kuanza.
+`--probe` inaendesha runs chache kwanza na kujibu maswali **mawili**: itachukua
+muda gani, na — gumu zaidi — **replicates ngapi zitatoa mshindi hata mmoja**.
+`calibrate()` inaruka `NaN`, kwa hiyo replicate isiyo na mshindi haihesabiki
+kwenye `MIN_REPLICATES`. Bila ukaguzi huu, saa 40 zingeweza kuishia
+`without_floor` kwa kila metric — na R5 isingefunguka.
+
+`--dry-run` inasimama baada ya kupima.
 """
 
 from __future__ import annotations
 
 import argparse
 import json
+import math
 import os
 import sys
 import time
@@ -95,8 +102,11 @@ def main() -> int:
                     help="§8.6 — feeds mbili hazitumii mkataba mmoja")
     ap.add_argument("--out", default=None)
     ap.add_argument("--pip-value", nargs="*", default=[], metavar="SYM=VAL")
+    ap.add_argument("--probe", type=int, default=3,
+                    help="runs za kupima kabla ya kuanza — zinakadiria muda NA "
+                         "kiwango cha washindi")
     ap.add_argument("--dry-run", action="store_true",
-                    help="pima run MOJA, tabiri muda, kisha simama")
+                    help="pima kisha simama, bila kujitoa kwenye run kamili")
     args = ap.parse_args()
 
     root = _root(args.root)
@@ -160,25 +170,52 @@ def main() -> int:
     )
     run_pipeline = P.for_calibration(spec, cfg_risk=cfg_risk, seed=args.seed)
 
-    # ---- kipimo cha run MOJA kabla ya kujitoa kwenye 150 ----
-    print("Kupima run moja…", flush=True)
-    sur = S.make(bars, S.BLOCK, seed=args.seed)
-    t0 = time.time()
-    sampuli = run_pipeline(sur.frame)
-    dakika_moja = time.time() - t0
-    jumla = dakika_moja * args.replicates * len(S.FAMILIES)
-    print(f"   run moja {dakika_moja:.1f}s · variants {sampuli[NF.VARIANTS_KEY]:,}")
-    print(f"   TABIRI: runs {args.replicates * len(S.FAMILIES):,} → "
-          f"{jumla / 3600:.1f} saa\n")
+    # ---- kipimo kabla ya kujitoa kwenye saa nyingi ----
+    #
+    # Runs za sampuli zinajibu maswali MAWILI, na la pili ndilo gumu: si tu
+    # "itachukua muda gani" bali "replicates ngapi zitatoa mshindi hata mmoja".
+    # `calibrate()` inaruka `NaN`, kwa hiyo replicate isiyo na mshindi
+    # HAIHESABIKI — na `MIN_REPLICATES` inahesabu zilizo na thamani, si
+    # zilizoendeshwa. Kutoangalia hili kungetoa saa 40 zinazoishia
+    # `without_floor` kwa kila metric.
+    n_sampuli = max(1, args.probe)
+    print(f"Kupima runs {n_sampuli}…", flush=True)
+    muda = []
+    washindi = 0
+    for i in range(n_sampuli):
+        sur = S.make(bars, S.BLOCK, seed=NF._seed_of(args.seed, S.BLOCK, i))
+        t0 = time.time()
+        sampuli = run_pipeline(sur.frame)
+        muda.append(time.time() - t0)
+        ana_mshindi = any(v == v for k, v in sampuli.items() if k != NF.VARIANTS_KEY)
+        washindi += int(ana_mshindi)
+        print(f"   {i + 1}/{n_sampuli}  {muda[-1]:>6.1f}s  "
+              f"variants {sampuli[NF.VARIANTS_KEY]:>6,}  "
+              f"{'mshindi' if ana_mshindi else 'HAKUNA'}", flush=True)
 
-    walipita = sum(1 for k, v in sampuli.items()
-                   if k != NF.VARIANTS_KEY and v == v)
-    if walipita == 0:
-        print("   ONYO: run hii haikutoa mshindi hata mmoja — metrics zote ni NaN.\n"
-              "         Sakafu inahitaji thamani zisizo NaN kwa replicates "
-              f"{NF.MIN_REPLICATES}+ kwa kila familia.\n"
-              "         Ongeza --candidates, la sivyo kila metric itaishia "
-              "`without_floor` na R5 haitafunguka.\n")
+    wastani = sum(muda) / len(muda)
+    runs_zote = args.replicates * len(S.FAMILIES)
+    print(f"\n   run moja {wastani:.1f}s (wastani wa {n_sampuli})")
+    print(f"   TABIRI: runs {runs_zote:,} → {wastani * runs_zote / 3600:.1f} saa")
+
+    kiwango = washindi / n_sampuli
+    print(f"   washindi {washindi}/{n_sampuli} = {kiwango:.0%}")
+    if kiwango >= 1.0:
+        print(f"   replicates {args.replicates} zinatosha "
+              f"(dai {NF.MIN_REPLICATES}).\n")
+    elif kiwango > 0.0:
+        # Replicates zinazohitajika ili `MIN_REPLICATES` ziwe na thamani.
+        inahitajika = math.ceil(NF.MIN_REPLICATES / kiwango)
+        print(f"   ONYO: kwa kiwango hiki, replicates {args.replicates} "
+              f"zingetoa ~{int(args.replicates * kiwango)} zenye thamani, "
+              f"chini ya {NF.MIN_REPLICATES}.\n"
+              f"         Chaguo: --replicates {inahitajika} "
+              f"(~{wastani * inahitajika * len(S.FAMILIES) / 3600:.1f} saa) "
+              f"AU --candidates kubwa zaidi.\n")
+    else:
+        print("   ONYO: hakuna run iliyotoa mshindi hata mmoja.\n"
+              "         Kila metric ingeishia `without_floor` na R5 haitafunguka.\n"
+              "         Ongeza --candidates kabla ya kuendelea.\n")
 
     if args.dry_run:
         return 0
