@@ -598,6 +598,52 @@ maana** — bila sakafu, kadri unavyotafuta zaidi ndivyo unavyodanganyika zaidi.
 
 ---
 
+### 9.4 Substrate ya kutafuta, na sheria ya kuchagua (2026-08-25)
+
+Mambo mawili yaliyokuwa hayajaandikwa yalilazimika kuamuliwa kabla Calibration B
+haijaendeshwa. Yote mawili yanabadilisha maana ya sakafu, kwa hiyo yanaandikwa
+hapa na si kwenye code pekee.
+
+**1 · Familia tatu zinatengeneza BARS, si ticks — na hazitaweza.**
+
+IAAFT juu ya ticks bilioni 2.7 si polepole; ni isiyowezekana. Lakini §11 nzima
+inatembea kwenye quotes za bid/ask. Njia mbili tu zilikuwepo: kuandika kitembezi
+cha pili kinachofanya kazi kwa bars, au kugeuza bars kuwa quotes na kutumia
+kitembezi kile kile.
+
+**Chaguo ni la pili** (`backtest/bar_path.py`), kwa sababu ya R12/R19: kitembezi
+cha pili kingekuwa modeli ya pili ya utekelezaji, na sakafu iliyopimwa kwa modeli
+moja isingehukumu candidate iliyopimwa kwa nyingine. Kila bar inatoa quotes nne
+kwenye robo zake, na `close` haiwekwi mwisho kabisa kwa sababu mwisho wa bar hii
+ni **mwanzo wa inayofuata** — ndipo signal ya R11 inapotua na fill inapotokea.
+
+Bar haisemi kama `high` au `low` ilitangulia. Mpangilio ni **UBAYA KWANZA kwa
+kila upande**: BUY inaona `low` kwanza, SELL inaona `high` kwanza. Mpangilio
+mmoja kwa pande zote — mfano `low` kwanza daima — ungekuwa mbaya kwa BUY na mzuri
+kwa SELL, na generator ingependelea SELL kwa sababu ya **uwakilishi wa data, si
+ya soko**. Upendeleo huo usingeonekana kwenye kipimo chochote.
+
+Substrate hii **si mbadala wa ticks**. Ni ya HATUA YA KUTAFUTA, ambapo wagombea
+ni maelfu. Waliobaki wanarudiwa juu ya ticks halisi kabla ya §13. Sharti pekee
+lisilovunjika: **Calibration B na hatua ya kutafuta zitumie substrate ILE ILE.**
+
+**2 · Sakafu inategemea sheria ya kuchagua "bora", na sheria hiyo ni sehemu yake.**
+
+Calibration B inaomba metrics za mgombea **mmoja** kwa kila replicate. Chaguo ni
+`net_account_return_month` — PRIMARY yenye mamlaka (R17, §1.2) — na metrics zote
+za mgombea huyo zinaripotiwa kama zilivyo.
+
+Njia mbadala ya kuchukua **kilele cha kila metric peke yake** ni kali zaidi kwa
+mtazamo wa kwanza, lakini inavunjika kwa `max_drawdown`: mgombea mwenye DD ndogo
+kuliko wote chini ya null ni yule anayetrade mara chache mno, na sakafu
+inayotokana naye ingedai kila strategy halisi iwe na DD ndogo kuliko ya mtu
+asiyetrade. Hilo si lango kali; ni lango lisilo na maana.
+
+`select_by` inaandikwa kwenye ushahidi. **Ikibadilika, sakafu ya zamani
+haihukumu utafutaji mpya.**
+
+---
+
 ## 10. Strategy — ufafanuzi na muundo
 
 ### 10.1 Ufafanuzi
