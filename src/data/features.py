@@ -139,6 +139,12 @@ def build(bars, *, symbol: str, hour_tz: str = "UTC"):
     if "spread_p50" in bars.columns:
         out["spread_p50"] = bars["spread_p50"].astype(float)
         out["spread_per_atr"] = out["spread_p50"] / out["ATR_pips"].replace(0.0, np.nan)
+    if "spread_p95" in bars.columns:
+        # p95 ya spread NDANI ya bar. RCE (§3.1) inatumia p95 ya M5 kama
+        # spike-guard kwa sababu H1 inaficha spikes za ndani ya bar — na hii
+        # ndiyo kipimo hicho hicho, kilichopimwa moja kwa moja badala ya
+        # kukadiriwa kwa bar ndogo zaidi.
+        out["spread_p95"] = bars["spread_p95"].astype(float)
     if "n_ticks" in bars.columns:
         ticks = bars["n_ticks"].astype(float)
         out["tick_count"] = ticks

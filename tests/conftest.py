@@ -13,7 +13,7 @@ import pytest
 
 from src.rce.config import load_config
 
-REPO = Path(__file__).resolve().parents[2]
+REPO = Path(__file__).resolve().parents[1]
 
 
 @pytest.fixture

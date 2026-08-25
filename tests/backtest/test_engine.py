@@ -40,12 +40,19 @@ def _ticks(mids, *, spread_pips=1.0, freq="1min"):
     })
 
 
-def _features(n, *, waka, atr_pips=20.0, freq="1h"):
-    """Features za bandia: `waka` ni orodha ya bool kwa kila bar."""
+def _features(n, *, waka, atr_pips=20.0, freq="1h", spread_pips=1.0):
+    """Features za bandia: `waka` ni orodha ya bool kwa kila bar.
+
+    `spread_p50`/`spread_p95` si mapambo: engine inakataa kuendesha bila spread
+    (§2 — hakuna namba ya kubuni inayoingia kwa RCE), na thamani hapa inalingana
+    na `_ticks(spread_pips=1.0)`.
+    """
     index = pd.date_range(T0, periods=n, freq=freq, tz="UTC")
     return pd.DataFrame(
         {"SIGNAL": np.where(np.asarray(waka, dtype=bool), 1.0, 0.0),
-         "ATR_pips": float(atr_pips)},
+         "ATR_pips": float(atr_pips),
+         "spread_p50": float(spread_pips),
+         "spread_p95": float(spread_pips)},
         index=index,
     )
 
@@ -181,6 +188,36 @@ def test_max_open_inaamuliwa_na_RCE_si_na_engine(cfg_risk):
                         if k == REJECT_MAX_OPEN or k.startswith(REJECT_MAX_CORRELATED)]
     assert zilizosimamishwa, f"hakuna signal iliyosimamishwa kwa kupishana: {mgawanyo}"
     assert sum(mgawanyo[k] for k in zilizosimamishwa) > 0
+
+
+def test_bila_spread_engine_INAKATAA_kuendesha(cfg_risk):
+    """§2 — spread ya kubuni ni constant isiyopimwa, na madhara hayaonekani.
+
+    RCE ingehesabu gharama ndogo kuliko halisi, lots zingekuwa kubwa kuliko
+    zinazoruhusiwa, na `net_account_return_month` ingekuwa ya soko lisilokuwepo.
+    Hakuna metric ingesema kwa nini — kwa hiyo lazima ilipuke hapa.
+    """
+    feats = _features(6, waka=[True] + [False] * 5).drop(
+        columns=["spread_p50", "spread_p95"])
+    with pytest.raises(B.BacktestError, match="spread_p50"):
+        B.run(_strategy(), feats, _ticks(_mfululizo([1])), cfg_risk=cfg_risk,
+              broker=_broker(), timeframe="H1")
+
+
+def test_spread_ya_RCE_ni_ya_DIRISHA_si_ya_run_nzima(cfg_risk):
+    """Spread ikipanda katikati, gharama ya RCE lazima ipande nayo.
+
+    Orodha moja isiyobadilika ingefanya `max_spread` isiwake kamwe na gharama
+    isiwe na uhusiano na soko.
+    """
+    feats = _features(12, waka=[i % 2 == 0 for i in range(12)])
+    feats.iloc[6:, feats.columns.get_loc("spread_p50")] = 8.0
+    feats.iloc[6:, feats.columns.get_loc("spread_p95")] = 8.0
+
+    out = B.run(_strategy(), feats, _ticks(_mfululizo([1] * 6)),
+                cfg_risk=cfg_risk, broker=_broker(), timeframe="H1")
+    gharama = [a.cost_pips for a in out.ledger.attempts]
+    assert gharama[-1] > gharama[0], f"gharama haikubadilika na spread: {gharama}"
 
 
 # ===========================================================================

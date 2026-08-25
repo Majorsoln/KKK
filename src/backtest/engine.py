@@ -265,17 +265,24 @@ def run(strategy, features, ticks, *, cfg_risk, broker: BrokerFacts,
     stamps = pd.DatetimeIndex(pd.to_datetime(ticks["timestamp"], utc=True)).as_unit("ns")
     stamps_ns = stamps.view("int64")
 
-    spreads_h1 = list(h1_spreads) if h1_spreads is not None else [1.0] * 100
-    spreads_m5 = list(m5_spreads) if m5_spreads is not None else [1.0] * 288
+    # Spread ya RCE ni ya DIRISHA LINALOFUATA bei, si namba moja ya run nzima.
+    # `spread_effective` (§3.1) inachukua wastani wa H1 za mwisho na p95 ya M5
+    # za mwisho — zote mbili ni za wakati wa uamuzi. Kupeleka orodha moja
+    # isiyobadilika kungefanya gharama ya RCE isiwe na uhusiano na soko, na
+    # `max_spread` isiwake kamwe.
+    mfululizo_spread = _mfululizo_wa_spread(features, h1_spreads, m5_spreads, cfg_risk)
+
+    # Safu za bei kama numpy MARA MOJA. `ticks["bid"].iloc[i]` ndani ya loop ni
+    # utafutaji wa safu kwa kila signal — pandas inajenga Series mpya kila mara.
+    bid_zote = ticks["bid"].to_numpy(dtype=float)
+    ask_zote = ticks["ask"].to_numpy(dtype=float)
 
     # ATR ya kila bar inahitajika kwa SL/TP za `atr_mult`; index ni mwanzo wa bar
     # wakati signal ni mwisho wake, kwa hiyo tunaunganisha kwa nafasi.
     atr_pips = features["ATR_pips"] if "ATR_pips" in features.columns else None
     ends = pd.DatetimeIndex(_bar_ends_for(features, timeframe, day_tz))
-    atr_kwa_muda = (
-        pd.Series(atr_pips.to_numpy(dtype=float), index=ends) if atr_pips is not None
-        else None
-    )
+    atr_zote = atr_pips.to_numpy(dtype=float) if atr_pips is not None else None
+    ends_ns = ends.as_unit("ns").view("int64")
 
     salio = matokeo.starting_balance
     wazi: list[Trade] = []
@@ -297,9 +304,15 @@ def run(strategy, features, ticks, *, cfg_risk, broker: BrokerFacts,
                 bado.append(t)
         wazi = bado
 
+        # Bars zilizoshafungwa kufikia wakati huu. `side="right"` juu ya mwisho
+        # wa bar: bar iliyofungwa DAKIKA hii inahesabika (taarifa yake ipo),
+        # inayofuata haipo — ndipo R1 inapokaa. Bar iliyotoa signal ni ya
+        # mwisho kati yao, kwa hiyo ATR yake iko kwenye `n - 1`.
+        n_zilizofungwa = int(np.searchsorted(ends_ns, muda.value, side="right"))
+
         # ---- SL/TP kwa pips ----
-        atr = float(atr_kwa_muda.get(muda, float("nan"))) if atr_kwa_muda is not None \
-            else float("nan")
+        atr = (float(atr_zote[n_zilizofungwa - 1])
+               if atr_zote is not None and n_zilizofungwa > 0 else float("nan"))
         sl_pips = _kwa_pips(strategy.sl_type, strategy.sl_param, atr, None)
         tp_pips = _kwa_pips(strategy.tp_type, strategy.tp_param, atr, sl_pips)
         if not (sl_pips > 0 and tp_pips > 0):
@@ -309,11 +322,13 @@ def run(strategy, features, ticks, *, cfg_risk, broker: BrokerFacts,
         idx = int(np.searchsorted(stamps_ns, muda.value, side="left"))
         if idx == 0 or idx >= len(stamps):
             continue
-        bid = float(ticks["bid"].iloc[idx - 1])
-        ask = float(ticks["ask"].iloc[idx - 1])
+        bid = float(bid_zote[idx - 1])
+        ask = float(ask_zote[idx - 1])
         entry = ask if strategy.direction.upper() == "BUY" else bid
 
         # ---- hatua 1: RCE CHECK (R19) ----
+        spreads_h1, spreads_m5 = mfululizo_spread(n_zilizofungwa)
+
         ctx = MarketContext(
             account=AccountState(
                 current_balance=salio, today_profit=faida_leo, today_loss=hasara_leo,
@@ -342,8 +357,9 @@ def run(strategy, features, ticks, *, cfg_risk, broker: BrokerFacts,
             time_stop_minutes=_time_stop_minutes(strategy, timeframe),
             swap_pips_per_night=broker.swap_pips_per_night,
         )
-        kipande = _slice(ticks, stamps_ns, muda, spec_exec.time_stop_minutes)
-        path = execute(kipande, spec_exec, signal_time=muda, requested_price=entry)
+        lo, hi = _mipaka(stamps_ns, muda, spec_exec.time_stop_minutes)
+        path = execute(ticks.iloc[lo:hi], spec_exec, signal_time=muda,
+                       requested_price=entry, stamps=stamps[lo:hi])
 
         matokeo.ledger.add(_na_utekelezaji(attempt, path))
         if path.outcome != FILL or not path.resolved:
@@ -369,6 +385,64 @@ def _bar_ends_for(features, timeframe: str, day_tz: str):
     from src.data.bars import bar_ends
 
     return bar_ends(features.index, timeframe, day_tz)
+
+
+def _mfululizo_wa_spread(features, h1_spreads, m5_spreads, cfg_risk):
+    """Rudisha `f(n_bars_zilizofungwa) -> (h1, m5)` — spreads za wakati wa uamuzi.
+
+    **Hakuna spread ya kubuni.** Kabla ya hapa, engine ilikuwa na `[1.0] * 100`
+    kama chaguo la kimya pale safu ya spread ikikosekana. Namba hiyo si
+    kadirio — ni constant isiyopimwa (§2), na madhara yake hayaonekani: RCE
+    ingehesabu gharama ndogo kuliko halisi, lots zingekuwa kubwa kuliko
+    zinazoruhusiwa, na `net_account_return_month` ingekuwa ya soko lisilokuwepo.
+    Hakuna metric ingesema kwa nini.
+
+    `spread_p50` ni msingi wa H1; `spread_p95` ni p95 ya spread **ndani ya
+    bar** — kipimo kile kile ambacho §3.1 inakitafuta kwenye M5, kilichopimwa
+    moja kwa moja badala ya kukadiriwa kwa bar ndogo zaidi. Ikikosekana,
+    `spread_p50` inatumika pande zote mbili: spike-guard dhaifu ni bora kuliko
+    spike-guard ya uongo.
+    """
+    import numpy as np
+
+    if h1_spreads is not None and m5_spreads is not None:
+        h1, m5 = list(h1_spreads), list(m5_spreads)
+        return lambda n: (h1, m5)
+
+    if "spread_p50" not in features.columns:
+        raise BacktestError(
+            "features hazina `spread_p50`, na hakuna `h1_spreads` iliyotolewa — "
+            "RCE haiwezi kupewa spread ya kubuni (§2, §3.1)"
+        )
+    base = features["spread_p50"].to_numpy(dtype=float)
+    spike = (features["spread_p95"].to_numpy(dtype=float)
+             if "spread_p95" in features.columns else base)
+
+    # Urefu wa dirisha unatoka kwa RCE yenyewe (`spread_model.*`), si kwangu.
+    # Kusoma kigezo cha RCE si kuweka sheria ya pili ya spread (R12) — ni
+    # kinyume chake: kupeleka bars ZOTE kungefanya `spread_effective` ikate
+    # orodha ndefu kwa kila signal, `O(n)` kwa kila mmoja, `O(n²)` kwa run.
+    n_base = int(cfg_risk.get("spread_model.base_window", 100)) or None
+    n_spike = int(cfg_risk.get("spread_model.spike_window", 288)) or None
+
+    # Bars zisizo na spread zinaondolewa MARA MOJA, si kwa kila signal.
+    # `ramani` inageuza "bars ngapi zimefungwa" kuwa "thamani ngapi halali
+    # zipo" kwa `searchsorted`, kwa hiyo kila kukata ni view, si nakala.
+    def andaa(thamani):
+        wapi = np.flatnonzero(np.isfinite(thamani))
+        return thamani[wapi], wapi
+
+    base_halali, base_wapi = andaa(base)
+    spike_halali, spike_wapi = andaa(spike)
+
+    def dirisha(n: int):
+        i = int(np.searchsorted(base_wapi, n, side="left"))
+        j = int(np.searchsorted(spike_wapi, n, side="left"))
+        h1 = base_halali[max(0, i - n_base) if n_base else 0: i]
+        m5 = spike_halali[max(0, j - n_spike) if n_spike else 0: j]
+        return h1.tolist(), m5.tolist()
+
+    return dirisha
 
 
 def _kwa_pips(aina: str, param: float, atr: float, sl_pips: float | None) -> float:
@@ -406,8 +480,8 @@ def _time_stop_minutes(strategy, timeframe: str) -> int:
     return int(strategy.time_stop_bars * urefu.total_seconds() / 60)
 
 
-def _slice(ticks, stamps_ns, muda, time_stop_minutes: int):
-    """Ticks za dirisha la trade pekee.
+def _mipaka(stamps_ns, muda, time_stop_minutes: int) -> tuple[int, int]:
+    """Mipaka ya dirisha la trade — `[lo, hi)` kwenye ticks.
 
     Bila hii, kila trade ingetembea hadi mwisho wa data: `O(n)` kwa kila signal,
     yaani `O(n²)` kwa run nzima. Dirisha linaishia tick MOJA baada ya `deadline`
@@ -419,7 +493,13 @@ def _slice(ticks, stamps_ns, muda, time_stop_minutes: int):
     lo = int(np.searchsorted(stamps_ns, muda.value, side="left"))
     deadline = muda.value + time_stop_minutes * 60 * 1_000_000_000
     hi = int(np.searchsorted(stamps_ns, deadline, side="left")) + 1
-    return ticks.iloc[max(0, lo - 1): min(len(ticks), hi + 1)]
+    return max(0, lo - 1), min(len(stamps_ns), hi + 1)
+
+
+def _slice(ticks, stamps_ns, muda, time_stop_minutes: int):
+    """`_mipaka` ikiwa tayari imekatwa — kwa wapigaji simu wasio na `stamps`."""
+    lo, hi = _mipaka(stamps_ns, muda, time_stop_minutes)
+    return ticks.iloc[lo:hi]
 
 
 def _na_utekelezaji(attempt: Attempt, path: TradePath) -> Attempt:

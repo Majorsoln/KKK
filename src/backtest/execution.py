@@ -102,11 +102,16 @@ class TradePath:
         return payload
 
 
-def execute(ticks, spec: ExecSpec, *, signal_time, requested_price: float) -> TradePath:
+def execute(ticks, spec: ExecSpec, *, signal_time, requested_price: float,
+            stamps=None) -> TradePath:
     """Tembea njia ya ticks kutoka signal hadi kutoka.
 
     `ticks` ni frame yenye `timestamp`, `bid`, `ask`, **iliyopangwa**, na
     ikianzia si baadaye kuliko `signal_time`.
+
+    `stamps` ni nyakati zilizoshageuzwa (`DatetimeIndex` ya `ns`, urefu sawa na
+    `ticks`) — njia ya kasi kwa mpigaji simu anayeziwa tayari. Ikikosekana
+    zinajengwa hapa; matokeo ni yale yale, na test inathibitisha hilo.
     """
     import numpy as np
     import pandas as pd
@@ -122,7 +127,13 @@ def execute(ticks, spec: ExecSpec, *, signal_time, requested_price: float) -> Tr
     # `Timestamp.value` DAIMA ni nanosekunde. Kuchanganya vipimo viwili
     # kunatoa tofauti ya mara 1,000 — na tofauti ya namna hiyo haitoi kosa,
     # inatoa jibu lisilo sahihi.
-    stamps = pd.DatetimeIndex(pd.to_datetime(ticks["timestamp"], utc=True)).as_unit("ns")
+    if stamps is None:
+        stamps = pd.DatetimeIndex(
+            pd.to_datetime(ticks["timestamp"], utc=True)).as_unit("ns")
+    elif len(stamps) != len(ticks):
+        raise ExecutionError(
+            f"`stamps` ({len(stamps)}) hailingani na `ticks` ({len(ticks)})"
+        )
     stamps_ns = stamps.view("int64")
     t_signal = _utc(signal_time).as_unit("ns")
     after = int(np.searchsorted(stamps_ns, t_signal.value))
