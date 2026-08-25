@@ -148,6 +148,11 @@ def main() -> int:
                          "kiwango cha washindi")
     ap.add_argument("--dry-run", action="store_true",
                     help="pima kisha simama, bila kujitoa kwenye run kamili")
+    ap.add_argument("--checkpoint", default=None,
+                    help="faili ya kuhifadhi kila replicate. Chaguo-msingi ni "
+                         "kando ya --out. Run ndefu inayokatika inaendelea "
+                         "kutoka hapa badala ya kuanza upya")
+    ap.add_argument("--no-checkpoint", action="store_true")
     args = ap.parse_args()
 
     root = _root(args.root)
@@ -272,15 +277,31 @@ def main() -> int:
     if args.dry_run:
         return 0
 
+    out_path = Path(args.out) if args.out else (
+        REPO / "research" / "reports" / "noise_floor.json")
+
+    # Fingerprint inashika kila kitu kinachobadilisha maana ya replicate. Ikiwa
+    # tofauti, checkpoint inaanza upya badala ya kuchanganya runs mbili — na
+    # kuchanganya hakungeonekana kwenye faili ya mwisho.
+    ckpt = None
+    if not args.no_checkpoint:
+        alama = json.dumps({
+            "spec": spec.to_json(), "seed": args.seed,
+            "n_bars": int(len(bars)), "replicates": args.replicates,
+            "families": list(S.FAMILIES),
+        }, sort_keys=True)
+        ckpt_path = Path(args.checkpoint) if args.checkpoint else (
+            out_path.with_name(out_path.stem + "_checkpoint.jsonl"))
+        ckpt = NF.Checkpoint.open(ckpt_path, alama, progress=print)
+        print(f"   checkpoint: {ckpt_path}\n")
+
     floor = NF.calibrate(
         bars, run_pipeline,
         n_replicates=args.replicates, seed=args.seed,
+        checkpoint=ckpt,
         source=f"{args.symbol} {tf} · bars {len(bars):,} · "
                f"K={args.candidates} · {root}",
     )
-
-    out_path = Path(args.out) if args.out else (
-        REPO / "research" / "reports" / "noise_floor.json")
     floor.write(out_path)
     print(f"\nimeandikwa: {out_path}")
 

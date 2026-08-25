@@ -33,7 +33,7 @@ from __future__ import annotations
 
 import json
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Iterable, Mapping, Sequence
@@ -264,6 +264,7 @@ def calibrate(
     regime: Sequence[str] | None = None,
     source: str = "",
     progress: Callable[[str], None] | None = print,
+    checkpoint: "Checkpoint | None" = None,
 ) -> NoiseFloor:
     """Endesha pipeline juu ya data bandia, rudisha jedwali la sakafu.
 
@@ -275,6 +276,12 @@ def calibrate(
     `run_pipeline` iwe **deterministic** ikipewa frame ile ile. Ikiwa na nasibu
     yake ya ndani isiyofungwa, sakafu itabadilika kila run bila sababu
     inayoonekana, na kizingiti kingekuwa kinatetemeka chini ya kila kitu.
+
+    `checkpoint` inahifadhi matokeo ya kila replicate inapokamilika, na
+    inayarudisha bila kuendesha upya. Si ya kasi — ni ya **kuishi**: run ya
+    kweli ni masaa mengi, na mashine inayozimika saa ya 40 bila checkpoint
+    inapoteza zote. Kwa sababu kila replicate ina seed yake inayotokana na
+    `(seed, familia, rep)`, kuendelea kunatoa jedwali LILE LILE.
 
     R23 — hakuna kinachoendeshwa kimya: kila replicate inachapishwa.
     """
@@ -305,9 +312,21 @@ def calibrate(
             # Seed ya kila run inatokana na (seed, familia, replicate) — kwa hiyo
             # jedwali zima linazalishika upya kutoka namba MOJA.
             rep_seed = _seed_of(seed, fam, rep)
-            sur = S.make(frame, fam, seed=rep_seed, block_len=block_len, regime=regime)
-            result = run_pipeline(sur.frame)
-            _check_result(result, fam, rep)
+            # `is not None`, si `if checkpoint`: `__len__` inafanya
+            # checkpoint TUPU iwe falsy — yaani ile ya run mpya kabisa,
+            # ambayo ndiyo inayohitaji kuandika zaidi kuliko zote.
+            result = (checkpoint.get(fam, rep)
+                      if checkpoint is not None else None)
+            ilihifadhiwa = result is not None
+            if result is None:
+                sur = S.make(frame, fam, seed=rep_seed,
+                             block_len=block_len, regime=regime)
+                result = run_pipeline(sur.frame)
+                _check_result(result, fam, rep)
+                if checkpoint is not None:
+                    checkpoint.put(fam, rep, result)
+            else:
+                _check_result(result, fam, rep)
 
             variants.append(int(result[VARIANTS_KEY]))
             for name, value in result.items():
@@ -333,7 +352,8 @@ def calibrate(
                 )
                 progress(
                     f"   {fam:<17} {rep + 1:>4}/{n_replicates}  "
-                    f"variants {result[VARIANTS_KEY]:>6,}  seed {rep_seed}{onyo}"
+                    f"variants {result[VARIANTS_KEY]:>6,}  seed {rep_seed}"
+                    f"{'  (imehifadhiwa)' if ilihifadhiwa else ''}{onyo}"
                 )
 
     rng = np.random.default_rng(seed)
@@ -386,6 +406,88 @@ def calibrate(
         progress("")
         progress(floor_table.render())
     return floor_table
+
+
+@dataclass
+class Checkpoint:
+    """Matokeo ya kila replicate, yakiandikwa yanapokamilika.
+
+    Run ya kweli ni masaa mengi. Mashine inayozimika saa ya 40 bila hii
+    inapoteza zote — na si kupoteza muda pekee, ni kupoteza **ushahidi** ambao
+    R5 inaudai.
+
+    ---
+
+    **Fingerprint ndiyo sehemu isiyo ya kawaida.**
+
+    Kuendelea kwenye run yenye vigezo TOFAUTI ni hatari kubwa kuliko kuanza
+    upya: jedwali lingechanganya replicates za `K=200` na za `K=1000`, na
+    `variants_tested` isingesema ukweli kuhusu utafutaji wowote. Hilo
+    lisingeonekana kwenye faili ya mwisho — namba zote zingeonekana halali.
+
+    Kwa hiyo fingerprint inaandikwa kwenye mstari wa kwanza, na kuendelea
+    kunakataliwa ikiwa haifanani. Faili inaanza upya badala ya kuchanganya.
+    """
+
+    path: Path
+    fingerprint: str
+    _seen: dict[tuple[str, int], dict] = field(default_factory=dict)
+
+    @classmethod
+    def open(cls, path: Path, fingerprint: str,
+             progress: Callable[[str], None] | None = None) -> "Checkpoint":
+        path = Path(path)
+        me = cls(path=path, fingerprint=fingerprint)
+        if not path.exists():
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(
+                json.dumps({"fingerprint": fingerprint}) + "\n",
+                encoding="utf-8", newline="\n",
+            )
+            return me
+
+        lines = path.read_text(encoding="utf-8").splitlines()
+        kichwa = json.loads(lines[0]) if lines else {}
+        if kichwa.get("fingerprint") != fingerprint:
+            if progress:
+                progress(
+                    f"   checkpoint ya vigezo TOFAUTI ({path.name}) — inaanza upya.\n"
+                    f"      iliyopo : {kichwa.get('fingerprint')}\n"
+                    f"      sasa    : {fingerprint}"
+                )
+            path.write_text(
+                json.dumps({"fingerprint": fingerprint}) + "\n",
+                encoding="utf-8", newline="\n",
+            )
+            return me
+
+        for line in lines[1:]:
+            if not line.strip():
+                continue
+            try:
+                row = json.loads(line)
+            except json.JSONDecodeError:
+                # Mstari wa mwisho unaweza kukatika mashine ikizimika katikati
+                # ya kuandika. Kuurusha ni sahihi: replicate hiyo itaendeshwa
+                # upya, na seed yake ni ile ile.
+                continue
+            me._seen[(row["family"], int(row["rep"]))] = row["result"]
+        if progress and me._seen:
+            progress(f"   checkpoint: replicates {len(me._seen):,} zimehifadhiwa")
+        return me
+
+    def get(self, family: str, rep: int) -> dict | None:
+        return self._seen.get((family, rep))
+
+    def put(self, family: str, rep: int, result: Mapping[str, float]) -> None:
+        row = {"family": family, "rep": int(rep), "result": dict(result)}
+        with self.path.open("a", encoding="utf-8", newline="\n") as fh:
+            fh.write(json.dumps(row, default=float) + "\n")
+            fh.flush()
+        self._seen[(family, int(rep))] = row["result"]
+
+    def __len__(self) -> int:
+        return len(self._seen)
 
 
 def guard_generator(*, noise_floor_path: Path, cost_calibration_path: Path) -> NoiseFloor:
