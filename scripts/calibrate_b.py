@@ -86,6 +86,46 @@ def bars_za_dirisha(inv, symbol: str, timeframe: str, stage, *, day_tz: str,
     return out, n_ticks
 
 
+def _hakikisha_chanzo_kimoja(inv, symbol: str, window) -> None:
+    """Vyanzo viwili chini ya symbol moja vinahitaji UAMUZI, si kosa tu.
+
+    `data.yaml §2.2` inakataa kuchanganya `aggregator` na `broker`, na kwa haki:
+    feeds mbili zina mikataba tofauti ya spread na hata ya muda (§8.6). Lakini
+    "chagua kimoja" bila kuonyesha vipi vinavyofunika dirisha ni kumtaka
+    mtumiaji akisie.
+
+    Kwa hiyo hapa: kila chanzo, faili zake, kipindi chake, na **ni kiasi gani
+    cha dirisha la utafiti kinakifunika**. Chanzo kisichofunika dirisha si
+    chaguo hata kama kipo kwenye diski.
+    """
+    vyanzo = inv.provenances(symbol)
+    if len(vyanzo) <= 1:
+        return
+
+    lines = [
+        f"{symbol}: vyanzo {len(vyanzo)} ({', '.join(vyanzo)}) — §2.2 inakataa "
+        f"kuvichanganya, kwa hiyo lazima uchague kimoja.",
+        "",
+        f"   dirisha la utafiti: {window.start} → {window.end}",
+        "",
+    ]
+    anza, mwisho = str(window.start)[:7], str(window.end)[:7]
+    for chanzo in vyanzo:
+        zake = [p for p in inv.raw(symbol) if p.provenance == chanzo]
+        vipindi = sorted(p.period for p in zake if p.period)
+        ndani = [v for v in vipindi if anza <= v[:7] <= mwisho]
+        span = f"{vipindi[0]} → {vipindi[-1]}" if vipindi else "tarehe haijulikani"
+        hali = (f"NDANI ya dirisha: miezi {len({v[:7] for v in ndani})}" if ndani
+                else "HAKUNA kinachoingia kwenye dirisha")
+        lines.append(f"   {chanzo:<12} faili {len(zake):>6,}  {span:<22} {hali}")
+
+    lines += [
+        "",
+        f"   Ongeza:  --provenance <jina>",
+    ]
+    raise SystemExit("\n".join(lines))
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--root", default=None)
@@ -137,6 +177,7 @@ def main() -> int:
 
     inv = discover(root, provenance=args.provenance,
                    exclusions=load_exclusions(cfg_data))
+    _hakikisha_chanzo_kimoja(inv, args.symbol, window)
     if not inv.of(args.symbol):
         raise SystemExit(f"hakuna data ya {args.symbol} kwenye {root}")
 
