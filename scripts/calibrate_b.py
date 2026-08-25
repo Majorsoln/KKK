@@ -292,6 +292,26 @@ def main() -> int:
         "seed": args.seed, "replicates": args.replicates,
     }, indent=2) + "\n", encoding="utf-8", newline="\n")
     print(f"imeandikwa: {kando}")
+
+    # Jedwali lisilo na sakafu hata moja si mafanikio. `calibrate()` inamaliza
+    # bila kulalamika — kila metric inaishia `without_floor` kwa ufafanuzi (§1.1)
+    # — na `guard_generator` itakataa vizuri. Lakini exit 0 na "imeandikwa"
+    # baada ya saa nyingi ni ujumbe usio sahihi kabisa: kazi imefanyika, jibu
+    # halijapatikana.
+    if not floor.entries:
+        print(
+            f"\nHAKUNA SAKAFU HATA MOJA.\n"
+            f"   Replicates {args.replicates} hazikutoa thamani "
+            f"{NF.MIN_REPLICATES} kwa metric yoyote.\n"
+            f"   R5 haitafunguka kwa faili hii. Ongeza --replicates au "
+            f"--candidates, kisha endesha tena."
+        )
+        return 2
+
+    hafifu = [e.metric for e in floor.entries.values() if e.uncertainty > 0.5]
+    if hafifu:
+        print(f"\n   ONYO: sakafu tete (CI pana kuliko 50%): {', '.join(hafifu)}")
+    print(f"\nsakafu {len(floor.entries)} · bila sakafu {len(floor.without_floor)}")
     return 0
 
 
