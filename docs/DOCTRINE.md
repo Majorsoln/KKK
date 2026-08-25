@@ -404,6 +404,52 @@ nafuu na linakata wagombea wengi kwa hesabu ya mstari mmoja — thamani yake ni
 
 ---
 
+### 8.4.1 `2×` inapimwa kwa UKINGO WA UHAKIKA, si kwa nukta (2026-08-25)
+
+Kipimo cha kwanza cha lango juu ya data isiyo na edge kilionyesha tundu ambalo
+lango la nukta haliwezi kuliona. **Wagombea 1,000 wa nasibu, bars 12,000 za H1:**
+
+```
+walipita §8.4:  6 / 1,000  (0.6%)
+trades zao:     1, 1, 2, 7, 10, 14      ← wastani 5.8
+bora:           Sharpe 11.44 kutoka trades MBILI
+```
+
+Mgombea wa trade **moja** ana "wastani wa gross edge kwa trade" — lakini si
+wastani, ni uchunguzi mmoja. Chini ya `2×` ya nukta, alipita. Na kwa kuwa
+Calibration B inachukua **bora** wa kila run, sakafu ya §9 ingewekwa na bahati ya
+sarafu moja — kizingiti ambacho hakuna strategy halisi ingekivuka, na §9 nzima
+ingekuwa lango lililofungwa badala ya kipimo.
+
+**Kizidishi `2×` hakijabadilika.** Kilichobadilika ni upande wa kushoto:
+
+```
+kabla :   x̄(edge)                  ≥  2 × live_sizing_cost
+sasa  :   x̄(edge) − t·s/√n         ≥  2 × live_sizing_cost
+```
+
+**Hakuna namba mpya imeingia**, na §2 inabaki salama:
+
+* `t` inatokana na `n` yenyewe — si chaguo, ni matokeo ya sampuli.
+* kiwango cha uhakika ni **p95 ile ile** inayotumika kwenye sakafu ya kelele
+  (§9.2), spike-guard ya spread (§3.1), na cap ya slippage (Calibration A).
+  Kiwango cha pili kingekuwa mfumo wenye viwango viwili vya uhakika.
+
+Matokeo yanajipanga yenyewe, bila kizingiti cha kubuni:
+
+| `n` | inadaiwa | maana |
+|---|---|---|
+| 1 | — | hakuna standard error, kwa hiyo hakuna ukingo → `thin_sample` |
+| 2 | `6.31 × SE` | sarafu mbili hazitoshi |
+| 30 | `1.70 × SE` | adhabu ya wastani |
+| 300 | `1.65 × SE` | adhabu imefifia; lango ni `2×` ya kawaida |
+
+Ukingo unawekwa kwenye **edge** pekee, si kwa gharama: gharama kwa kila trade ni
+thabiti kwa ujenzi (spread + commission), wakati edge ndiyo yenye mtawanyiko.
+
+`ratio_lower` na `sample_penalty` zinaingia kwenye Strategy DNA (§13) pamoja na
+`cost_sensitivity` — zote tatu ni vipimo vya **udhaifu**, si vya utendaji.
+
 ### 8.5 R16 inasimamia TF ya UTEKELEZAJI (Calibration A, 2026-08-23)
 
 Calibration A ya kwanza — cells 84, symbols 12, TF 7, ticks bilioni ~2.7, miaka 8
@@ -1125,7 +1171,7 @@ Zifuatazo ni malango, si mapendekezo. Kila moja inaweza kupimwa kwa test.
 | **R17** | PRIMARY OUTCOME ni **mbili**; `net_account_return_month` ndiyo yenye mamlaka. |
 | **R18** | Kila hatua inatangaza dirisha lake la data; `stage.end < HOLDOUT_START` ni assertion, si nidhamu. |
 | **R19** | Utekelezaji una hatua **mbili**: RCE CHECK kisha EXECUTION. `NO_BUDGET` ≠ `NO_FILL`. |
-| **R20** | Lango la uchumi linatumia `live_sizing_cost`; `research_cost` ni diagnostic. |
+| **R20** | Lango la uchumi linatumia `live_sizing_cost`; `research_cost` ni diagnostic. Linapima **ukingo wa chini wa uhakika** wa edge (§8.4.1), si wastani — wastani hausemi lolote kuhusu `n` iliyoutoa. |
 | **R21** | `max_conditions` ni invariant baada ya **kila** mutation, si kizazi cha kwanza. |
 | **R22** | Kila variable ya formula ina ufafanuzi wa §21; hakuna prose kwenye hesabu. |
 | **R23** | Hakuna amri inayoendesha kimya. Kila hatua inachapisha maendeleo. |

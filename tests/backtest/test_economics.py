@@ -14,9 +14,12 @@ import pytest
 from src.backtest import economics as E
 
 
-def _eco(edge, *, research=1.0, live=1.0, n=10) -> E.Economics:
+def _eco(edge, *, research=1.0, live=1.0, n=10, lower=None) -> E.Economics:
+    """Uchumi wa mkono. `lower` haikitolewa inachukuliwa kuwa sawa na `edge` —
+    yaani sampuli kubwa isiyo na adhabu, ili tests za uwiano zibaki safi."""
     return E.Economics(n_trades=n, gross_edge_pips=edge,
-                       research_cost_pips=research, live_sizing_cost_pips=live)
+                       research_cost_pips=research, live_sizing_cost_pips=live,
+                       edge_lower_pips=edge if lower is None else lower)
 
 
 # ===========================================================================
@@ -56,6 +59,62 @@ def test_bila_trades_ni_NO_TRADES_si_kupita():
     assert eco.reject_reason == E.REJECT_NO_TRADES and not eco.passes
 
 
+# ===========================================================================
+# Ukingo wa uhakika — sampuli ndogo (2026-08-25)
+# ===========================================================================
+
+
+def test_trade_MOJA_inakataliwa_hata_ikiwa_na_edge_kubwa():
+    """Uchunguzi mmoja hauna standard error, kwa hiyo hauna ukingo.
+
+    Kipimo halisi: kati ya wagombea 1,000 wa nasibu, waliopita §8.4 walikuwa na
+    trades 1–14. Mmoja alikuwa na Sharpe 11.44 kutoka trades MBILI. Wakiingia
+    kwenye sakafu ya §9, hakuna strategy halisi ingeivuka.
+    """
+    eco = _eco(50.0, live=1.0, n=1, lower=float("nan"))
+    assert eco.reject_reason == E.REJECT_THIN_SAMPLE and not eco.passes
+
+
+def test_ukingo_ndio_unaopitisha_si_wastani():
+    """Wastani `3×` unapita, lakini ukingo `1.5×` haupiti."""
+    eco = _eco(3.0, live=1.0, n=4, lower=1.5)
+    assert eco.edge_over_live == pytest.approx(3.0)
+    assert eco.ratio_lower == pytest.approx(1.5)
+    assert not eco.passes
+
+
+def test_adhabu_ya_sampuli_inaonekana():
+    eco = _eco(3.0, live=1.0, n=4, lower=1.5)
+    assert eco.sample_penalty == pytest.approx(1.5)
+
+
+def test_kizidishi_cha_doctrine_HAKIJABADILIKA():
+    """§8.4 inasema `2×`. Kilichobadilika ni upande wa KUSHOTO pekee."""
+    assert E.KIZIDISHI == 2.0
+
+
+def test_sampuli_kubwa_thabiti_INAPITA(cfg_risk):
+    """Adhabu inafifia sampuli ikikua — lango linarudi kuwa `2×` ya kawaida."""
+    from src.stats import mean_lower_bound
+
+    kila_moja = [6.0] * 200                      # thabiti kabisa
+    eco = E.Economics(n_trades=200, gross_edge_pips=6.0, research_cost_pips=2.0,
+                      live_sizing_cost_pips=2.2,
+                      edge_lower_pips=mean_lower_bound(kila_moja))
+    assert eco.passes and eco.ratio_lower == pytest.approx(6.0 / 2.2)
+
+
+def test_sampuli_ndogo_yenye_mtawanyiko_HAIPITI():
+    from src.stats import mean_lower_bound
+
+    kila_moja = [40.0, -25.0, 40.0]              # wastani 18.3, lakini si thabiti
+    eco = E.Economics(n_trades=3, gross_edge_pips=sum(kila_moja) / 3,
+                      research_cost_pips=2.0, live_sizing_cost_pips=2.2,
+                      edge_lower_pips=mean_lower_bound(kila_moja))
+    assert eco.edge_over_live > E.KIZIDISHI, "wastani peke yake ungepita"
+    assert not eco.passes, "ukingo unapaswa kuiangusha"
+
+
 def test_gharama_SIFURI_haipitishi():
     """Gharama sifuri si nafuu — ni gharama isiyopimwa.
 
@@ -73,7 +132,7 @@ def test_edge_hasi_inakataliwa():
 
 def test_inajielezea():
     text = _eco(3.0, live=1.0).render()
-    assert "edge/live" in text and "SAWA" in text
+    assert "uwiano" in text and "ukingo" in text and "SAWA" in text
     assert _eco(3.0, live=1.0).to_json()["required"] == E.KIZIDISHI
 
 
