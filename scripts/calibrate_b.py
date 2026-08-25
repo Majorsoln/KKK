@@ -91,7 +91,8 @@ def main() -> int:
     ap.add_argument("--root", default=None)
     ap.add_argument("--provenance", default=None)
     ap.add_argument("--symbol", default="EURUSD")
-    ap.add_argument("--tf", default="H1", help="R11 inafunga entry kwenye H1")
+    ap.add_argument("--tf", default=None,
+                    help="chaguo-msingi ni `bars.decision_tf` ya data.yaml (R11)")
     ap.add_argument("--candidates", type=int, default=200,
                     help="wagombea kwa kila replicate — K ya §9.1")
     ap.add_argument("--replicates", type=int, default=NF.MIN_REPLICATES)
@@ -114,13 +115,23 @@ def main() -> int:
     cfg_risk = load_config(REPO / "config" / "risk.yaml")
     cfg_broker = load_config(REPO / "config" / "broker_costs.yaml")
 
-    day_tz = str(cfg_data.get("broker_server_tz", "UTC"))
+    # Bila default: kigezo hiki KIPO kwenye `data.yaml`, na `.get` yenye default
+    # ingerudisha "UTC" kimya kama ufunguo ungeandikwa vibaya — siku ya broker
+    # ingehama saa mbili, na hakuna kitu kingelalamika.
+    day_tz = str(cfg_data.get("timezone.day_reset_tz"))
+    tf = args.tf or str(cfg_data.get("bars.decision_tf"))      # R11
     window = research_window(cfg_data)
-    stage = declare(window, name="calibration_b", purpose="DOCTRINE §9.2")
+    stage = declare("calibration_b", "DOCTRINE §9.2 — sakafu ya kelele",
+                    window, cfg=cfg_data)
 
     print(f"L0: {root}")
-    print(f"dirisha: {window.start.date()} → {window.end.date()} · day_tz {day_tz}")
-    print(f"symbol {args.symbol} · TF {args.tf} · hour_tz {args.hour_tz}")
+    print(f"dirisha: {window.start} → {window.end} · day_tz {day_tz}")
+    print(f"symbol {args.symbol} · TF {tf} · hour_tz {args.hour_tz}")
+    if args.hour_tz == "UTC" and day_tz != "UTC":
+        print(f"   KUMBUKA (§8.6): `hour` inatumia UTC wakati siku ya broker ni "
+              f"{day_tz}.\n"
+              f"         Feeds mbili hazitumii mkataba mmoja; chaguo hili ni "
+              f"lako, si la kimya.")
     print(f"wagombea {args.candidates:,} · replicates {args.replicates} × "
           f"familia {len(S.FAMILIES)} = runs {args.replicates * len(S.FAMILIES):,}\n")
 
@@ -149,12 +160,12 @@ def main() -> int:
 
     print("Kujenga bars…", flush=True)
     t0 = time.time()
-    bars, n_ticks = bars_za_dirisha(inv, args.symbol, args.tf, stage,
+    bars, n_ticks = bars_za_dirisha(inv, args.symbol, tf, stage,
                                     day_tz=day_tz, months=args.months, pip=pip)
     print(f"   bars {len(bars):,} · ticks {n_ticks:,} · {time.time() - t0:.0f}s\n")
 
     spec = P.PipelineSpec(
-        symbol=args.symbol, timeframe=args.tf,
+        symbol=args.symbol, timeframe=tf,
         broker=BrokerFacts(
             spec=SymbolSpec(symbol=args.symbol, point=pip / 10.0,
                             contract_size=contract, volume_min=0.01,
@@ -223,7 +234,7 @@ def main() -> int:
     floor = NF.calibrate(
         bars, run_pipeline,
         n_replicates=args.replicates, seed=args.seed,
-        source=f"{args.symbol} {args.tf} · bars {len(bars):,} · "
+        source=f"{args.symbol} {tf} · bars {len(bars):,} · "
                f"K={args.candidates} · {root}",
     )
 
