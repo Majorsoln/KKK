@@ -321,9 +321,19 @@ def calibrate(
                 seen[fam].setdefault(name, []).append(float(value))
 
             if progress:
+                # Idadi ya replicates ZENYE THAMANI, si zilizoendeshwa. Ndiyo
+                # inayohesabiwa dhidi ya `MIN_REPLICATES` chini, kwa hiyo ndiyo
+                # inayopaswa kuonekana wakati run inaendelea: kujua saa 60
+                # baadaye kwamba hazikutosha si kujua, ni kupoteza.
+                zilizojaa = min(
+                    (len(v) for v in seen[fam].values()), default=0
+                ) if seen[fam] else 0
+                onyo = "" if zilizojaa >= MIN_REPLICATES else (
+                    f"  [zenye thamani {zilizojaa}/{MIN_REPLICATES}]"
+                )
                 progress(
                     f"   {fam:<17} {rep + 1:>4}/{n_replicates}  "
-                    f"variants {result[VARIANTS_KEY]:>6,}  seed {rep_seed}"
+                    f"variants {result[VARIANTS_KEY]:>6,}  seed {rep_seed}{onyo}"
                 )
 
     rng = np.random.default_rng(seed)
