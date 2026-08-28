@@ -335,7 +335,13 @@ def calibrate(
                 if name not in specs:
                     extra.add(name)
                     continue
-                if value is None or (isinstance(value, float) and math.isnan(value)):
+                # `isfinite`, si `isnan` pekee. `profit_factor` ni `inf` pale
+                # mgombea hana trade hata moja ya hasara — si thamani kubwa, ni
+                # thamani isiyohesabika. Ikiingia kwenye `np.quantile`,
+                # interpolation inafanya `inf - inf` na sakafu YOTE inakuwa
+                # `NaN`. Lango la `> NaN` halipitiki kamwe, na halionyeshi kwa
+                # nini. (Calibration B ya kwanza, 2026-08-26.)
+                if value is None or not _ni_namba(value):
                     continue
                 seen[fam].setdefault(name, []).append(float(value))
 
@@ -515,6 +521,14 @@ def guard_generator(*, noise_floor_path: Path, cost_calibration_path: Path) -> N
 # ===========================================================================
 # Ndani
 # ===========================================================================
+
+
+def _ni_namba(value: Any) -> bool:
+    """Namba halisi inayoweza kuingia kwenye mgawanyo. `NaN`/`inf` si namba."""
+    try:
+        return math.isfinite(float(value))
+    except (TypeError, ValueError):
+        return False
 
 
 def _check_result(result: Any, family: str, rep: int) -> None:

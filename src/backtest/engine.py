@@ -95,11 +95,31 @@ class BacktestResult:
     trades: list[Trade] = field(default_factory=list)
     starting_balance: float = 0.0
     n_signals_raw: int = 0
+    # Miezi YOTE ya dirisha lililoendeshwa. `None` = tumia miezi ya trades
+    # pekee — njia ya zamani, iliyoachwa kwa wapigaji simu wanaojenga
+    # `BacktestResult` kwa mkono kwenye tests.
+    months: Any = None
 
     # ---------------- mfululizo ----------------
 
     def monthly(self):
-        """Mwezi kwa mwezi: pips, pesa, idadi ya trades (R8)."""
+        """Mwezi kwa mwezi: pips, pesa, idadi ya trades (R8).
+
+        **Denominator ni miezi ya DIRISHA, si miezi iliyokuwa na trades.**
+
+        Strategy iliyofanya trades 10 kwenye miezi 2 kati ya 99 haikupata
+        `net_pips_month` ya miezi hiyo miwili — ilipata sifuri kwa miezi 97.
+        Mwezi usio na trade ni mwezi wenye matokeo ya sifuri, si mwezi
+        usiokuwepo.
+
+        Kasoro hii ilipatikana kwa Calibration B ya kwanza (2026-08-26), na
+        haikuonekana kama kosa — ilionekana kama utendaji. Sakafu iliyotokea:
+        `profitable_month_fraction` ya **1.0000** (mgombea alitrade mwezi mmoja
+        wenye faida, kwa hiyo 1/1), `sharpe` ya **20.91** (kupotoka kwa miezi
+        miwili ni kudogo), `net_pips_month` ya **1,591** (jumla ikigawanywa kwa
+        2 badala ya 99). Malango matatu yasiyopitika, kutoka kosa moja la
+        denominator.
+        """
         import pandas as pd
 
         if not self.trades:
@@ -109,7 +129,7 @@ class BacktestResult:
             "muda": [t.path.exit_time for t in self.trades],
             "net_pips": [t.net_pips for t in self.trades],
             "pnl_account": [t.pnl_account for t in self.trades],
-            "balance_before": [t.balance_after - t.pnl_account for t in self.trades],
+            "balance_after": [t.balance_after for t in self.trades],
         })
         # Mwezi unahesabiwa kwa UTC kwa makusudi (R8). `tz_localize(None)` baada
         # ya `tz_convert` ni kutupa tz **baada** ya kuitumia, si kuipuuza.
@@ -120,10 +140,26 @@ class BacktestResult:
             net_pips=("net_pips", "sum"),
             pnl_account=("pnl_account", "sum"),
             n_trades=("net_pips", "size"),
-            balance_open=("balance_before", "first"),
+            balance_close=("balance_after", "last"),
         )
+
+        if self.months is not None and len(self.months):
+            # Miezi ya dirisha inayokosekana inaongezwa ikiwa na SIFURI.
+            out = out.reindex(self.months.union(out.index).sort_values())
+            out["net_pips"] = out["net_pips"].fillna(0.0)
+            out["pnl_account"] = out["pnl_account"].fillna(0.0)
+            out["n_trades"] = out["n_trades"].fillna(0).astype(int)
+            out["balance_close"] = out["balance_close"].ffill()
+
+        # Salio la kufungua ni la KUFUNGA la mwezi uliotangulia — si la trade ya
+        # kwanza ya mwezi huu. Tofauti inaonekana pale kuna miezi ya ukimya:
+        # `ffill` ya salio la kufungua ingerudia salio la KABLA ya trades za
+        # mwezi uliopita, na return ya kila mwezi tulivu ingehesabiwa kwa msingi
+        # usio sahihi.
+        out["balance_open"] = out["balance_close"].shift(1).fillna(
+            self.starting_balance)
         out["return_pct"] = out["pnl_account"] / out["balance_open"]
-        return out
+        return out.drop(columns=["balance_close"])
 
     def equity(self):
         import pandas as pd
@@ -173,7 +209,12 @@ class BacktestResult:
 
         faida = float(sum(t.pnl_account for t in self.trades if t.pnl_account > 0))
         hasara = float(-sum(t.pnl_account for t in self.trades if t.pnl_account < 0))
-        pf = faida / hasara if hasara > 0 else float("inf") if faida > 0 else 0.0
+        # Bila hasara hata moja, `profit_factor` HAIHESABIKI — si kubwa isiyo na
+        # kikomo. Kuirudisha `inf` kunaifanya iwe thamani BORA kabisa hasa pale
+        # sampuli ni ndogo kuliko zote, ambayo ndiyo hali inayotudanganya zaidi.
+        # Ikiingia kwenye `np.quantile`, `inf − inf` inageuza sakafu YOTE kuwa
+        # `NaN` (Calibration B ya kwanza, 2026-08-26).
+        pf = faida / hasara if hasara > 0 else float("nan")
 
         return {
             "net_pips_month": float(pips.mean()),
@@ -258,6 +299,10 @@ def run(strategy, features, ticks, *, cfg_risk, broker: BrokerFacts,
             else cfg_risk.get("base_balance")
         ),
         n_signals_raw=sig.n_signals,
+        months=pd.PeriodIndex(
+            pd.DatetimeIndex(features.index).tz_convert("UTC").tz_localize(None),
+            freq="M",
+        ).unique().sort_values() if len(features) else None,
     )
     if sig.n_signals == 0:
         return matokeo

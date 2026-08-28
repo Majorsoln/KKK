@@ -248,6 +248,82 @@ def test_max_drawdown_ni_chanya_na_inatoka_kwenye_kilele(cfg_risk):
 
 
 # ===========================================================================
+# Vipimo vya mwezi (R8) — denominator ni miezi ya DIRISHA
+# ===========================================================================
+
+
+def _endesha_miezi_mingi(matokeo, cfg_risk):
+    """Trades chache mwanzoni, kisha miezi mingi ya ukimya.
+
+    Ndicho kilichotokea kwenye Calibration B ya kwanza: mgombea mwenye trades
+    chache kwenye miezi miwili, dirisha likiwa la miaka minane.
+    """
+    mids = _mfululizo(matokeo)
+    ticks = _ticks(mids)
+    n = len(matokeo)
+    bars = (len(mids) // 60) + 1
+    waka = [(i % 2 == 0) and (i // 2) < n for i in range(bars)]
+    feats = _features(bars, waka=waka)
+
+    # Panua index ya features hadi miezi sita, bila kuongeza signals.
+    ziada = pd.date_range(feats.index[-1] + pd.Timedelta(hours=1),
+                          periods=24 * 30 * 6, freq="1h", tz="UTC")
+    kimya = pd.DataFrame({"SIGNAL": 0.0, "ATR_pips": 20.0,
+                          "spread_p50": 1.0, "spread_p95": 1.0}, index=ziada)
+    feats = pd.concat([feats, kimya])
+    return B.run(_strategy(), feats, ticks, cfg_risk=cfg_risk, broker=_broker(),
+                 timeframe="H1", starting_balance=10_000.0)
+
+
+def test_mwezi_usio_na_trade_ni_SIFURI_si_mwezi_usiokuwepo(cfg_risk):
+    """Kasoro iliyofichua Calibration B ya kwanza (2026-08-26).
+
+    Mgombea aliyetrade miezi 2 kati ya 99 aliripotiwa kana kwamba miezi hiyo
+    miwili ndiyo maisha yake yote. Haikuonekana kama kosa — ilionekana kama
+    utendaji bora, na ikatoa malango matatu yasiyopitika.
+    """
+    out = _endesha_miezi_mingi([1, 1], cfg_risk)
+    kwa_mwezi = out.monthly()
+
+    yenye_trades = int((kwa_mwezi["n_trades"] > 0).sum())
+    assert len(kwa_mwezi) > yenye_trades + 3, (
+        f"miezi ya ukimya haijahesabiwa: {len(kwa_mwezi)} vs {yenye_trades}"
+    )
+    tulivu = kwa_mwezi[kwa_mwezi["n_trades"] == 0]
+    assert (tulivu["net_pips"] == 0.0).all()
+    assert (tulivu["return_pct"] == 0.0).all()
+
+
+def test_pips_kwa_mwezi_zinagawanywa_kwa_miezi_YOTE(cfg_risk):
+    out = _endesha_miezi_mingi([1, 1], cfg_risk)
+    kwa_mwezi = out.monthly()
+    assert out.metrics()["net_pips_month"] == pytest.approx(
+        out.total_pips / len(kwa_mwezi)
+    )
+
+
+def test_miezi_yenye_faida_HAIWEZI_kuwa_1_pale_kuna_ukimya(cfg_risk):
+    """`profitable_month_fraction = 1.0` ilifanya lango lisipitike kabisa."""
+    out = _endesha_miezi_mingi([1, 1], cfg_risk)
+    assert out.metrics()["profitable_month_fraction"] < 1.0
+
+
+def test_salio_la_mwezi_tulivu_linafuata_uliopita_si_mwanzo(cfg_risk):
+    """`ffill`, si `starting_balance`: mwezi tulivu unaanza pale uliopita uliishia."""
+    out = _endesha_miezi_mingi([1, 1], cfg_risk)
+    kwa_mwezi = out.monthly()
+    baada = kwa_mwezi[kwa_mwezi.index > kwa_mwezi[kwa_mwezi["n_trades"] > 0].index[-1]]
+    assert (baada["balance_open"] != out.starting_balance).all()
+
+
+def test_bila_miezi_ya_dirisha_tabia_ya_zamani_inabaki(cfg_risk):
+    """`months=None` ni kwa wapigaji simu wanaojenga matokeo kwa mkono."""
+    out = _endesha([1, -1], cfg_risk)
+    out.months = None
+    assert (out.monthly()["n_trades"] > 0).all()
+
+
+# ===========================================================================
 # Vipimo vya mwezi (R8)
 # ===========================================================================
 

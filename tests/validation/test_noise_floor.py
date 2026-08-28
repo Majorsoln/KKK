@@ -13,6 +13,7 @@ sakafu inaweza kuwa si sakafu:
 from __future__ import annotations
 
 import json
+import math
 
 import numpy as np
 import pandas as pd
@@ -323,3 +324,50 @@ def test_jedwali_tupu_halifungui_generator(tmp_path):
 def test_higher_is_lazima_iwe_mojawapo():
     with pytest.raises(NF.CalibrationError, match="higher_is"):
         NF.MetricSpec("x", "kubwa")
+
+
+# ===========================================================================
+# `inf` si "kubwa" — ni "haihesabiki" (Calibration B ya kwanza, 2026-08-26)
+# ===========================================================================
+
+
+def _na_inf(mara, kila: int):
+    """Pipeline inayotoa `inf` kila run ya `kila` — kama mgombea asiye na hasara."""
+    def pipeline(_sur):
+        mara["n"] += 1
+        pf = float("inf") if kila and mara["n"] % kila == 0 else 2.0 + mara["n"] % 3
+        return {"profit_factor": pf, "sharpe": 1.0, NF.VARIANTS_KEY: 20}
+    return pipeline
+
+
+def test_inf_HAICHAFUI_sakafu_za_metrics_nyingine():
+    """Kabla ya marekebisho, `inf` moja iligeuza sakafu YOTE ya metric kuwa NaN.
+
+    `np.quantile` inafanya interpolation, na `inf − inf` ni `NaN`. Lango la
+    `> NaN` halipitiki kamwe wala halionyeshi kwa nini — run ya kwanza ya
+    Calibration B ilipoteza lango zima la `profit_factor` hivyo.
+    """
+    jedwali = _floor(run=_na_inf({"n": 0}, 4))
+    assert math.isfinite(jedwali.entries["sharpe"].floor)
+    assert "profit_factor" not in jedwali.entries
+
+
+def test_metric_yenye_inf_inaishia_BILA_sakafu_si_na_sakafu_ya_uongo():
+    """§1.1 — bora metric ikose lango kuliko iwe na lango lisilo na maana."""
+    jedwali = _floor(run=_na_inf({"n": 0}, 4))
+    assert "profit_factor" in jedwali.without_floor
+    with pytest.raises(NF.NoFloorError):
+        jedwali.gate("profit_factor", 99.0)
+
+
+def test_bila_inf_sakafu_inapatikana_kama_kawaida():
+    jedwali = _floor(run=_na_inf({"n": 0}, 0))
+    assert math.isfinite(jedwali.entries["profit_factor"].floor)
+
+
+def test_ni_namba_inakataa_NaN_na_inf():
+    assert NF._ni_namba(1.5) and NF._ni_namba(0)
+    assert not NF._ni_namba(float("inf"))
+    assert not NF._ni_namba(float("-inf"))
+    assert not NF._ni_namba(float("nan"))
+    assert not NF._ni_namba(None) and not NF._ni_namba("x")
