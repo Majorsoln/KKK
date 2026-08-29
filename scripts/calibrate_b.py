@@ -329,6 +329,16 @@ def main() -> int:
         )
         return 2
 
+    # Sakafu isiyopitika si kali — ni mlango uliofungwa, na inakataa kila kitu
+    # kimya. Run ya kwanza (§9.5) ilitoa nne kati ya saba, na hakuna
+    # kilichozionyesha hadi zilipohesabiwa kwa mkono baada ya saa nyingi.
+    if floor.haipitiki:
+        print(f"\nSAKAFU ZISIZOPITIKA: {', '.join(floor.haipitiki)}\n"
+              f"   Hakuna thamani halali inayoweza kuzivuka — malango haya "
+              f"yatakataa KILA KITU.\n"
+              f"   §13 ingebaki tupu bila kosa lolote kuonekana. Ona §9.5.")
+        return 3
+
     hafifu = [e.metric for e in floor.entries.values() if e.uncertainty > 0.5]
     if hafifu:
         print(f"\n   ONYO: sakafu tete (CI pana kuliko 50%): {', '.join(hafifu)}")

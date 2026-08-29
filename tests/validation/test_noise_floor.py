@@ -407,3 +407,37 @@ def test_malango_yaliyobaki_ni_YALE_ya_9_2():
         "net_pips_month", "net_account_return_month", "profitable_month_fraction",
         "sharpe", "profit_factor", "max_drawdown",
     }
+
+
+# ===========================================================================
+# Sakafu isiyopitika inaonekana MARA MOJA (§9.5)
+# ===========================================================================
+
+
+def test_sakafu_ya_fraction_kwenye_1_inaonekana_kuwa_HAIPITIKI():
+    """`profitable_month_fraction > 1.0` inakataa kila kitu — hakuna cha kupita."""
+    jedwali = _floor(run=_pipeline({"profitable_month_fraction": 1.0}))
+    entry = jedwali.entries["profitable_month_fraction"]
+    assert not entry.inapitika
+    assert "profitable_month_fraction" in jedwali.haipitiki
+    assert "HAIPITIKI" in entry.render()
+    assert "ZISIZOPITIKA" in jedwali.render()
+
+
+def test_sakafu_ya_max_drawdown_kwenye_sifuri_HAIPITIKI():
+    """DD haiwezi kuwa hasi, kwa hiyo `< 0` ni mlango uliofungwa."""
+    jedwali = _floor(run=_pipeline({"max_drawdown": 0.0}))
+    assert "max_drawdown" in jedwali.haipitiki
+
+
+def test_sakafu_za_kawaida_ZINAPITIKA():
+    jedwali = _floor(run=_pipeline(noise=0.05, seed=8))
+    assert jedwali.haipitiki == ()
+    assert "ZISIZOPITIKA" not in jedwali.render()
+
+
+def test_mipaka_yanahifadhiwa_kwenye_faili(tmp_path):
+    jedwali = _floor(run=_pipeline({"profitable_month_fraction": 1.0}))
+    njia = jedwali.write(tmp_path / "nf.json")
+    tena = NF.NoiseFloor.read(njia)
+    assert tena.haipitiki == jedwali.haipitiki

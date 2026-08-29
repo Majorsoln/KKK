@@ -71,6 +71,12 @@ class MetricSpec:
 
     name: str
     higher_is: str
+    # Mipaka ya metric YENYEWE, si ya sakafu. `profitable_month_fraction` haiwezi
+    # kuzidi 1.0; `max_drawdown` haiwezi kuwa chini ya 0. Sakafu inayofika mpaka
+    # huo ni lango lisilopitika — na hilo linapaswa kuonekana mara moja, si
+    # baada ya §13 kubaki tupu kwa miezi.
+    lo: float = float("-inf")
+    hi: float = float("inf")
 
     def __post_init__(self) -> None:
         if self.higher_is not in (BETTER, WORSE):
@@ -87,10 +93,10 @@ class MetricSpec:
 DEFAULT_METRICS: tuple[MetricSpec, ...] = (
     MetricSpec("net_pips_month", BETTER),
     MetricSpec("net_account_return_month", BETTER),
-    MetricSpec("profitable_month_fraction", BETTER),
+    MetricSpec("profitable_month_fraction", BETTER, lo=0.0, hi=1.0),
     MetricSpec("sharpe", BETTER),
-    MetricSpec("profit_factor", BETTER),
-    MetricSpec("max_drawdown", WORSE),
+    MetricSpec("profit_factor", BETTER, lo=0.0),
+    MetricSpec("max_drawdown", WORSE, lo=0.0),
 )
 
 # `fill_rate` HAIPO hapo juu kwa makusudi (§9.5, 2026-08-26).
@@ -126,6 +132,21 @@ class FloorEntry:
     n_used: dict[str, int]
     ci_low: float
     ci_high: float
+    lo: float = float("-inf")
+    hi: float = float("inf")
+
+    @property
+    def inapitika(self) -> bool:
+        """Je kuna thamani YOYOTE halali inayoweza kuvuka sakafu hii?
+
+        Sakafu ya `profitable_month_fraction > 1.0` au `max_drawdown < 0` si
+        kali — ni **isiyopitika**, na inakataa kila kitu kimya. Run ya kwanza ya
+        Calibration B (§9.5) ilitoa nne kama hizo kati ya saba, na hakuna
+        kilichozionyesha hadi zilipohesabiwa kwa mkono.
+        """
+        if not math.isfinite(self.floor):
+            return False
+        return self.floor < self.hi if self.higher_is == BETTER else self.floor > self.lo
 
     @property
     def binding_family(self) -> str:
@@ -148,10 +169,11 @@ class FloorEntry:
     def render(self) -> str:
         pct = int(self.tail * 100)
         fam = " · ".join(f"{k[:5]} {v:+.4f}" for k, v in sorted(self.by_family.items()))
+        alama = "" if self.inapitika else "  HAIPITIKI"
         return (
             f"{self.metric:<28} p{pct:<3} {self.floor:>+10.4f}  "
             f"[{self.ci_low:+.4f}, {self.ci_high:+.4f}]  "
-            f"←{self.binding_family[:5]}   {fam}"
+            f"←{self.binding_family[:5]}   {fam}{alama}"
         )
 
     def to_json(self) -> dict[str, Any]:
@@ -160,6 +182,7 @@ class FloorEntry:
             "floor": self.floor, "by_family": self.by_family, "n_used": self.n_used,
             "ci_low": self.ci_low, "ci_high": self.ci_high,
             "binding_family": self.binding_family, "uncertainty": self.uncertainty,
+            "lo": self.lo, "hi": self.hi, "passable": self.inapitika,
         }
 
 
@@ -203,6 +226,15 @@ class NoiseFloor:
     def __contains__(self, metric: str) -> bool:
         return metric in self.entries
 
+    @property
+    def haipitiki(self) -> tuple[str, ...]:
+        """Malango ambayo hakuna thamani halali inayoweza kuyavuka.
+
+        Jedwali lenye hata moja kati ya haya si sakafu — ni mlango uliofungwa.
+        §13 ingebaki tupu bila kosa lolote kuonekana (§9.5).
+        """
+        return tuple(e.metric for e in self.entries.values() if not e.inapitika)
+
     # ---------------- kuripoti ----------------
 
     def render(self) -> str:
@@ -217,6 +249,15 @@ class NoiseFloor:
         if self.without_floor:
             lines += ["", "   BILA SAKAFU (diagnostic pekee, §1.1):"]
             lines += [f"      {m}" for m in self.without_floor]
+        if self.haipitiki:
+            lines += [
+                "",
+                f"   KOSA · sakafu ZISIZOPITIKA: {', '.join(self.haipitiki)}",
+                "      Hakuna thamani halali inayoweza kuzivuka. Malango haya "
+                "yatakataa KILA KITU,",
+                "      kimya. Ona §9.5 — chanzo cha kawaida ni denominator au "
+                "thamani isiyohesabika.",
+            ]
         tete = [e.metric for e in self.entries.values() if e.uncertainty > 0.5]
         if tete:
             lines += ["", f"   ONYO · sakafu tete (CI pana kuliko 50%): {', '.join(tete)}"]
@@ -252,6 +293,8 @@ class NoiseFloor:
                 metric=e["metric"], higher_is=e["higher_is"], tail=e["tail"],
                 floor=e["floor"], by_family=dict(e["by_family"]),
                 n_used=dict(e["n_used"]), ci_low=e["ci_low"], ci_high=e["ci_high"],
+                lo=float(e.get("lo", float("-inf"))),
+                hi=float(e.get("hi", float("inf"))),
             )
             for name, e in raw["entries"].items()
         }
@@ -416,6 +459,7 @@ def calibrate(
         entries[name] = FloorEntry(
             metric=name, higher_is=spec.higher_is, tail=spec.tail, floor=float(floor),
             by_family=by_family, n_used=n_used, ci_low=lo, ci_high=hi,
+            lo=spec.lo, hi=spec.hi,
         )
 
     floor_table = NoiseFloor(
