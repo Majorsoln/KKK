@@ -520,10 +520,10 @@ class Checkpoint:
         if kichwa.get("fingerprint") != fingerprint:
             if progress:
                 progress(
-                    f"   checkpoint ya vigezo TOFAUTI ({path.name}) — inaanza upya.\n"
-                    f"      iliyopo : {kichwa.get('fingerprint')}\n"
-                    f"      sasa    : {fingerprint}"
+                    f"   checkpoint ya vigezo TOFAUTI ({path.name}) — inaanza upya."
                 )
+                for mstari in _tofauti(kichwa.get("fingerprint"), fingerprint):
+                    progress(f"      {mstari}")
             path.write_text(
                 json.dumps({"fingerprint": fingerprint}) + "\n",
                 encoding="utf-8", newline="\n",
@@ -557,6 +557,60 @@ class Checkpoint:
 
     def __len__(self) -> int:
         return len(self._seen)
+
+
+def _tofauti(zamani: Any, sasa: Any) -> list[str]:
+    """Vigezo VILIVYOBADILIKA pekee, si fingerprint nzima.
+
+    Kuchapisha JSON mbili ndefu kunaficha kilichobadilika ndani ya kilichobaki
+    sawa — na hicho ndicho kinachohitajika kujulikana.
+    """
+    try:
+        a = json.loads(zamani) if isinstance(zamani, str) else dict(zamani or {})
+        b = json.loads(sasa) if isinstance(sasa, str) else dict(sasa or {})
+    except (json.JSONDecodeError, TypeError, ValueError):
+        return [f"zamani: {zamani}", f"sasa  : {sasa}"]
+    if not isinstance(a, dict) or not isinstance(b, dict):
+        return [f"zamani: {zamani}", f"sasa  : {sasa}"]
+
+    out = []
+    for key in sorted(set(a) | set(b)):
+        kabla, baada = a.get(key), b.get(key)
+        if kabla != baada:
+            out.append(f"{key}: {_fupi(kabla)} → {_fupi(baada)}")
+    return out or ["(hakuna kigezo kilichobadilika — fingerprint imeharibika?)"]
+
+
+def _fupi(value: Any, kikomo: int = 60) -> str:
+    text = json.dumps(value, sort_keys=True) if not isinstance(value, str) else value
+    return text if len(text) <= kikomo else text[: kikomo - 1] + "…"
+
+
+def code_fingerprint(*roots: Path) -> str:
+    """sha256 ya code YOTE inayoathiri matokeo.
+
+    Checkpoint iliyoshika vigezo pekee (`K`, `seed`, bars) ilirudisha replicates
+    za **code ya zamani** baada ya kasoro mbili kurekebishwa: vigezo
+    havikubadilika, code ilibadilika, na run nzima ilikuwa ni kucheza tena
+    matokeo yale yale. Jedwali lililotoka lilionekana halali kabisa.
+
+    Kwa hiyo fingerprint inashika **maudhui ya faili**. Mabadiliko yoyote ya
+    code au config yanaifanya checkpoint ianze upya — gharama ya saa nyingi,
+    lakini nafuu kuliko sakafu inayodai kupima code isiyokuwa ikiendeshwa.
+    """
+    import hashlib
+
+    h = hashlib.sha256()
+    for root in sorted(Path(r) for r in roots):
+        if root.is_file():
+            faili = [root]
+        else:
+            faili = sorted(p for p in root.rglob("*")
+                           if p.is_file() and p.suffix in (".py", ".yaml", ".yml"))
+        for path in faili:
+            h.update(str(path.name).encode("utf-8"))
+            h.update(path.read_bytes())
+    return h.hexdigest()[:32]
 
 
 def guard_generator(*, noise_floor_path: Path, cost_calibration_path: Path) -> NoiseFloor:

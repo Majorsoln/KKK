@@ -227,6 +227,29 @@ def main() -> int:
     )
     run_pipeline = P.for_calibration(spec, cfg_risk=cfg_risk, seed=args.seed)
 
+    out_path = Path(args.out) if args.out else (
+        REPO / "research" / "reports" / "noise_floor.json")
+
+    # Checkpoint inafunguliwa KABLA ya kupima, si baada yake. Runs za probe ni
+    # replicates halali za `block_resample` (seed ile ile), kwa hiyo zinahifadhiwa
+    # na `calibrate()` haiziendeshi tena. Run ya pili ilipoteza dakika 40 hivi.
+    ckpt = None
+    if not args.no_checkpoint:
+        # `code` ni sehemu isiyoweza kuachwa. Bila yake, checkpoint ya code ya
+        # ZAMANI inarudishwa pale vigezo havijabadilika — na run nzima inakuwa
+        # ni kucheza tena matokeo yale yale, huku jedwali likionekana halali.
+        # Ilitokea kwenye run ya pili (2026-08-26).
+        alama = json.dumps({
+            "spec": spec.to_json(), "seed": args.seed,
+            "n_bars": int(len(bars)), "replicates": args.replicates,
+            "families": list(S.FAMILIES),
+            "code": NF.code_fingerprint(REPO / "src", REPO / "config"),
+        }, sort_keys=True)
+        ckpt_path = Path(args.checkpoint) if args.checkpoint else (
+            out_path.with_name(out_path.stem + "_checkpoint.jsonl"))
+        ckpt = NF.Checkpoint.open(ckpt_path, alama, progress=print)
+        print(f"   checkpoint: {ckpt_path}\n")
+
     # ---- kipimo kabla ya kujitoa kwenye saa nyingi ----
     #
     # Runs za sampuli zinajibu maswali MAWILI, na la pili ndilo gumu: si tu
@@ -240,20 +263,37 @@ def main() -> int:
     muda = []
     washindi = 0
     for i in range(n_sampuli):
-        sur = S.make(bars, S.BLOCK, seed=NF._seed_of(args.seed, S.BLOCK, i))
-        t0 = time.time()
-        sampuli = run_pipeline(sur.frame)
-        muda.append(time.time() - t0)
+        iliyohifadhiwa = ckpt.get(S.BLOCK, i) if ckpt is not None else None
+        if iliyohifadhiwa is not None:
+            sampuli = iliyohifadhiwa
+            imepimwa = False
+        else:
+            sur = S.make(bars, S.BLOCK, seed=NF._seed_of(args.seed, S.BLOCK, i))
+            t0 = time.time()
+            sampuli = run_pipeline(sur.frame)
+            muda.append(time.time() - t0)
+            imepimwa = True
+            if ckpt is not None:
+                ckpt.put(S.BLOCK, i, sampuli)
+
         ana_mshindi = any(v == v for k, v in sampuli.items() if k != NF.VARIANTS_KEY)
         washindi += int(ana_mshindi)
-        print(f"   {i + 1}/{n_sampuli}  {muda[-1]:>6.1f}s  "
+        muda_str = f"{muda[-1]:>6.1f}s" if imepimwa else "imehifad"
+        print(f"   {i + 1}/{n_sampuli}  {muda_str}  "
               f"variants {sampuli[NF.VARIANTS_KEY]:>6,}  "
               f"{'mshindi' if ana_mshindi else 'HAKUNA'}", flush=True)
 
-    wastani = sum(muda) / len(muda)
     runs_zote = args.replicates * len(S.FAMILIES)
-    print(f"\n   run moja {wastani:.1f}s (wastani wa {n_sampuli})")
-    print(f"   TABIRI: runs {runs_zote:,} → {wastani * runs_zote / 3600:.1f} saa")
+    if muda:
+        wastani = sum(muda) / len(muda)
+        print(f"\n   run moja {wastani:.1f}s (wastani wa {len(muda)})")
+        print(f"   TABIRI: runs {runs_zote:,} → "
+              f"{wastani * runs_zote / 3600:.1f} saa")
+    else:
+        wastani = None
+        zilizobaki = runs_zote - (len(ckpt) if ckpt is not None else 0)
+        print(f"\n   zote za probe zilikuwa zimehifadhiwa — hakuna kipimo kipya "
+              f"cha muda.\n   zilizobaki kuendeshwa: {zilizobaki:,}/{runs_zote:,}")
 
     kiwango = washindi / n_sampuli
     print(f"   washindi {washindi}/{n_sampuli} = {kiwango:.0%}")
@@ -263,11 +303,12 @@ def main() -> int:
     elif kiwango > 0.0:
         # Replicates zinazohitajika ili `MIN_REPLICATES` ziwe na thamani.
         inahitajika = math.ceil(NF.MIN_REPLICATES / kiwango)
+        muda_str = ("" if wastani is None else
+                    f" (~{wastani * inahitajika * len(S.FAMILIES) / 3600:.1f} saa)")
         print(f"   ONYO: kwa kiwango hiki, replicates {args.replicates} "
               f"zingetoa ~{int(args.replicates * kiwango)} zenye thamani, "
               f"chini ya {NF.MIN_REPLICATES}.\n"
-              f"         Chaguo: --replicates {inahitajika} "
-              f"(~{wastani * inahitajika * len(S.FAMILIES) / 3600:.1f} saa) "
+              f"         Chaguo: --replicates {inahitajika}{muda_str} "
               f"AU --candidates kubwa zaidi.\n")
     else:
         print("   ONYO: hakuna run iliyotoa mshindi hata mmoja.\n"
@@ -276,24 +317,6 @@ def main() -> int:
 
     if args.dry_run:
         return 0
-
-    out_path = Path(args.out) if args.out else (
-        REPO / "research" / "reports" / "noise_floor.json")
-
-    # Fingerprint inashika kila kitu kinachobadilisha maana ya replicate. Ikiwa
-    # tofauti, checkpoint inaanza upya badala ya kuchanganya runs mbili — na
-    # kuchanganya hakungeonekana kwenye faili ya mwisho.
-    ckpt = None
-    if not args.no_checkpoint:
-        alama = json.dumps({
-            "spec": spec.to_json(), "seed": args.seed,
-            "n_bars": int(len(bars)), "replicates": args.replicates,
-            "families": list(S.FAMILIES),
-        }, sort_keys=True)
-        ckpt_path = Path(args.checkpoint) if args.checkpoint else (
-            out_path.with_name(out_path.stem + "_checkpoint.jsonl"))
-        ckpt = NF.Checkpoint.open(ckpt_path, alama, progress=print)
-        print(f"   checkpoint: {ckpt_path}\n")
 
     floor = NF.calibrate(
         bars, run_pipeline,

@@ -77,8 +77,36 @@ def test_mabadiliko_yanaelezwa_si_kufanyika_kimya(tmp_path):
 
     maneno: list[str] = []
     NF.Checkpoint.open(njia, "K=1000", progress=maneno.append)
-    assert any("TOFAUTI" in m for m in maneno)
-    assert any("K=200" in m and "K=1000" in m for m in maneno)
+    yote = "\n".join(maneno)
+    assert "TOFAUTI" in yote
+    assert "K=200" in yote and "K=1000" in yote
+
+
+def test_kilichobadilika_PEKEE_kinaonyeshwa():
+    """Kuchapisha JSON mbili ndefu kunaficha kilichobadilika ndani ya kilichobaki.
+
+    Fingerprint halisi ni ndefu (spec nzima + hash ya code); mtumiaji anahitaji
+    kujua kigezo KIPI kimebadilika, si kulinganisha mistari miwili kwa macho.
+    """
+    zamani = json.dumps({"code": "aaaa", "n_bars": 50_161, "replicates": 50},
+                        sort_keys=True)
+    sasa = json.dumps({"code": "bbbb", "n_bars": 50_161, "replicates": 50},
+                      sort_keys=True)
+    mistari = NF._tofauti(zamani, sasa)
+    assert mistari == ["code: aaaa → bbbb"]
+
+
+def test_fingerprint_isiyo_JSON_bado_inaelezwa():
+    mistari = NF._tofauti("alama-1", "alama-2")
+    assert any("alama-1" in m for m in mistari)
+    assert any("alama-2" in m for m in mistari)
+
+
+def test_thamani_ndefu_inakatwa():
+    zamani = json.dumps({"spec": "x" * 200}, sort_keys=True)
+    sasa = json.dumps({"spec": "y" * 200}, sort_keys=True)
+    mistari = NF._tofauti(zamani, sasa)
+    assert len(mistari) == 1 and "…" in mistari[0] and len(mistari[0]) < 200
 
 
 def test_mstari_uliokatika_unarukwa_si_kulipuka(tmp_path):
@@ -179,3 +207,63 @@ def test_matokeo_yaliyohifadhiwa_bado_yanakaguliwa(tmp_path):
         NF.calibrate(_frame(), lambda _s: _matokeo(1.0),
                      n_replicates=NF.MIN_REPLICATES, seed=1,
                      checkpoint=ck, progress=None)
+
+
+# ===========================================================================
+# Fingerprint lazima ishike CODE, si vigezo pekee (2026-08-26)
+# ===========================================================================
+
+
+def test_code_fingerprint_inabadilika_code_ikibadilika(tmp_path):
+    """Kasoro iliyopoteza run nzima ya pili.
+
+    Vigezo (`K`, `seed`, bars) havikubadilika lakini code ilikuwa imerekebishwa.
+    Checkpoint ilirudisha replicates za code ya ZAMANI, run ikawa ni kucheza
+    tena matokeo yale yale, na jedwali lililotoka lilionekana halali kabisa.
+    """
+    mizizi = tmp_path / "src"
+    (mizizi / "pkg").mkdir(parents=True)
+    faili = mizizi / "pkg" / "moduli.py"
+    faili.write_text("X = 1\n", encoding="utf-8")
+
+    kabla = NF.code_fingerprint(mizizi)
+    faili.write_text("X = 2\n", encoding="utf-8")
+    baada = NF.code_fingerprint(mizizi)
+    assert kabla != baada
+
+    faili.write_text("X = 1\n", encoding="utf-8")
+    assert NF.code_fingerprint(mizizi) == kabla
+
+
+def test_code_fingerprint_inashika_config_pia(tmp_path):
+    """Kigezo cha `risk.yaml` kinabadilisha matokeo kama code inavyofanya."""
+    mizizi = tmp_path / "config"
+    mizizi.mkdir()
+    cfg = mizizi / "risk.yaml"
+    cfg.write_text("max_open_trades: 7\n", encoding="utf-8")
+
+    kabla = NF.code_fingerprint(mizizi)
+    cfg.write_text("max_open_trades: 3\n", encoding="utf-8")
+    assert NF.code_fingerprint(mizizi) != kabla
+
+
+def test_code_fingerprint_inapuuza_faili_zisizo_za_code(tmp_path):
+    mizizi = tmp_path / "src"
+    mizizi.mkdir()
+    (mizizi / "a.py").write_text("X = 1\n", encoding="utf-8")
+
+    kabla = NF.code_fingerprint(mizizi)
+    (mizizi / "kumbukumbu.log").write_text("x" * 500, encoding="utf-8")
+    (mizizi / "__pycache__").mkdir()
+    assert NF.code_fingerprint(mizizi) == kabla
+
+
+def test_checkpoint_ya_code_ya_zamani_inaanza_UPYA(tmp_path):
+    """Ndio mwisho unaotakiwa: si kurudisha, ni kuanza upya."""
+    njia = tmp_path / "c.jsonl"
+    NF.Checkpoint.open(njia, "code=A").put(S.BLOCK, 0, _matokeo(1.5))
+
+    maneno: list[str] = []
+    tena = NF.Checkpoint.open(njia, "code=B", progress=maneno.append)
+    assert len(tena) == 0
+    assert any("TOFAUTI" in m for m in maneno)

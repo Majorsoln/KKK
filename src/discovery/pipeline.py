@@ -53,7 +53,7 @@ from typing import Any, Callable, Mapping
 
 from src.backtest import economics as ECO
 from src.backtest.bar_path import to_path
-from src.backtest.engine import BrokerFacts, run
+from src.backtest.engine import BrokerFacts, miezi_ya_dirisha, run
 from src.backtest.ledger import Ledger
 from src.discovery.evaluate import DEGENERATE, EvaluateError
 from src.discovery.generator import GeneratorSpec, generate
@@ -204,6 +204,11 @@ def search(bars, spec: PipelineSpec, *, cfg_risk, seed: int,
 
     feats = build_features(bars, symbol=spec.symbol, hour_tz=spec.hour_tz)
 
+    # Miezi ya dirisha zinahesabiwa MARA MOJA, si kwa kila mgombea. Bars 50,000
+    # zikigeuzwa kuwa `PeriodIndex` kwa kila mmoja kati ya 1,000 zinagharimu
+    # nusu ya muda wa run — na hazibadiliki hata kidogo.
+    miezi = miezi_ya_dirisha(feats)
+
     # Njia MBILI pekee — moja kwa kila direction — zinajengwa mara moja badala
     # ya kwa kila mgombea. `bar_path` ni deterministic kwa (bars, direction),
     # kwa hiyo hii ni kasi tu, si mabadiliko ya tabia.
@@ -223,7 +228,7 @@ def search(bars, spec: PipelineSpec, *, cfg_risk, seed: int,
             continue
 
         sababu, result = _pima(candidate, feats, njia, spec, cfg_risk,
-                               starting_balance)
+                               starting_balance, miezi)
         ledger.advance(record.candidate_id, BACKTEST, reject_reason=sababu)
         _hesabu(out.by_reason, sababu or "SAWA")
 
@@ -271,7 +276,7 @@ def for_calibration(spec: PipelineSpec, *, cfg_risk, seed: int,
 
 
 def _pima(candidate, feats, njia, spec: PipelineSpec, cfg_risk,
-          starting_balance) -> tuple[str, Any]:
+          starting_balance, miezi=None) -> tuple[str, Any]:
     """Mgombea mmoja: backtest kisha lango la uchumi. Rudisha (sababu, matokeo)."""
     from src.discovery.evaluate import signals as tafuta
 
@@ -289,7 +294,8 @@ def _pima(candidate, feats, njia, spec: PipelineSpec, cfg_risk,
     # kungezifanya zisibadilike kwa run nzima.
     result = run(candidate, feats, njia[candidate.direction.upper()],
                  cfg_risk=cfg_risk, broker=spec.broker, timeframe=spec.timeframe,
-                 day_tz=spec.day_tz, starting_balance=starting_balance)
+                 day_tz=spec.day_tz, starting_balance=starting_balance,
+                 months=miezi)
     eco = ECO.measure(result)
     return ("" if eco.passes else eco.reject_reason), result
 

@@ -279,11 +279,18 @@ def run(strategy, features, ticks, *, cfg_risk, broker: BrokerFacts,
         timeframe: str, day_tz: str = "UTC",
         starting_balance: float | None = None,
         h1_spreads: Sequence[float] | None = None,
-        m5_spreads: Sequence[float] | None = None) -> BacktestResult:
+        m5_spreads: Sequence[float] | None = None,
+        months=None) -> BacktestResult:
     """Endesha strategy moja juu ya features na ticks zake.
 
     `h1_spreads`/`m5_spreads` zinapelekwa kwa RCE kama zilivyo — RCE ndiyo
     inayoamua jinsi ya kuzitumia (R12).
+
+    `months` ni miezi ya dirisha (`miezi_ya_dirisha(features)`). Inahesabiwa hapa
+    ikikosekana, lakini mpigaji simu anayeendesha wagombea WENGI juu ya features
+    zile zile anapaswa kuihesabu MARA MOJA: kugeuza bars 50,000 kuwa
+    `PeriodIndex` kwa kila mgombea kuligharimu nusu ya muda wa run nzima
+    (kipimo: 229ms → 169ms kwa mgombea).
     """
     import numpy as np
     import pandas as pd
@@ -299,10 +306,7 @@ def run(strategy, features, ticks, *, cfg_risk, broker: BrokerFacts,
             else cfg_risk.get("base_balance")
         ),
         n_signals_raw=sig.n_signals,
-        months=pd.PeriodIndex(
-            pd.DatetimeIndex(features.index).tz_convert("UTC").tz_localize(None),
-            freq="M",
-        ).unique().sort_values() if len(features) else None,
+        months=months if months is not None else miezi_ya_dirisha(features),
     )
     if sig.n_signals == 0:
         return matokeo
@@ -424,6 +428,18 @@ def run(strategy, features, ticks, *, cfg_risk, broker: BrokerFacts,
 # ===========================================================================
 # Ndani
 # ===========================================================================
+
+
+def miezi_ya_dirisha(features):
+    """Miezi YOTE ya dirisha, kwa UTC. Ndio denominator wa §21 (ona `monthly`)."""
+    import pandas as pd
+
+    if len(features) == 0:
+        return None
+    index = pd.DatetimeIndex(features.index)
+    if index.tz is not None:
+        index = index.tz_convert("UTC").tz_localize(None)
+    return pd.PeriodIndex(index, freq="M").unique().sort_values()
 
 
 def _bar_ends_for(features, timeframe: str, day_tz: str):
