@@ -371,3 +371,39 @@ def test_ni_namba_inakataa_NaN_na_inf():
     assert not NF._ni_namba(float("-inf"))
     assert not NF._ni_namba(float("nan"))
     assert not NF._ni_namba(None) and not NF._ni_namba("x")
+
+
+# ===========================================================================
+# §9.5 — `fill_rate` ni diagnostic, si lango (2026-08-26)
+# ===========================================================================
+
+
+def test_fill_rate_HAINA_sakafu():
+    """Sakafu ya kelele ni marekebisho ya KUTAFUTA MARA NYINGI.
+
+    `fill_rate` haipandishwi na utafutaji — strategy ya kipuuzi inajaza vizuri
+    kama ya busara. Sakafu yake ilikuwa `p95 = 1.0000`: dai kwamba mgombea ajaze
+    bora kuliko 95% ya strategies za nasibu, yaani lango lisilopitika.
+    """
+    assert "fill_rate" not in {m.name for m in NF.DEFAULT_METRICS}
+
+    jedwali = _floor()
+    assert "fill_rate" not in jedwali.entries
+    with pytest.raises(NF.NoFloorError, match="DIAGNOSTIC"):
+        jedwali.gate("fill_rate", 0.99)
+
+
+def test_fill_rate_bado_INARIPOTIWA_haipotei_kimya():
+    """Kuiondoa kwenye malango si kuificha. §1.1 — diagnostic bado ni ushahidi."""
+    jedwali = _floor()
+    assert "fill_rate" in jedwali.without_floor
+    assert "fill_rate" in jedwali.render()
+
+
+def test_malango_yaliyobaki_ni_YALE_ya_9_2():
+    """Sita za §9.2, pamoja na PRIMARY ya §1.2 yenye mamlaka."""
+    jedwali = _floor(run=_pipeline(noise=0.5, seed=3))
+    assert set(jedwali.entries) == {
+        "net_pips_month", "net_account_return_month", "profitable_month_fraction",
+        "sharpe", "profit_factor", "max_drawdown",
+    }

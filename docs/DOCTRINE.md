@@ -605,8 +605,10 @@ noise_floor.profitable_month_fraction
 noise_floor.sharpe
 noise_floor.profit_factor
 noise_floor.max_drawdown          ← hapa ni p5, si p95 (ndogo ni bora)
-noise_floor.fill_rate
 ```
+
+`fill_rate` **haipo** kwenye orodha hiyo — ona §9.5. Sakafu ya kelele ni
+marekebisho ya kutafuta mara nyingi, na `fill_rate` haipandishwi na utafutaji.
 
 Kila run ya Calibration B inatoa **jedwali**, si namba. Metric isiyokuwa na sakafu
 yake **haiwezi kuwa lango** — inaweza kuwa diagnostic pekee (§13).
@@ -687,6 +689,62 @@ asiyetrade. Hilo si lango kali; ni lango lisilo na maana.
 
 `select_by` inaandikwa kwenye ushahidi. **Ikibadilika, sakafu ya zamani
 haihukumu utafutaji mpya.**
+
+---
+
+### 9.5 Calibration B ya kwanza ilirudisha sakafu isiyopitika (2026-08-26)
+
+Run ya kwanza juu ya data halisi — EURUSD H1, **bars 50,161** kutoka **ticks
+milioni 238**, `K = 1,000`, replicates 50 × familia 3 — ilikamilika kimitambo na
+kutoa sakafu ambayo **malango manne kati ya saba hayapitiki kihisabati**:
+
+```
+profitable_month_fraction   > 1.0000     kiwango cha juu ni 1.0
+fill_rate                   > 1.0000     kiwango cha juu ni 1.0
+max_drawdown                < 0.0000     DD haiwezi kuwa hasi
+profit_factor               > NaN        chochote > NaN ni False
+```
+
+na matatu yaliyobaki — pips **1,591**/mwezi, **29.5%**/mwezi, Sharpe **20.9** —
+hayafikiki na strategy yoyote ya kweli. R5 ingefunguka na §13 ingebaki tupu.
+
+**Sababu ya kwanza: denominator wa miezi.** `monthly()` ilihesabu miezi
+iliyokuwa na trades PEKEE. Mgombea aliyefanya trades 10 kwenye miezi 2 kati ya
+99 aliripotiwa kana kwamba miezi hiyo miwili ndiyo maisha yake yote — jumla
+ikigawanywa kwa 2, miezi yenye faida 1/1, na Sharpe ya kupotoka kwa pointi
+mbili. Kosa moja, malango matatu. **Halikuonekana kama kosa; lilionekana kama
+utendaji bora.**
+
+Mwezi usio na trade ni mwezi wenye **sifuri**, si mwezi usiokuwepo. Kipimo baada
+ya marekebisho, mgombea yule yule: miezi zenye trades **5/17**, miezi yenye
+faida **0.235** (si 1.0), Sharpe **1.27** (si 20.9).
+
+**Sababu ya pili: `inf` haikuchujwa kama `NaN`.** `profit_factor` bila hasara
+hata moja ilikuwa `inf`. `np.quantile` inafanya interpolation, `inf − inf` ni
+`NaN`, na sakafu yote ya metric ikawa `NaN`. `profit_factor` bila hasara
+**haihesabiki** — si kubwa isiyo na kikomo; kuirudisha `inf` kunaifanya iwe
+thamani bora kabisa hasa pale sampuli ni ndogo kuliko zote.
+
+---
+
+**`fill_rate` inaondolewa kwenye malango na kubaki DIAGNOSTIC.**
+
+Hii si kasoro ya code; ni ufafanuzi uliokosewa. Sakafu ya kelele ni
+**marekebisho ya kutafuta mara nyingi** — inajibu *"utafutaji wa K ulizalisha
+nini kwa bahati?"* Inafanya kazi kwa metric ambazo utafutaji unazipandisha.
+
+`fill_rate` haipandishwi na utafutaji. Strategy ya kipuuzi inajaza vizuri kama
+ya busara, kwa sababu kujaza kunategemea spread na mapengo, si ubora wa sheria.
+Kwa hiyo `p95 = 1.0000` haikuwa ajali — ilikuwa dai kwamba mgombea ajaze **bora
+kuliko 95% ya strategies za nasibu**, lango lisilopitika kwa ufafanuzi.
+
+Ukaguzi wa §16.4 (`fill_rate` ya chini mno = haitradiki) bado ni sahihi, lakini
+msingi wake ni **utekelezaji halisi wa ticks** — si mgawanyo wa null juu ya
+substrate ya bars (§9.4), ambapo quotes nne kwa kila bar zinafanya kujaza kuwa
+rahisi kuliko soko lilivyo. Kipimo hicho kinakuja na hatua ya ticks.
+
+§1.1 inaruhusu waziwazi: metric isiyo na sakafu yake inaweza kuwa **diagnostic
+pekee**. Inaendelea kuripotiwa; haipitishi wala haikatai.
 
 ---
 
@@ -863,19 +921,26 @@ inaishi kwenye ripoti ya mwisho ya kila candidate, pamoja na:
 research_fill_rate · OOS_fill_rate · live_fill_rate · fill_rate_gap
 ```
 
-Candidate inakataliwa ikiwa `OOS_fill_rate < noise_floor.fill_rate` (§9.2) — si kwa
-namba iliyochaguliwa.
+**Kizingiti chake HAKITOKI kwenye sakafu ya kelele (§9.5, 2026-08-26).**
 
-**`fill_rate_min: 0.60` ya `config/risk.yaml` SI lango la utafiti.** Ni **onyo la
-uendeshaji** la RCE kwa live. Vipimo viwili, vyenye kazi mbili:
+Ilikuwa `OOS_fill_rate < noise_floor.fill_rate`. Kipimo cha kwanza kilionyesha
+kuwa ufafanuzi huo ulikuwa umekosewa: sakafu ya kelele inasahihisha **bahati ya
+kutafuta mara nyingi**, na `fill_rate` haipandishwi na utafutaji — strategy ya
+kipuuzi inajaza vizuri kama ya busara. Sakafu iliyotokea ilikuwa `p95 = 1.0000`,
+yaani dai kwamba mgombea ajaze bora kuliko 95% ya strategies za nasibu.
+
+Msingi sahihi ni **utekelezaji halisi wa ticks**, si mgawanyo wa null juu ya
+substrate ya bars (§9.4) ambapo kujaza ni rahisi kuliko soko lilivyo. Kipimo
+hicho kinakuja na hatua ya ticks; hadi hapo `fill_rate` ni **diagnostic** —
+inaripotiwa kwenye kila candidate, haipitishi wala haikatai.
+
+**`fill_rate_min: 0.60` ya `config/risk.yaml` SI lango la utafiti** wala haijawa.
+Ni **onyo la uendeshaji** la RCE kwa live:
 
 | | chanzo | kazi |
 |---|---|---|
 | `fill_rate_min` = 0.60 | RCE, `config/risk.yaml:48` | onyo la live: cap ni ngumu mno |
-| `noise_floor.fill_rate` | Calibration B (§9.2) | **lango la utafiti** |
-
-Kizingiti cha utafiti kinatoka kwenye sakafu iliyopimwa **kabla ya holdout**, na
-hakibadilishwi baada ya kuona matokeo.
+| `research/OOS/live fill_rate` | ripoti ya candidate | **diagnostic** (§1.1) |
 
 ### 11.4 Uhakiki uliojengwa ndani
 

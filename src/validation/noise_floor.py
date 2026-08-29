@@ -91,8 +91,27 @@ DEFAULT_METRICS: tuple[MetricSpec, ...] = (
     MetricSpec("sharpe", BETTER),
     MetricSpec("profit_factor", BETTER),
     MetricSpec("max_drawdown", WORSE),
-    MetricSpec("fill_rate", BETTER),
 )
+
+# `fill_rate` HAIPO hapo juu kwa makusudi (§9.5, 2026-08-26).
+#
+# Sakafu ya kelele ni marekebisho ya **kutafuta mara nyingi**: inajibu swali
+# "utafutaji wa K ulizalisha nini kwa bahati?" Inafanya kazi kwa metric ambazo
+# utafutaji unazipandisha — Sharpe, faida, miezi yenye faida. `fill_rate`
+# haipandishwi na utafutaji: strategy ya kipuuzi inajaza vizuri kama ya busara,
+# kwa sababu kujaza kunategemea spread na mapengo, si ubora wa sheria.
+#
+# Kuiweka kwenye jedwali kunatoa sakafu ya `p95 = 1.0000`, ambayo inadai mgombea
+# ajaze BORA kuliko 95% ya strategies za nasibu — lango lisilopitika kwa
+# ufafanuzi. Run ya kwanza (2026-08-26) ilionyesha hilo kwa vitendo.
+#
+# Ukaguzi wa §16.4 (`fill_rate` ya chini mno = haitradiki) bado ni sahihi, lakini
+# msingi wake ni utekelezaji halisi wa ticks — si mgawanyo wa null juu ya
+# substrate ya bars, ambapo quotes nne kwa kila bar zinafanya kujaza kuwa rahisi
+# kuliko soko lilivyo. Kipimo hicho kinakuja na hatua ya ticks, si hapa.
+#
+# §1.1 inaruhusu waziwazi: metric isiyo na sakafu inaweza kuwa DIAGNOSTIC pekee.
+FILL_RATE_NI_DIAGNOSTIC = "fill_rate"
 
 
 @dataclass(frozen=True)
