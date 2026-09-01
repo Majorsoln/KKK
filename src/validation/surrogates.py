@@ -301,19 +301,51 @@ def iaaft(x, rng, *, iters: int = 200):
 
 
 def _block_indices(m: int, block: int, rng):
-    """Blocks za mviringo: mwanzo wa nasibu, urefu thabiti, zinazungushwa mwisho.
+    """Blocks zinapangwa UPYA, hazichukuliwi kwa kurudia (2026-09-01).
 
-    Mviringo (`% m`) inahakikisha kila index ina nafasi SAWA ya kuchaguliwa.
-    Bila hiyo, rows za mwanzo zingeonekana mara nyingi zaidi kuliko za mwisho,
-    na data bandia ingekuwa na upendeleo wa kipindi — upendeleo ambao
-    ungeonekana kama muundo.
+    Kila index inaonekana **mara moja hasa**. Mzunguko wa nasibu kabla ya
+    kugawanya unahamisha mipaka ya blocks, kwa hiyo jozi ya bars haiwi ndani ya
+    block moja daima wala nje yake daima.
+
+    ---
+
+    **Kwa nini si kusampuli kwa kurudia (bootstrap ya kawaida).**
+
+    Bootstrap ya block inachukua blocks kwa kurudia kwa sababu imeundwa kukadiria
+    mgawanyo wa sampuli wa kipimo — hapo mtawanyiko wa ziada ndio unaotafutwa.
+    Kusudi letu ni kinyume: tunataka **soko lile lile, bila utabirikaji**.
+
+    Kwa kurudia, block moja inaweza kuchukuliwa mara kadhaa, na jumla ya returns
+    inakuwa nasibu badala ya kubaki ile ya soko. Kipimo (bars 8,000, surrogate
+    40 kwa kila familia):
+
+    ```
+    familia             drift: kati   sd ya drift   |drift| kubwa
+    asili                  +0.01268             —             —
+    regime_shuffle         +0.01268       0.00000       +0.01268
+    return_surrogate       +0.01268       0.00000       +0.01268
+    block_resample         +0.00984       0.01111       +0.03255   ← kwa kurudia
+    ```
+
+    Familia mbili zinahifadhi drift **kabisa**. Ya tatu ilikuwa inaitawanya kwa
+    kiasi kinachokaribia drift yenyewe, na baadhi ya surrogate zilikuwa na
+    mwelekeo **mara 2.6** ya soko halisi.
+
+    Athari yake ilipimwa (`scripts/null_vs_real.py`, EURUSD H1): data bandia
+    ilikuwa **rahisi mara 1.95** kuliko soko halisi kwenye metric yenye mamlaka,
+    na `block_resample` ndiyo iliyokuwa inafunga sakafu kwa 5 kati ya 6. Sakafu
+    haikuwa ya "soko bila edge"; ilikuwa ya soko lenye mwelekeo usiokuwepo.
+
+    Kupanga upya kunavunja uhusiano KATI ya blocks — ndilo kusudi la familia hii
+    (§9.2) — bila kubadilisha kile kilichotokea sokoni.
     """
     import numpy as np
 
-    n_blocks = math.ceil(m / block)
-    starts = rng.integers(0, m, size=n_blocks)
-    idx = (starts[:, None] + np.arange(block)[None, :]) % m
-    return idx.reshape(-1)[:m]
+    zunguka = (np.arange(m) + int(rng.integers(0, m))) % m
+    mianzo = range(0, m, block)
+    vipande = [zunguka[b: min(b + block, m)] for b in mianzo]
+    mpangilio = rng.permutation(len(vipande))
+    return np.concatenate([vipande[i] for i in mpangilio])
 
 
 def _regime_indices(labels: Sequence[str], rng):

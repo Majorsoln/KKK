@@ -397,3 +397,91 @@ def test_surrogate_inajielezea():
     assert s.preserves and s.breaks
     assert "block" in s.render()
     assert s.to_json()["family"] == SG.BLOCK
+
+
+# ===========================================================================
+# Drift ni ya SOKO, si ya generator (2026-09-01)
+# ===========================================================================
+
+
+def _drift(close) -> float:
+    """Jumla ya log-returns — kile soko lilifanya kutoka mwanzo hadi mwisho."""
+    import numpy as np
+
+    x = np.asarray(close, dtype=float)
+    return float(np.log(x[-1] / x[0]))
+
+
+@pytest.mark.parametrize("family", SG.FAMILIES)
+def test_drift_inahifadhiwa_KABISA(family):
+    """Data bandia ni soko LILE LILE bila utabirikaji — si soko lingine.
+
+    Kabla ya 2026-09-01, `block_resample` ilikuwa inasampuli blocks kwa
+    KURUDIA, kwa hiyo block moja ingeweza kuchukuliwa mara kadhaa na jumla ya
+    returns ikawa nasibu. Kipimo (bars 8,000, surrogate 40): drift ya asili
+    +0.01268, lakini surrogate zilifika +0.03255 — mwelekeo mara 2.6 ya soko
+    halisi.
+
+    Athari: `null_vs_real.py` juu ya EURUSD H1 ilionyesha data bandia ni rahisi
+    **mara 1.95** kuliko soko halisi, na `block_resample` ndiyo iliyokuwa
+    inafunga sakafu kwa 5 kati ya 6. Sakafu ilikuwa ya soko lenye mwelekeo
+    usiokuwepo.
+    """
+    frame = _bars(600, seed=11)
+    asili = _drift(frame["close"])
+    for seed in range(6):
+        sur = SG.make(frame, family, seed=seed)
+        assert _drift(sur.frame["close"]) == pytest.approx(asili, abs=1e-9), (
+            f"{family} seed {seed} imebadilisha drift"
+        )
+
+
+def test_block_resample_inatumia_kila_row_MARA_MOJA():
+    """Kupanga upya, si kusampuli. Ndicho kinachohifadhi drift kwa ujenzi."""
+    import numpy as np
+
+    for seed in range(5):
+        idx = SG._block_indices(500, 42, np.random.default_rng(seed))
+        assert len(idx) == 500
+        assert sorted(idx.tolist()) == list(range(500))
+
+
+def test_block_resample_inahifadhi_NDANI_na_kuvunja_KATI(  # noqa: N802
+):
+    """Kuhifadhi drift si kuacha kufanya kazi — jedwali la §9.2 linabaki kweli.
+
+    Familia hii inadai kuhifadhi autocorrelation **ndani** ya block na kuvunja
+    uhusiano **kati** ya blocks. Vipimo viwili, kila kimoja kwa upande wake:
+
+    * `acf(1)` — jozi za jirani, karibu zote ndani ya block moja → inabaki
+    * `VR(100)` — upeo mrefu kuliko block → inabadilika kwa kiasi kikubwa
+
+    Mwelekeo wa mabadiliko ya `VR` unategemea data: mfululizo unaorudi nyuma
+    (`VR < 1`) unapangwa upya na kupanda; unaoendelea (`VR > 1`) unashuka. Dai
+    ni **kubadilika**, si kushuka — kudai upande ni kudhani kile data inachofanya.
+    """
+    import numpy as np
+
+    frame = _bars(1200, seed=3)
+    close = frame["close"].to_numpy(dtype=float)
+    wimbi = 0.02 * np.sin(np.arange(len(close)) / 200.0 * 2 * np.pi)
+    frame = frame.copy()
+    for col in ("open", "high", "low", "close"):
+        frame[col] = frame[col].to_numpy(dtype=float) + wimbi
+
+    def vr(x, k):
+        n = len(x) // k * k
+        x = x[:n]
+        return float(x.reshape(-1, k).sum(1).var(ddof=1) / (k * x.var(ddof=1)))
+
+    r_asili = np.diff(np.log(frame["close"].to_numpy(dtype=float)))
+    r_sur = np.diff(np.log(
+        SG.make(frame, SG.BLOCK, seed=2).frame["close"].to_numpy(dtype=float)))
+
+    # KATI ya blocks — imevunjwa
+    assert abs(np.log(vr(r_sur, 100) / vr(r_asili, 100))) > 1.0, (
+        f"VR(100) {vr(r_asili, 100):.3f} → {vr(r_sur, 100):.3f}: "
+        f"muundo wa masafa marefu haujavunjwa"
+    )
+    # NDANI ya block — imehifadhiwa
+    assert _acf1(r_sur) == pytest.approx(_acf1(r_asili), abs=0.05)

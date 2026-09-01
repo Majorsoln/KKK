@@ -765,9 +765,92 @@ profit_factor                 p95       +1.7897  [  +1.6636,   +2.8403] block   
 max_drawdown                  p5      +549.4842  [ +460.49,  +777.94]   block       58%  TETE
 ```
 
-`fill_rate` ni diagnostic (§9.5). **R5 imefunguka.**
+`fill_rate` ni diagnostic (§9.5).
+
+> **SAKAFU HII SI HALALI — ona §9.7.** Ilipimwa kwa null iliyokuwa na mwelekeo
+> usiokuwepo sokoni. Inabaki hapa kama rekodi ya kilichotokea, si kama
+> kizingiti.
 
 ---
+### 9.7 SAKAFU YA KWANZA ILIKUWA YA SOKO LINGINE (2026-09-01)
+
+Discovery ya kwanza juu ya sakafu ya §9.6 ilitoa muundo usiokuwa wa bar kali:
+kati ya wagombea 23 waliopita §8.4, malango **manne** yalikataa **23/23** — kwa
+kauli moja. Bora wa data halisi alikuwa na trades 7,305 na uwiano wa uchumi
+3.15×, akitoa ~309 pips/mwezi wakati sakafu inadai 1,102.
+
+Kukataa kwa 100% kwenye malango manne **huru** si sura ya bar iliyo kali; ni
+sura ya mizani miwili tofauti.
+
+**Dhana ambayo §9 nzima inaikaa juu yake:** data bandia ina **ugumu ule ule**
+wa soko halisi, ikiwa imeondolewa utabirikaji pekee. Dhana hiyo haikuwa
+imepimwa. `scripts/null_vs_real.py` inaipima kwa muundo mmoja — generator ILE
+ILE (wagombea wale wale) juu ya bars halisi na juu ya surrogate za bars zile
+zile, kwa hiyo tofauti yoyote inatoka kwenye **data pekee**.
+
+EURUSD H1, `K = 200`, surrogate mbili kwa kila familia:
+
+```
+kipimo                        HALISI   bandia (kati)   uwiano
+net_account_return_month      0.0035          0.0068    1.95×
+net_pips_month               33.6803         57.3227    1.70×
+sharpe                        0.4930          0.9571    1.94×
+profitable_month_fraction     0.0202          0.1515    7.50×
+max_drawdown                443.9750        647.9045    1.46×
+```
+
+**Data bandia ilikuwa rahisi mara ~2** kwenye metric yenye mamlaka.
+
+---
+
+**Chanzo: `block_resample` ilikuwa inasampuli kwa KURUDIA.**
+
+Familia moja moja ilionyesha kuwa si zote: `block_resample` ilishinda kwa
+uthabiti (0.0108, 0.0076), wakati nyingine mbili zilibadilikabadilika. Na
+`block_resample` ndiyo iliyokuwa **inafunga sakafu kwa 5 kati ya 6** (§9.6).
+
+Kipimo cha moja kwa moja (bars 8,000, surrogate 40 kwa kila familia) —
+**drift**, yaani jumla ya log-returns, ambayo ni kile soko lilifanya:
+
+```
+familia             drift: kati   sd ya drift   |drift| kubwa
+asili                  +0.01268             —             —
+regime_shuffle         +0.01268       0.00000       +0.01268
+return_surrogate       +0.01268       0.00000       +0.01268
+block_resample         +0.00984       0.01111       +0.03255
+```
+
+Familia mbili zinahifadhi drift **kabisa**. Ya tatu ilikuwa inaitawanya kwa
+kiasi kinachokaribia drift yenyewe, na baadhi ya surrogate zilikuwa na mwelekeo
+**mara 2.6** ya soko halisi. Strategy ya kufuata mwelekeo ilikuwa inaneemeka
+kwenye soko lisilokuwepo.
+
+Sababu ni ya kimuundo: bootstrap ya block inachukua blocks **kwa kurudia** kwa
+sababu imeundwa kukadiria mgawanyo wa sampuli wa kipimo — hapo mtawanyiko wa
+ziada ndio unaotafutwa. Kusudi letu ni kinyume: **soko lile lile, bila
+utabirikaji.**
+
+**Marekebisho:** blocks zinapangwa upya (permutation), hazichukuliwi kwa
+kurudia. Kila index inaonekana mara moja hasa; mzunguko wa nasibu kabla ya
+kugawanya unahamisha mipaka. Drift inahifadhiwa kwa ujenzi.
+
+Familia bado inatimiza kusudi lake — `acf(1)` inabaki `0.0435 → 0.0436` (ndani
+ya block), wakati `VR(100)` inabadilika kwa kiasi kikubwa (kati ya blocks).
+
+---
+
+**Sakafu ya §9.6 SI HALALI.** Ilipimwa kwa null iliyokuwa na mwelekeo
+usiokuwepo sokoni. Inabaki kwenye hati kama rekodi ya kilichotokea, si kama
+kizingiti.
+
+**Somo:** §9.2 ilikuwa imeonya kwamba *"sakafu ya familia moja ni nusu tabia ya
+soko, nusu tabia ya generator, na hazitofautishwi kwa kuangalia."* Onyo hilo
+lilikuwa sahihi, na familia tatu hazikutosha kulizuia — mbili zilizokuwa sahihi
+hazikuweza kuizuia moja iliyokuwa na kasoro, kwa sababu §9.2 inachukua
+**ngumu zaidi**. `null_vs_real.py` ndiyo kipimo kinachokosekana, na kinapaswa
+kuendeshwa **kabla** ya kila Calibration B, si baada ya sakafu kukataa kila
+kitu.
+
 
 **`block_resample` inafunga sakafu kwa 5 kati ya 6.** Ndiyo null inayohifadhi
 autocorrelation ya ndani ya block — yaani inayofanana zaidi na soko. Kwamba
