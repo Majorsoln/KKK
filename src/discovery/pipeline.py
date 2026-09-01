@@ -184,16 +184,20 @@ class SearchResult:
 def search(bars, spec: PipelineSpec, *, cfg_risk, seed: int,
            starting_balance: float | None = None,
            progress: Callable[[str], None] | None = None,
-           on_pass: Callable[[str, Any, Any], None] | None = None) -> SearchResult:
+           on_pass: Callable[[Any, Any, Any, Any], None] | None = None) -> SearchResult:
     """Endesha wagombea `n` juu ya bars zile zile, rudisha bora.
 
     `seed` inatawala kila kitu cha nasibu hapa. Ikipewa bars zile zile na seed
     ile ile, matokeo ni yale yale — sharti la `calibrate()` (§9.2).
 
-    `on_pass(candidate_id, result, economics)` inaitwa kwa kila aliyepita lango
-    la uchumi. `SearchResult` inashikilia bora PEKEE — kwa runs 150 za
-    Calibration B, kushikilia kila `BacktestResult` kungejaza kumbukumbu bila
-    sababu. Anayehitaji wote (mf. §13) anachukua hapa.
+    `on_pass(record, strategy, result, economics)` inaitwa kwa kila aliyepita
+    lango la uchumi, akiwa na **kila kitu §13 inachohitaji**: rekodi ya ledger
+    (`candidate_id`, `variant_hash`, kizazi, wazazi), DNA yenyewe, matokeo, na
+    uchumi.
+
+    `SearchResult` inashikilia bora PEKEE — kwa runs 150 za Calibration B,
+    kushikilia kila `BacktestResult` kungejaza kumbukumbu bila sababu. Anayehitaji
+    wote anachukua hapa, na anaamua mwenyewe cha kuhifadhi.
     """
     import math
 
@@ -240,7 +244,7 @@ def search(bars, spec: PipelineSpec, *, cfg_risk, seed: int,
         out.n_passed_economics += 1
         eco = ECO.measure(result)
         if on_pass is not None:
-            on_pass(record.candidate_id, result, eco)
+            on_pass(record, candidate, result, eco)
 
         thamani = result.metrics().get(spec.select_by, float("nan"))
         if thamani == thamani and thamani > bora_thamani:      # NaN-safe

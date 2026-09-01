@@ -204,8 +204,17 @@ class BacktestResult:
         pips = kwa_mwezi["net_pips"].to_numpy(dtype=float)
         ret = kwa_mwezi["return_pct"].to_numpy(dtype=float)
 
-        sd = float(ret.std(ddof=1)) if len(ret) > 1 else 0.0
-        sharpe = float(ret.mean() / sd * np.sqrt(12)) if sd > 0 else 0.0
+        # Sharpe ya mwezi MMOJA si Sharpe ndogo — haihesabiki. `sd` inahitaji
+        # angalau pointi mbili, na `0.0` hapa ingekuwa jibu lililobuniwa
+        # linaloingia kwenye mgawanyo wa §9 na kushusha sakafu kwa upande usio
+        # salama. Sawa na `profit_factor` bila hasara (§9.5).
+        #
+        # Kwa dirisha halisi hii haitokei: `monthly()` inarudisha miezi YOTE ya
+        # dirisha, kwa hiyo `len(ret)` ni 99 na `sd` ni sifuri tu ikiwa hakuna
+        # trade hata moja — hali inayoshughulikiwa juu.
+        sd = float(ret.std(ddof=1)) if len(ret) > 1 else float("nan")
+        sharpe = (float(ret.mean() / sd * np.sqrt(12))
+                  if sd == sd and sd > 0 else float("nan"))
 
         faida = float(sum(t.pnl_account for t in self.trades if t.pnl_account > 0))
         hasara = float(-sum(t.pnl_account for t in self.trades if t.pnl_account < 0))

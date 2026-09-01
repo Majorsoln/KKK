@@ -144,8 +144,13 @@ def bars_zenye_mwelekeo():
     Bila hii, test ingetegemea bahati ya seed: juu ya random walk yenye spread,
     mara nyingi hakuna anayepita §8.4, na test ingerukwa — yaani isingepima
     chochote.
+
+    Bars 2,200 ni takriban miezi mitatu. Urefu si wa mapambo: `sharpe` inahitaji
+    angalau miezi MIWILI ili ihesabike kabisa, na dirisha la mwezi mmoja
+    lingefanya kila mgombea awe na `NaN` — test isingepima lango, ingepima
+    ufafanuzi.
     """
-    return _bars(600, seed=21, drift=1.2e-6)
+    return _bars(2200, seed=21, drift=1.2e-6)
 
 
 def test_bora_ni_wa_juu_kabisa_kwa_select_by(bars_zenye_mwelekeo, cfg_risk):
@@ -164,7 +169,7 @@ def test_bora_ni_KILELE_cha_waliopita_si_wa_mwisho(bars_zenye_mwelekeo, cfg_risk
     """
     walipita: list[float] = []
 
-    def kamata(_cid, result, _eco) -> None:
+    def kamata(_rekodi, _strategy, result, _eco) -> None:
         walipita.append(result.metrics()[P.SELECT_BY])
 
     out = P.search(bars_zenye_mwelekeo, _spec(60), cfg_risk=cfg_risk, seed=13,
@@ -178,7 +183,7 @@ def test_on_pass_haiitwi_kwa_waliokataliwa(bars, cfg_risk):
     walioitwa: list[str] = []
     out = P.search(bars, _spec(20), cfg_risk=cfg_risk, seed=9,
                    starting_balance=10_000.0,
-                   on_pass=lambda cid, *_: walioitwa.append(cid))
+                   on_pass=lambda rekodi, *_: walioitwa.append(rekodi.candidate_id))
     assert len(walioitwa) == out.n_passed_economics
     assert len(walioitwa) < out.variants_tested
 
@@ -289,3 +294,77 @@ def test_inajielezea(bars, cfg_risk):
     text = out.render()
     assert "UTAFUTAJI" in text and P.SELECT_BY in text
     assert out.to_json()["spec"]["substrate"] == "bar_path"
+
+
+# ===========================================================================
+# Lango la §9 juu ya wagombea HALISI (§13)
+# ===========================================================================
+
+
+def _sakafu_ya_mfano(**kw):
+    from src.validation.noise_floor import BETTER, WORSE, FloorEntry, NoiseFloor
+
+    base = {"net_account_return_month": (BETTER, -1.0),
+            "sharpe": (BETTER, -99.0),
+            "max_drawdown": (WORSE, 1e9)}
+    base.update(kw)
+    entries = {
+        jina: FloorEntry(metric=jina, higher_is=upande,
+                         tail=0.95 if upande == BETTER else 0.05, floor=f,
+                         by_family={"block_resample": f},
+                         n_used={"block_resample": 50},
+                         ci_low=f, ci_high=f)
+        for jina, (upande, f) in base.items()
+    }
+    return NoiseFloor(entries=entries,
+                      families=("block_resample", "regime_shuffle", "return_surrogate"),
+                      n_replicates=50, variants_tested_min=60,
+                      variants_tested_median=60.0, without_floor=("fill_rate",))
+
+
+def test_mnusurika_anabeba_DNA_yake(bars_zenye_mwelekeo, cfg_risk):
+    """§13 inahitaji strategy YENYEWE, si `strategy_id` pekee.
+
+    `on_pass` inatoa rekodi ya ledger NA DNA — bila DNA, database ya §13
+    ingekuwa na majina ya strategies zisizoweza kuendeshwa tena.
+    """
+    from src.discovery import survivors as SV
+
+    floor = _sakafu_ya_mfano()
+    uchujaji = SV.Screening()
+
+    def kwa_aliyepita(rekodi, strategy, result, eco):
+        m = result.metrics()
+        uamuzi = SV.screen(rekodi.candidate_id, rekodi.variant_hash, m, floor)
+        uchujaji.add(uamuzi, SV.Survivor(
+            verdict=uamuzi, strategy=strategy, economics=eco,
+            n_trades=result.n_trades, n_months=int(m.get("n_months", 0)),
+        ) if uamuzi.passed else None)
+
+    out = P.search(bars_zenye_mwelekeo, _spec(60), cfg_risk=cfg_risk, seed=13,
+                   starting_balance=10_000.0, on_pass=kwa_aliyepita)
+
+    assert uchujaji.n_screened == out.n_passed_economics >= 2
+    assert uchujaji.survivors, "sakafu ya sifuri haikupitisha mtu"
+
+    mmoja = uchujaji.survivors[0]
+    assert mmoja.strategy.entry.conditions, "DNA haina masharti"
+    assert mmoja.strategy.variant_hash == mmoja.verdict.variant_hash
+    assert mmoja.strategy.strategy_id in mmoja.render()
+    assert "trades" in mmoja.render()
+    assert mmoja.to_json()["strategy"]["entry"]
+
+
+def test_sakafu_KALI_inakata_wote(bars_zenye_mwelekeo, cfg_risk):
+    """Ndicho kinachotarajiwa kwa sakafu halisi — na si kosa."""
+    from src.discovery import survivors as SV
+
+    floor = _sakafu_ya_mfano(sharpe=("better", 99.0))
+    uchujaji = SV.Screening()
+    P.search(bars_zenye_mwelekeo, _spec(60), cfg_risk=cfg_risk, seed=13,
+             starting_balance=10_000.0,
+             on_pass=lambda r, s, res, e: uchujaji.add(
+                 SV.screen(r.candidate_id, r.variant_hash, res.metrics(), floor)))
+
+    assert uchujaji.survivors == []
+    assert uchujaji.by_failed_metric()["sharpe"] == uchujaji.n_screened
