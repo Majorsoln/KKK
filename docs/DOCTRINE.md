@@ -748,6 +748,62 @@ pekee**. Inaendelea kuripotiwa; haipitishi wala haikatai.
 
 ---
 
+### 9.6 SAKAFU ILIYOPIMWA — EURUSD H1 (2026-08-26)
+
+`research/reports/noise_floor.json` · seed `20260825` · `K = 1,000` ·
+replicates 50 × familia 3 · bars **50,161** kutoka ticks **238,714,419** ·
+dirisha 2016-01-04 → 2024-03-31 · substrate `bar_path` (§9.4) ·
+`select_by = net_account_return_month`
+
+```
+metric                       ncha        sakafu   CI                    familia    upana
+net_pips_month                p95     +1102.50   [ +913.50, +1228.87]   block       29%
+net_account_return_month      p95       +0.0224  [  +0.0219,   +0.0238] block        8%
+profitable_month_fraction     p95       +0.9303  [  +0.8561,   +0.9449] block       10%
+sharpe                        p95       +3.3817  [  +2.9632,   +3.6050] return      19%
+profit_factor                 p95       +1.7897  [  +1.6636,   +2.8403] block       66%  TETE
+max_drawdown                  p5      +549.4842  [ +460.49,  +777.94]   block       58%  TETE
+```
+
+`fill_rate` ni diagnostic (§9.5). **R5 imefunguka.**
+
+---
+
+**`block_resample` inafunga sakafu kwa 5 kati ya 6.** Ndiyo null inayohifadhi
+autocorrelation ya ndani ya block — yaani inayofanana zaidi na soko. Kwamba
+ndiyo inayotoa bar ngumu zaidi si ajali; ni §9.2 ikifanya kazi kama
+ilivyoandikwa: *sakafu inapanda hasa kwa aina ya edge ambayo null inaihifadhi.*
+
+**Sharpe ya 3.38 ni kubwa kuliko 1.70 ya §9.1 — na hilo linatarajiwa.**
+
+§9.1 ni mfano wa nadharia. Hii ni kipimo cha **pipeline yetu**, ambayo ina
+kitu ambacho mfano huo hauna: RCE inasizisha kwa hali ya akaunti (§1.2). Hasara
+zikija, budget inapungua, lots zinapungua, na hasara inayofuata inakuwa ndogo.
+Mnyororo huo **unabana mtawanyiko wa chini** wa curve ya equity, na Sharpe ya
+kila kitu inapanda — ya null na ya strategy halisi vilevile.
+
+Kwa hiyo ulinganisho unabaki wa haki: strategy halisi itapimwa kwa mfumo ULE
+ULE. Ndiyo sababu §2 inadai kupima badala ya kurithi 1.70.
+
+**`net_pips_month` ya 1,102 inatawaliwa na MZUNGUKO, si ubora.**
+
+Pips kwa mwezi ni `trades × pips kwa trade`. Mshindi wa null anafikia 1,102 kwa
+kutrade mara nyingi, si kwa kuwa mzuri kwa kila trade. Strategy halisi
+inayotrade mara chache kwa ubora zaidi inaweza kupita lango la **pesa** (2.24%)
+na kuanguka kwenye lango la **pips** — si kwa sababu ni mbaya, bali kwa sababu
+vipimo viwili vinapima vitu viwili.
+
+Hakuna marekebisho yanayofanywa sasa: sakafu ni sahihi kwa kile inachopima.
+Lakini wagombea halisi wakianza kuanguka hapa **wakiwa wamepita `net_account_
+return_month`**, sababu inajulikana tayari, na §21 itahitaji `net_pips_month`
+irekebishwe kwa mzunguko badala ya kupimwa ghafi.
+
+**`profit_factor` na `max_drawdown` zina CI pana (66% na 58%).** Zinatumika,
+lakini ni tete kuliko nyingine. Replicates zaidi ya 50 zingezibana — gharama ni
+saa, si usahihi wa ziada mahali pengine.
+
+---
+
 ## 10. Strategy — ufafanuzi na muundo
 
 ### 10.1 Ufafanuzi
