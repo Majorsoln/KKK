@@ -173,31 +173,53 @@ def main() -> int:
     print(f"{'walipita §8.4':<28} {n_h:>12,} {n_b:>14,}")
 
 
+    # ---- hukumu: PERCENTILE, si uwiano dhidi ya kizingiti nilichobuni ----
+    #
+    # Uwiano wa wastani unahitaji kizingiti ("1.5× ni kubwa mno") ambacho ni
+    # namba isiyopimwa — §2 inaikataa. Percentile haihitaji chochote: inauliza
+    # **surrogate ngapi zilishindwa na data halisi**, na jibu lake linajieleza.
     print()
-    mamlaka = hukumu.get("net_account_return_month", float("nan"))
+    jina = "net_account_return_month"
+    thamani_b = sorted(r[jina] for r in zote if r[jina] == r[jina])
+    h = halisi[jina]
 
-    # Bila washindi pande zote mbili hakuna ulinganisho. Kusema "ziko karibu"
-    # hapo kungekuwa hitimisho kutoka kwenye kutokuwepo kwa data — kosa baya
-    # kuliko kutokuwa na jibu.
-    if halisi["n_passed"] == 0 or n_b == 0 or mamlaka != mamlaka:
+    if halisi["n_passed"] == 0 or not thamani_b or h != h:
         print(f"HAKUNA ULINGANISHO. Washindi: halisi {halisi['n_passed']}, "
-              f"bandia (kati) {n_b}.\n"
+              f"bandia zenye thamani {len(thamani_b)}.\n"
               f"   Upande usio na mshindi hauwezi kulinganishwa. Ongeza "
               f"--candidates au --surrogate-seeds.")
-        alama = "hakuna_ulinganisho"
-    elif mamlaka > 1.5:
-        print(f"DATA BANDIA NI RAHISI ZAIDI ({mamlaka:.2f}× kwenye metric yenye\n"
-              f"   mamlaka). Sakafu si ya 'soko bila edge' — ni ya soko lingine,\n"
-              f"   na iko juu kupita kiasi. §9.2 inaonya juu ya hili yenyewe.")
+        return _andika(args, tf, bars, halisi, bandia, hukumu,
+                       "hakuna_ulinganisho", None)
+
+    chini = sum(1 for x in thamani_b if x < h)
+    pct = chini / len(thamani_b)
+    ukingo = 1.0 / (len(thamani_b) + 1)
+
+    print(f"`{jina}` ya data HALISI dhidi ya surrogate:")
+    print(f"   surrogate: {' · '.join(f'{x:.4f}' for x in thamani_b)}")
+    print(f"   halisi:    {h:.4f}   →  imezidi {chini}/{len(thamani_b)} "
+          f"= {pct:.0%}")
+    print(f"   ukingo wa kipimo: ±{ukingo:.0%} (surrogate {len(thamani_b)})\n")
+
+    if pct <= ukingo:
+        print("NULL NI RAHISI KULIKO SOKO. Kila surrogate — au karibu kila moja —\n"
+              "   imeshinda data halisi. Sakafu iko juu kupita kiasi na si halali.")
         alama = "bandia_ni_rahisi"
-    elif mamlaka < 0.67:
-        print(f"DATA BANDIA NI NGUMU ZAIDI ({mamlaka:.2f}×). Sakafu iko chini\n"
-              f"   kupita kiasi na inaweza kupitisha kelele.")
-        alama = "bandia_ni_ngumu"
+    elif pct >= 1.0 - ukingo:
+        print("SOKO LINA MUUNDO AMBAO NULL HAINA. Data halisi imezidi karibu kila\n"
+              "   surrogate — ndicho kinachotafutwa. Sakafu ni halali na kali.")
+        alama = "halisi_ina_muundo"
     else:
-        print(f"DATA BANDIA NA HALISI ZIKO KARIBU ({mamlaka:.2f}×).\n"
-              f"   Sakafu ni halali; wagombea wanaanguka kwa sababu ya ubora wao.")
-        alama = "sawa"
+        print("HAITOFAUTIKI. Data halisi iko NDANI ya mgawanyo wa surrogate.\n"
+              "   Null haionekani kuwa na kasoro — lakini pia data halisi\n"
+              "   haionyeshi muundo unaozidi kelele kwa nafasi hii ya kutafuta.\n"
+              f"   Kwa surrogate {len(thamani_b)}, kipimo kinaweza kuona tofauti\n"
+              f"   kubwa pekee. Ongeza --surrogate-seeds kwa jibu jembamba zaidi.")
+        alama = "haitofautiki"
+    return _andika(args, tf, bars, halisi, bandia, hukumu, alama, pct)
+
+
+def _andika(args, tf, bars, halisi, bandia, hukumu, alama, pct):
 
     out_path = Path(args.out) if args.out else (
         REPO / "research" / "reports" / f"null_vs_real_{args.symbol}_{tf}.json")
@@ -206,7 +228,8 @@ def main() -> int:
         "created_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "symbol": args.symbol, "timeframe": tf, "n_bars": int(len(bars)),
         "n_candidates": args.candidates, "generator_seed": args.seed,
-        "halisi": halisi, "bandia": bandia, "uwiano": hukumu, "hukumu": alama,
+        "halisi": halisi, "bandia": bandia, "uwiano": hukumu,
+        "percentile": pct, "hukumu": alama,
     }, indent=2, default=str) + "\n", encoding="utf-8", newline="\n")
     print(f"\nimeandikwa: {out_path}")
     return 0
