@@ -169,6 +169,32 @@ class Comparison:
             return MUUNDO
         return HAITOFAUTIKI
 
+    def percentile_ya(self, jina: str) -> float:
+        """Percentile ya metric YOYOTE, si ya mamlaka pekee.
+
+        Hukumu inatoka kwa `MAMLAKA` (R17), lakini vipimo vingine vinaeleza
+        **aina** ya tofauti. GBPUSD (§9.8) ilizidi surrogate zote kwenye
+        `net_account_return_month` mara mbili, wakati `sharpe` haikurudia na
+        `max_drawdown` ilikuwa mbaya mara 7 — yaani tofauti iko kwenye faida
+        ghafi, si kwenye ubora. Bila percentile kwa kila metric, tofauti hiyo
+        ingehitaji kuhesabiwa kwa mkono.
+
+        `max_drawdown` ni `WORSE`: percentile inahesabu surrogate zilizo na DD
+        KUBWA kuliko halisi, ili "juu" imaanishe "bora" kwa vipimo vyote.
+        """
+        chini_ni_bora = jina == "max_drawdown"
+        b = [r.metrics.get(jina, float("nan")) for r in self.bandia]
+        b = [x for x in b if x == x]
+        h = self.halisi.metrics.get(jina, float("nan"))
+        if not b or h != h:
+            return float("nan")
+        bora = sum(1 for x in b if (x > h) is chini_ni_bora)
+        return bora / len(b)
+
+    def kwa_kila_metric(self) -> dict[str, float]:
+        """Percentile ya kila metric — TAARIFA inayoeleza aina ya tofauti."""
+        return {jina: self.percentile_ya(jina) for jina in VIPIMO}
+
     def uwiano(self) -> dict[str, float]:
         """`bandia (kati) ÷ halisi` kwa kila metric — TAARIFA, si hukumu."""
         out: dict[str, float] = {}
@@ -202,6 +228,15 @@ class Comparison:
             f"(p = {self.p_value:.3f})",
             f"   {UJUMBE[self.hukumu]}",
         ]
+        # Vipimo vingine kwa percentile pia: vinaeleza AINA ya tofauti, si
+        # kuihukumu. Sharpe ikiwa chini wakati faida iko juu inamaanisha
+        # tofauti iko kwenye faida ghafi, si kwenye ubora (§9.8).
+        nyingine = [(k, v) for k, v in self.kwa_kila_metric().items()
+                    if k != MAMLAKA and v == v]
+        if nyingine:
+            lines.append("   vipimo vingine (percentile): " + " · ".join(
+                f"{k.replace('_month', '').replace('_fraction', '')} {v:.0%}"
+                for k, v in nyingine))
         return "\n".join(lines)
 
     def to_json(self) -> dict[str, Any]:
@@ -213,6 +248,7 @@ class Comparison:
             "bandia": [r.to_json() for r in self.bandia],
             "percentile": self.percentile, "azimio": self.azimio,
             "p_value": self.p_value, "uwiano": self.uwiano(),
+            "percentile_kwa_metric": self.kwa_kila_metric(),
             "hukumu": self.hukumu,
         }
 

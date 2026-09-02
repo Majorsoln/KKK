@@ -887,6 +887,76 @@ saa, si usahihi wa ziada mahali pengine.
 
 ---
 
+### 9.8 GBPUSD H1: ishara ya kwanza iliyorudia (2026-09-01)
+
+Baada ya §9.7, symbols zote 12 zilipimwa kwa kipimo cha null
+(`scripts/scan_symbols.py`, `K = 200`, surrogate 6 kwa kila moja). Zilizopangwa
+kwa `p_value`:
+
+```
+symbol   halisi   bandia kati   imezidi        p   hukumu
+GBPUSD   0.0078        0.0018       6/6    0.143   halisi_ina_muundo
+EURCHF   0.0022        0.0006       3/3    0.250   halisi_ina_muundo
+USDCHF   0.0013        0.0009       3/4    0.400   haitofautiki
+...
+EURUSD   0.0035        0.0048       2/5    0.667   haitofautiki
+USDJPY   0.0033        0.0042       1/6    0.857   haitofautiki
+```
+
+**§9.1 inarudi kwenye ngazi ya symbols.** Symbols 12 zikipimwa, matarajio ya
+kupata moja yenye `p = 0.14` kwa **bahati** ni **1.7**. Tumepata moja. Scan
+peke yake si ushahidi — ni cheo.
+
+---
+
+**Kwa hiyo GBPUSD ilirudiwa kwa seed NYINGINE ya generator.** Bahati hairudii;
+muundo unarudia. Seed 2 inatoa wagombea tofauti kabisa **na** surrogate tofauti,
+juu ya bars zile zile:
+
+```
+          halisi   imezidi        p   wagombea waliopita §8.4
+seed 1    0.0078     6/6      0.143   halisi 21 · bandia kubwa 12
+seed 2    0.0080     5/5      0.167   halisi 17 · bandia kubwa  5
+```
+
+`net_account_return_month` ilikuwa **0.0078 kisha 0.0080** — thabiti hadi
+tarakimu ya tatu, kwa wagombea wasiohusiana. Majaribio mawili huru: `p` ya
+pamoja ≈ **0.024**.
+
+Uteuzi kisha urudiaji ni utaratibu halali: uteuzi ulikuwa na multiplicity ya
+symbols 12; urudiaji ni jaribio jipya juu ya dhana iliyotangulia kutajwa.
+
+---
+
+**LAKINI ilishinda kwa FAIDA, si kwa UBORA.** Percentile kwa kila metric,
+seed 2:
+
+```
+net_account_return_month   100%      profit_factor      100%
+net_pips_month              60%      sharpe              20%
+profitable_month_fraction    0%      max_drawdown         0%
+```
+
+Mgombea bora wa GBPUSD ana **DD ya $2,783 kwa akaunti ya $10,000 — asilimia
+27.8**, wakati surrogate zake zilikuwa ~$400. `sharpe` ilizidi surrogate zote
+kwa seed 1 (0.69) lakini ikawa katikati kwa seed 2 (0.35).
+
+Yaani: soko halisi la GBPUSD linaruhusu utafutaji wa nasibu kukusanya **faida
+kubwa zaidi** kuliko surrogate zake, kwa uthabiti — lakini kwa **hatari kubwa
+zaidi**, na bila faida ya wazi kwenye vipimo vya ubora.
+
+**Hilo halibatilishi ishara.** Sakafu ya kelele haihukumu metric moja: `§9.2`
+inadai malango YOTE, na `max_drawdown` ni mojawapo. Lango la DD ndilo la
+kuangalia pale Calibration B ya GBPUSD itakapoendeshwa — na ndilo linaloweza
+kukataa yote.
+
+**Kilichoongezwa kutokana na hili:** `Comparison.kwa_kila_metric()`. Kipimo
+kilikuwa kinaonyesha percentile ya metric yenye mamlaka pekee, kwa hiyo tofauti
+kati ya "faida" na "ubora" ilihitaji kuhesabiwa kwa mkono — na ingeweza kupita
+bila kuonekana.
+
+---
+
 ## 10. Strategy — ufafanuzi na muundo
 
 ### 10.1 Ufafanuzi

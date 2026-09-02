@@ -213,3 +213,68 @@ def test_matarajio_yanapuuza_zisizopimika():
     zote = [_kwa_symbol("A", 0.05, [0.01] * 6),
             _kwa_symbol("B", float("nan"), [0.01] * 6)]
     assert NC.expected_by_chance(zote) == pytest.approx(1 / 7)
+
+
+# ===========================================================================
+# Percentile kwa KILA metric — inaeleza AINA ya tofauti (§9.8)
+# ===========================================================================
+
+
+def _kamili(halisi: dict, bandia: list[dict]) -> NC.Comparison:
+    return NC.Comparison(
+        symbol="GBPUSD", timeframe="H1", n_bars=50_164, n_candidates=200, seed=2,
+        halisi=NC.Run("HALISI", 17, halisi),
+        bandia=[NC.Run(f"b{i}", 1, m) for i, m in enumerate(bandia)],
+    )
+
+
+def test_max_drawdown_inahesabiwa_kwa_upande_SAHIHI():
+    """`WORSE` metric: "juu" lazima imaanishe "bora" kwa vipimo vyote.
+
+    DD ndogo ni bora, kwa hiyo percentile inahesabu surrogate zenye DD KUBWA
+    kuliko halisi. Bila hivyo, DD mbaya ingeonekana kama alama nzuri.
+    """
+    nzuri = _kamili({"max_drawdown": 100.0},
+                    [{"max_drawdown": x} for x in (300.0, 400.0, 500.0)])
+    mbaya = _kamili({"max_drawdown": 900.0},
+                    [{"max_drawdown": x} for x in (300.0, 400.0, 500.0)])
+    assert nzuri.percentile_ya("max_drawdown") == 1.0
+    assert mbaya.percentile_ya("max_drawdown") == 0.0
+
+
+def test_metric_za_kawaida_ni_juu_ni_bora():
+    c = _kamili({"sharpe": 0.9}, [{"sharpe": x} for x in (0.3, 0.5, 0.7)])
+    assert c.percentile_ya("sharpe") == 1.0
+
+
+def test_tofauti_kati_ya_FAIDA_na_UBORA_inaonekana(cfg_risk=None):
+    """Ndilo somo la §9.8: GBPUSD ilishinda kwa faida, si kwa ubora.
+
+    Bila percentile kwa kila metric, hilo lingehitaji kuhesabiwa kwa mkono —
+    na lingeweza kupita bila kuonekana.
+    """
+    c = _kamili(
+        {NC.MAMLAKA: 0.0080, "sharpe": 0.348, "max_drawdown": 2783.0},
+        [{NC.MAMLAKA: m, "sharpe": s, "max_drawdown": d}
+         for m, s, d in [(0.0002, 0.49, 300.0), (0.0027, 0.49, 392.0),
+                         (0.0028, 0.28, 450.0), (0.0008, 0.68, 380.0),
+                         (0.0017, 0.78, 410.0)]],
+    )
+    kwa_metric = c.kwa_kila_metric()
+    assert kwa_metric[NC.MAMLAKA] == 1.0, "faida: imezidi zote"
+    assert kwa_metric["sharpe"] < 0.5, "ubora: haikuzidi"
+    assert kwa_metric["max_drawdown"] == 0.0, "hatari: mbaya kuliko zote"
+
+
+def test_vipimo_vyote_vinaonekana_kwenye_ripoti():
+    c = _kamili(
+        {NC.MAMLAKA: 0.008, "sharpe": 0.35, "max_drawdown": 2783.0},
+        [{NC.MAMLAKA: 0.002, "sharpe": 0.50, "max_drawdown": 400.0}] * 3,
+    )
+    text = c.render()
+    assert "sharpe" in text and "max_drawdown" in text
+
+
+def test_metric_isiyoripotiwa_ni_NaN_si_sifuri():
+    c = _kamili({NC.MAMLAKA: 0.008}, [{NC.MAMLAKA: 0.002}] * 3)
+    assert math.isnan(c.percentile_ya("sharpe"))
