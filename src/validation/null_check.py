@@ -34,9 +34,23 @@ surrogate ngapi zilishindwa na data halisi?
      0%   null ni RAHISI kuliko soko. Sakafu ingekuwa juu kupita kiasi.
 ```
 
-Azimio ni `1/(n+1)` kwa surrogate `n`. Kwa surrogate 3, "100%" ina nafasi ya
-25% ya kutokea kwa bahati — si ushahidi, ni dokezo. Idadi inaripotiwa daima
-pamoja na jibu, kwa sababu jibu bila azimio lake si jibu.
+Percentile peke yake haitoshi kupanga symbols: `3/3` na `6/6` zote ni 100%,
+lakini ya kwanza ina nafasi ya **25%** ya kutokea kwa bahati na ya pili **14%**.
+`p_value` = `(n − k + 1) ÷ (n + 1)` inajumuisha vyote viwili, na ndiyo
+inayotumika kupanga.
+
+---
+
+**§9.1 inarudi kwenye ngazi ya symbols.**
+
+Kadri unavyopima symbols nyingi, ndivyo bora kati yao inavyoonekana nzuri hata
+kama hakuna hata moja yenye muundo. Symbols 12 zikipimwa, **matarajio ya
+kupata moja yenye `p = 0.14` kwa bahati ni 1.7**. Symbol moja hiyo si ugunduzi;
+ni kile null inachokitoa.
+
+`expected_by_chance()` inahesabu hilo, na scan inaripoti daima. Kuchuja bila
+namba hiyo ni kufanya §9.1 mara ya pili baada ya kujenga mfumo mzima wa
+kuiepuka.
 """
 
 from __future__ import annotations
@@ -124,6 +138,27 @@ class Comparison:
         return 1.0 / (self.n_bandia + 1) if self.n_bandia else float("nan")
 
     @property
+    def p_value(self) -> float:
+        """Nafasi ya kupata cheo hiki — au bora zaidi — kwa BAHATI.
+
+        Chini ya null, data halisi ni mojawapo ya `n+1` zinazoweza kupangwa kwa
+        mpangilio wowote. Ikizidi `k` kati ya `n`, nafasi ya kufika hapo au juu
+        zaidi ni `(n − k + 1) ÷ (n + 1)`.
+
+        **Hii ndiyo namba ya kupanga symbols, si percentile.** Percentile
+        peke yake inasema `3/3` na `6/6` ni sawa — zote 100% — wakati ya kwanza
+        ina nafasi ya 25% ya kutokea kwa bahati na ya pili 14%. Ushahidi si
+        kile kilichoonekana pekee; ni pamoja na ni mara ngapi ungeweza
+        kuonekana bila kuwepo.
+        """
+        b = self.thamani_bandia
+        h = self.halisi.mamlaka
+        if not b or h != h:
+            return float("nan")
+        k = sum(1 for x in b if x < h)
+        return (len(b) - k + 1) / (len(b) + 1)
+
+    @property
     def hukumu(self) -> str:
         pct = self.percentile
         if pct != pct:
@@ -163,7 +198,8 @@ class Comparison:
         lines += [
             f"   surrogate: {' · '.join(f'{x:.4f}' for x in b)}",
             f"   halisi:    {self.halisi.mamlaka:.4f}  →  imezidi "
-            f"{int(pct * len(b))}/{len(b)} = {pct:.0%}  (azimio ±{self.azimio:.0%})",
+            f"{int(pct * len(b))}/{len(b)} = {pct:.0%}  "
+            f"(p = {self.p_value:.3f})",
             f"   {UJUMBE[self.hukumu]}",
         ]
         return "\n".join(lines)
@@ -176,7 +212,8 @@ class Comparison:
             "halisi": self.halisi.to_json(),
             "bandia": [r.to_json() for r in self.bandia],
             "percentile": self.percentile, "azimio": self.azimio,
-            "uwiano": self.uwiano(), "hukumu": self.hukumu,
+            "p_value": self.p_value, "uwiano": self.uwiano(),
+            "hukumu": self.hukumu,
         }
 
 
@@ -238,35 +275,55 @@ def compare(bars, spec, *, cfg_risk, seed: int, n_surrogate_seeds: int = 2,
 
 
 def rank(comparisons) -> list[Comparison]:
-    """Symbols zilizopangwa kwa percentile — ya juu kwanza.
+    """Symbols zilizopangwa kwa `p_value` — ndogo kwanza.
+
+    Kupanga kwa percentile peke yake kunaweka `3/3` (p = 0.25) juu ya `6/6`
+    (p = 0.14) pale zote mbili zinaonyesha 100% — na hiyo ni kupendelea
+    ushahidi dhaifu. `p_value` inajumuisha vyote viwili kwenye namba moja.
 
     `NaN` (bila ulinganisho) zinaenda mwisho: symbol isiyoweza kupimwa si
     symbol iliyofeli, lakini pia si mahali pa kuanzia.
     """
     def ufunguo(c: Comparison):
-        pct = c.percentile
-        return (0 if pct == pct else 1, -(pct if pct == pct else 0.0))
+        p = c.p_value
+        return (0 if p == p else 1, p if p == p else 0.0)
 
     return sorted(comparisons, key=ufunguo)
+
+
+def expected_by_chance(comparisons, p_kikomo: float | None = None) -> float:
+    """Symbols ngapi zingefika `p ≤ kikomo` kwa BAHATI, zikipimwa zote.
+
+    §9.1 kwenye ngazi ya symbols: kadri unavyopima symbols nyingi, ndivyo bora
+    kati yao inavyoonekana nzuri hata kama hakuna hata moja yenye muundo.
+    Symbol moja yenye `p = 0.14` kati ya 12 zilizopimwa **si ugunduzi** — ni
+    matarajio.
+    """
+    zenye = [c for c in comparisons if c.p_value == c.p_value]
+    if not zenye:
+        return float("nan")
+    kikomo = p_kikomo if p_kikomo is not None else min(c.p_value for c in zenye)
+    return len(zenye) * kikomo
 
 
 def render_table(comparisons) -> str:
     """Jedwali moja la symbols zote — ndilo linaloamua wapi pa kutafuta."""
     lines = [
         f"{'symbol':<9} {'TF':<4} {'halisi':>9} {'bandia kati':>12} "
-        f"{'percentile':>11} {'azimio':>7}  hukumu",
+        f"{'imezidi':>9} {'p':>7}  hukumu",
     ]
     for c in rank(comparisons):
         pct = c.percentile
         b = c.thamani_bandia
         kati = b[len(b) // 2] if b else float("nan")
-        pct_str = f"{pct:.0%}" if pct == pct else "—"
-        azimio_str = f"±{c.azimio:.0%}" if c.azimio == c.azimio else "—"
+        pct_str = (f"{int(pct * c.n_bandia)}/{c.n_bandia}" if pct == pct else "—")
+        p = c.p_value
+        azimio_str = f"{p:.3f}" if p == p else "—"
         h = c.halisi.mamlaka
         h_str = f"{h:.4f}" if h == h else "—"
         kati_str = f"{kati:.4f}" if kati == kati else "—"
         lines.append(
             f"{c.symbol:<9} {c.timeframe:<4} {h_str:>9} "
-            f"{kati_str:>12} {pct_str:>11} {azimio_str:>7}  {c.hukumu}"
+            f"{kati_str:>12} {pct_str:>9} {azimio_str:>7}  {c.hukumu}"
         )
     return "\n".join(lines)

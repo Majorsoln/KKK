@@ -170,12 +170,25 @@ def main() -> int:
               f"--candidates.")
         return 1
     if bora.hukumu == NC.MUUNDO:
-        print(f"{bora.symbol} imezidi surrogate ZOTE ({bora.percentile:.0%}, "
-              f"azimio ±{bora.azimio:.0%}).\n"
-              f"   Ndipo pa kuelekeza Calibration B. Kumbuka: kwa surrogate "
-              f"{bora.n_bandia}, hii\n"
-              f"   ni KUCHUJA, si uthibitisho — inayofuata ni Calibration B "
-              f"kamili.")
+        # §9.1 kwenye ngazi ya symbols. Kadri unavyopima symbols nyingi, ndivyo
+        # bora kati yao inavyoonekana nzuri hata kama hakuna hata moja yenye
+        # muundo. Kuripoti symbol iliyoongoza bila namba hii kungekuwa kufanya
+        # kosa la §9.1 mara ya pili — baada ya kujenga mfumo mzima wa kuliepuka.
+        matarajio = NC.expected_by_chance(matokeo)
+        n_zilizopimika = sum(1 for c in matokeo if c.p_value == c.p_value)
+        print(f"{bora.symbol}: imezidi surrogate {bora.n_bandia}/{bora.n_bandia}, "
+              f"p = {bora.p_value:.3f}")
+        print(f"\n   LAKINI: symbols {n_zilizopimika} zimepimwa. Kwa `p` hiyo, "
+              f"matarajio ya\n"
+              f"   kupata symbol {matarajio:.1f} kwa BAHATI. Hii si ugunduzi — "
+              f"ni cheo.")
+        print(f"\n   Kabla ya Calibration B ya saa 30, rudia {bora.symbol} kwa "
+              f"SEED NYINGINE\n"
+              f"   ya generator. Bahati hairudii; muundo unarudia:\n"
+              f"      python scripts\\null_vs_real.py --symbol {bora.symbol} "
+              f"--seed 2 \\\n"
+              f"          --candidates {args.candidates} --surrogate-seeds "
+              f"{args.surrogate_seeds}")
     else:
         print(f"Hakuna symbol iliyozidi surrogate zake zote. Ya juu ni "
               f"{bora.symbol} ({bora.percentile:.0%}).\n"

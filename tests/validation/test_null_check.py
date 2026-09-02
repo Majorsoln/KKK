@@ -166,7 +166,50 @@ def test_symbol_isiyopimika_inaenda_MWISHO():
     assert [c.symbol for c in NC.rank(zote)] == ["XAUUSD", "EURUSD"]
 
 
-def test_jedwali_linaonyesha_azimio_pamoja_na_jibu():
+def test_jedwali_linaonyesha_p_pamoja_na_jibu():
     text = NC.render_table([_kwa_symbol("XAUUSD", 0.010, [0.005, 0.006, 0.007])])
-    assert "XAUUSD" in text and "100%" in text and "±25%" in text
+    assert "XAUUSD" in text and "3/3" in text and "0.250" in text
     assert NC.MUUNDO in text
+
+
+# ===========================================================================
+# `p_value` — ushahidi, si kile kilichoonekana pekee
+# ===========================================================================
+
+
+def test_p_value_inatofautisha_3_kwa_3_na_6_kwa_6():
+    """Zote ni 100%, lakini si ushahidi sawa."""
+    chache = _kwa_symbol("A", 0.05, [0.01, 0.01, 0.01])
+    nyingi = _kwa_symbol("B", 0.05, [0.01] * 6)
+    assert chache.percentile == nyingi.percentile == 1.0
+    assert chache.p_value == pytest.approx(0.25)
+    assert nyingi.p_value == pytest.approx(1 / 7)
+
+
+def test_kupanga_kunatumia_p_si_percentile():
+    """Kosa la scan ya kwanza: EURCHF (3/3) iliwekwa juu ya GBPUSD (6/6)."""
+    zote = [
+        _kwa_symbol("EURCHF", 0.0022, [0.0019, 0.0005, 0.0006]),
+        _kwa_symbol("GBPUSD", 0.0078, [0.0016, 0.0029, 0.0038,
+                                       0.0018, 0.0016, 0.0013]),
+    ]
+    assert all(c.percentile == 1.0 for c in zote)
+    assert [c.symbol for c in NC.rank(zote)] == ["GBPUSD", "EURCHF"]
+
+
+def test_p_value_ya_kushindwa_kabisa_ni_moja():
+    c = _kwa_symbol("A", 0.001, [0.01, 0.02, 0.03])
+    assert c.p_value == pytest.approx(1.0)
+
+
+def test_matarajio_kwa_bahati_yanahesabiwa():
+    """§9.1 kwenye ngazi ya symbols: 12 zikipimwa, `p = 0.14` inatarajiwa 1.7."""
+    zote = [_kwa_symbol(f"S{i}", 0.01, [0.02] * 6) for i in range(11)]
+    zote.append(_kwa_symbol("BORA", 0.05, [0.01] * 6))
+    assert NC.expected_by_chance(zote) == pytest.approx(12 / 7)
+
+
+def test_matarajio_yanapuuza_zisizopimika():
+    zote = [_kwa_symbol("A", 0.05, [0.01] * 6),
+            _kwa_symbol("B", float("nan"), [0.01] * 6)]
+    assert NC.expected_by_chance(zote) == pytest.approx(1 / 7)
