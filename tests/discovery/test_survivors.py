@@ -143,3 +143,121 @@ def test_json_ina_kila_uamuzi_si_walionusurika_pekee():
     out = _screening().to_json()
     assert out["n_screened"] == 3 and len(out["verdicts"]) == 3
     assert out["n_survivors"] == 0
+
+
+# ===========================================================================
+# §9.9 — lango la pamoja linapokuwepo, ndilo linaloamua
+# ===========================================================================
+
+
+def _floor_ya_pamoja(rho: float = 0.0) -> NoiseFloor:
+    """Jedwali kamili: sakafu za kila metric NA lango la pamoja, kutoka safu."""
+    import math
+
+    import numpy as np
+
+    from src.validation import noise_floor as NF
+
+    rng = np.random.default_rng(9)
+    specs = (NF.MetricSpec("net_account_return_month", BETTER),
+             NF.MetricSpec("sharpe", BETTER),
+             NF.MetricSpec("max_drawdown", WORSE, lo=0.0))
+    fams = ("block_resample", "regime_shuffle", "return_surrogate")
+
+    rows = {}
+    for f in fams:
+        zake = []
+        for _ in range(50):
+            pamoja = rng.normal()
+            def kelele():
+                return rho * pamoja + math.sqrt(1 - rho ** 2) * rng.normal()
+            zake.append({
+                "net_account_return_month": 0.01 + 0.01 * kelele(),
+                "sharpe": 1.0 + 0.5 * kelele(),
+                "max_drawdown": 400.0 - 50.0 * kelele(),
+                "fill_rate": 0.95,
+                NF.VARIANTS_KEY: 1000,
+            })
+        rows[f] = zake
+
+    return NF.floor_from_rows(
+        rows, metrics=specs, families=fams, n_replicates=50,
+        variants=[1000] * 150, seed=3, source="jaribio",
+    )
+
+
+def test_lango_la_pamoja_ndilo_linaloamua():
+    floor = _floor_ya_pamoja()
+    assert floor.joint is not None
+    v = SV.screen("c1", "h1", _metrics(net_account_return_month=9.0,
+                                       sharpe=9.0, max_drawdown=1.0), floor)
+    assert v.passed and v.joint
+    assert v.t == pytest.approx(1.0)
+    assert v.t > v.joint_floor
+
+
+def test_mwelekeo_MMOJA_dhaifu_unatosha_kukataa():
+    """`min`, si wastani — ubora wa wengine haulipii."""
+    floor = _floor_ya_pamoja()
+    v = SV.screen("c1", "h1", _metrics(net_account_return_month=9.0,
+                                       sharpe=9.0, max_drawdown=99_999.0), floor)
+    assert not v.passed
+    assert v.failed == ("max_drawdown",)
+
+
+def test_kiwango_cha_null_kinacholingana_na_kilichotangazwa():
+    """Dai zima la §9.9, likipimwa kupitia `screen()` yenyewe."""
+    floor = _floor_ya_pamoja()
+    ref = floor.joint.reference
+    n = len(ref["sharpe"])
+    walipita = sum(
+        1 for i in range(n)
+        if SV.screen(f"n{i}", "", {m: ref[m][i] for m in ref}, floor).passed
+    )
+    assert walipita / n == pytest.approx(floor.joint.null_pass_rate, abs=1.0 / n)
+    assert walipita > 0
+
+
+def test_mkusanyiko_wa_zamani_ungekataa_ZAIDI():
+    """Ushahidi wa mwelekeo wa mabadiliko: §9.9 ni LEGEVU kuliko §9.2, na kwa
+    kiasi kinachopimwa — si kubwa kiasi cha kufuta kipimo."""
+    floor = _floor_ya_pamoja()
+    ref = floor.joint.reference
+    n = len(ref["sharpe"])
+    safu = [{m: ref[m][i] for m in ref} for i in range(n)]
+
+    pamoja = sum(1 for r in safu if SV.screen("x", "", r, floor).passed)
+    zamani = sum(1 for r in safu
+                 if all(floor.gate(m, r[m]) for m in floor.entries))
+    assert zamani <= pamoja
+    assert pamoja / n < 0.05
+
+
+def test_jedwali_LISILO_na_lango_la_pamoja_linatumia_kanuni_ya_zamani():
+    """Si kudhani — `Verdict.joint` inasema kanuni ipi ilitumika."""
+    v = SV.screen("c1", "h1", _metrics(), _floor())
+    assert v.passed and not v.joint
+    assert v.u == {} and v.below_own_floor == ()
+
+
+def test_aliyepita_pamoja_lakini_chini_ya_sakafu_yake_ANAANDIKWA():
+    """Tofauti kati ya kanuni mbili haipaswi kupotea kimya."""
+    floor = _floor_ya_pamoja()
+    juu = max(floor.entries["sharpe"].floor, 0.0)
+    m = _metrics(net_account_return_month=9.0, sharpe=juu, max_drawdown=1.0)
+    v = SV.screen("c1", "h1", m, floor)
+    if v.passed:
+        # `sharpe` iko sawasawa na sakafu yake, kwa hiyo `passes()` inaikataa.
+        assert "sharpe" in v.below_own_floor
+        assert "chini ya sakafu yake" in v.render()
+
+
+def test_ripoti_inasema_kanuni_iliyotumika():
+    floor = _floor_ya_pamoja()
+    s = SV.Screening()
+    s.add(SV.screen("a", "ha", _metrics(sharpe=-9.0), floor))
+    assert "§9.9" in s.render(floor)
+
+    z = SV.Screening()
+    z.add(SV.screen("a", "ha", _metrics(sharpe=1.0), _floor()))
+    assert "§9.2" in z.render(_floor())

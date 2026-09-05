@@ -38,6 +38,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Iterable, Mapping, Sequence
 
+from . import joint as JT
 from . import surrogates as S
 
 BETTER = "better"
@@ -199,6 +200,11 @@ class NoiseFloor:
     seed: int = 0
     created_at: str = ""
     source: str = ""
+    # §9.9 — lango linaloamua. Sakafu za `entries` zinabaki kama **maelezo** ya
+    # kila mwelekeo peke yake; kudai zote kwa wakati mmoja ndiko kulikokuwa na
+    # kosa la aina-I la <0.7% wakati zikidai `p95`. `None` kwa jedwali la zamani
+    # lililoandikwa kabla ya §9.9 — na hilo linapaswa kuonekana, si kudhaniwa.
+    joint: "JT.JointGate | None" = None
 
     # ---------------- lango ----------------
 
@@ -246,6 +252,8 @@ class NoiseFloor:
             "",
         ]
         lines += ["   " + e.render() for e in self.entries.values()]
+        if self.joint is not None:
+            lines += ["", "   " + self.joint.render().replace("\n", "\n   ")]
         if self.without_floor:
             lines += ["", "   BILA SAKAFU (diagnostic pekee, §1.1):"]
             lines += [f"      {m}" for m in self.without_floor]
@@ -274,6 +282,7 @@ class NoiseFloor:
             "variants_tested_median": self.variants_tested_median,
             "without_floor": list(self.without_floor),
             "entries": {k: v.to_json() for k, v in self.entries.items()},
+            "joint": None if self.joint is None else self.joint.to_json(),
         }
 
     def write(self, path: Path) -> Path:
@@ -306,6 +315,8 @@ class NoiseFloor:
             without_floor=tuple(raw.get("without_floor", ())),
             seed=int(raw.get("seed", 0)), created_at=raw.get("created_at", ""),
             source=raw.get("source", ""),
+            joint=(JT.JointGate.from_json(raw["joint"])
+                   if raw.get("joint") else None),
         )
 
 
@@ -365,9 +376,11 @@ def calibrate(
         )
 
     specs = {m.name: m for m in metrics}
-    seen: dict[str, dict[str, list[float]]] = {f: {} for f in fams}
+    # **Safu, si nguzo.** Sakafu ya kila metric inahitaji nguzo; lango la
+    # pamoja (§9.9) linahitaji metrics za mgombea YULE YULE zikiwa pamoja.
+    # Kukusanya nguzo pekee kungepoteza upangaji huo bila kuonekana.
+    rows: dict[str, list[dict[str, float]]] = {f: [] for f in fams}
     variants: list[int] = []
-    extra: set[str] = set()
 
     for fam in fams:
         for rep in range(n_replicates):
@@ -391,21 +404,7 @@ def calibrate(
                 _check_result(result, fam, rep)
 
             variants.append(int(result[VARIANTS_KEY]))
-            for name, value in result.items():
-                if name == VARIANTS_KEY:
-                    continue
-                if name not in specs:
-                    extra.add(name)
-                    continue
-                # `isfinite`, si `isnan` pekee. `profit_factor` ni `inf` pale
-                # mgombea hana trade hata moja ya hasara — si thamani kubwa, ni
-                # thamani isiyohesabika. Ikiingia kwenye `np.quantile`,
-                # interpolation inafanya `inf - inf` na sakafu YOTE inakuwa
-                # `NaN`. Lango la `> NaN` halipitiki kamwe, na halionyeshi kwa
-                # nini. (Calibration B ya kwanza, 2026-08-26.)
-                if value is None or not _ni_namba(value):
-                    continue
-                seen[fam].setdefault(name, []).append(float(value))
+            rows[fam].append({k: v for k, v in result.items() if k != VARIANTS_KEY})
 
             if progress:
                 # Idadi ya replicates ZENYE THAMANI, si zilizoendeshwa. Ndiyo
@@ -413,8 +412,10 @@ def calibrate(
                 # inayopaswa kuonekana wakati run inaendelea: kujua saa 60
                 # baadaye kwamba hazikutosha si kujua, ni kupoteza.
                 zilizojaa = min(
-                    (len(v) for v in seen[fam].values()), default=0
-                ) if seen[fam] else 0
+                    (sum(1 for r in rows[fam] if _ni_namba(r.get(m.name)))
+                     for m in metrics),
+                    default=0,
+                )
                 onyo = "" if zilizojaa >= MIN_REPLICATES else (
                     f"  [zenye thamani {zilizojaa}/{MIN_REPLICATES}]"
                 )
@@ -424,7 +425,60 @@ def calibrate(
                     f"{'  (imehifadhiwa)' if ilihifadhiwa else ''}{onyo}"
                 )
 
+    floor_table = floor_from_rows(
+        rows, metrics=metrics, families=fams, n_replicates=int(n_replicates),
+        variants=variants, seed=int(seed), source=source,
+    )
+    if progress:
+        progress("")
+        progress(floor_table.render())
+    return floor_table
+
+
+def floor_from_rows(
+    rows_by_family: Mapping[str, Sequence[Mapping[str, Any]]],
+    *,
+    metrics: Sequence[MetricSpec],
+    families: Sequence[str],
+    n_replicates: int,
+    variants: Sequence[int],
+    seed: int,
+    source: str = "",
+) -> NoiseFloor:
+    """Jenga jedwali kutoka matokeo ya replicates — bila kuendesha chochote.
+
+    Imetenganishwa na `calibrate()` kwa sababu mbili. Ya kwanza ni checkpoint:
+    replicates zote 150 tayari ziko kwenye faili, kwa hiyo jedwali linaweza
+    kujengwa upya kwa sekunde badala ya masaa pale kanuni ya lango inapobadilika.
+
+    Ya pili ni muhimu zaidi: kuwa na **njia moja** ya kujenga sakafu inamaanisha
+    jedwali lililojengwa upya ni lile lile hasa lililotoka kwenye run — si
+    hesabu ya pili inayokaribiana nayo.
+    """
+    import numpy as np
+
+    specs = {m.name: m for m in metrics}
+    fams = tuple(families)
     rng = np.random.default_rng(seed)
+
+    # Nguzo zinatokana na safu, si kinyume chake. `isfinite`, si `isnan` pekee:
+    # `profit_factor` ni `inf` pale mgombea hana trade hata moja ya hasara — si
+    # thamani kubwa, ni thamani isiyohesabika. Ikiingia kwenye `np.quantile`,
+    # interpolation inafanya `inf - inf` na sakafu YOTE inakuwa `NaN`. Lango la
+    # `> NaN` halipitiki kamwe, na halionyeshi kwa nini (2026-08-26).
+    seen: dict[str, dict[str, list[float]]] = {f: {} for f in fams}
+    extra: set[str] = set()
+    for fam in fams:
+        for row in rows_by_family.get(fam, ()):
+            for name, value in row.items():
+                if name == VARIANTS_KEY:
+                    continue
+                if name not in specs:
+                    extra.add(name)
+                    continue
+                if _ni_namba(value):
+                    seen[fam].setdefault(name, []).append(float(value))
+
     entries: dict[str, FloorEntry] = {}
     hafifu: list[str] = []
 
@@ -449,7 +503,6 @@ def calibrate(
         # sakafu RAHISI kuliko zote — kinyume kabisa cha sheria.
         pick = max if spec.higher_is == BETTER else min
         binding = pick(by_family, key=lambda k: by_family[k])
-        floor = by_family[binding]
 
         # CI inatoka kwa familia ILIYOFUNGA sakafu, si kwa zote zilizounganishwa.
         # Ikitoka kwenye pooled, ingeeleza kutokuwa na uhakika kwa namba ambayo
@@ -457,24 +510,30 @@ def calibrate(
         lo, hi = _bootstrap_ci(seen[binding][name], spec.tail, rng)
 
         entries[name] = FloorEntry(
-            metric=name, higher_is=spec.higher_is, tail=spec.tail, floor=float(floor),
+            metric=name, higher_is=spec.higher_is, tail=spec.tail,
+            floor=float(by_family[binding]),
             by_family=by_family, n_used=n_used, ci_low=lo, ci_high=hi,
             lo=spec.lo, hi=spec.hi,
         )
 
-    floor_table = NoiseFloor(
+    # §9.9 — lango la pamoja linajengwa kutoka SAFU, juu ya metrics zilezile
+    # zenye sakafu. Zisipokuwepo, hakuna lango; §1.1 inaamua kilichobaki.
+    joint = None
+    if entries:
+        joint = JT.calibrate_joint(
+            {f: list(rows_by_family.get(f, ())) for f in fams},
+            {name: e.higher_is for name, e in entries.items()},
+        )
+
+    return NoiseFloor(
         entries=entries, families=fams, n_replicates=int(n_replicates),
-        variants_tested_min=int(min(variants)),
-        variants_tested_median=float(_median(variants)),
+        variants_tested_min=int(min(variants)) if variants else 0,
+        variants_tested_median=float(_median(variants)) if variants else 0.0,
         without_floor=tuple(sorted(extra | set(hafifu))),
         seed=int(seed),
         created_at=datetime.now(timezone.utc).isoformat(timespec="seconds"),
-        source=source,
+        source=source, joint=joint,
     )
-    if progress:
-        progress("")
-        progress(floor_table.render())
-    return floor_table
 
 
 @dataclass

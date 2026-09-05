@@ -441,3 +441,100 @@ def test_mipaka_yanahifadhiwa_kwenye_faili(tmp_path):
     njia = jedwali.write(tmp_path / "nf.json")
     tena = NF.NoiseFloor.read(njia)
     assert tena.haipitiki == jedwali.haipitiki
+
+
+# ===========================================================================
+# §9.9 — lango la pamoja ndani ya jedwali (2026-09-05)
+# ===========================================================================
+
+
+def _safu(seed=5, n=50):
+    """Replicates za familia tatu, zikiwa na metrics za mgombea MMOJA pamoja."""
+    import numpy as np
+
+    rng = np.random.default_rng(seed)
+    out = {}
+    for f in NF.S.FAMILIES:
+        out[f] = [{
+            "net_pips_month": float(rng.normal(100, 40)),
+            "net_account_return_month": float(rng.normal(0.01, 0.004)),
+            "sharpe": float(rng.normal(1.0, 0.5)),
+            "max_drawdown": float(abs(rng.normal(300, 80))),
+            "profitable_month_fraction": float(rng.uniform(0.2, 0.8)),
+            "fill_rate": 0.96,
+            NF.VARIANTS_KEY: 1000,
+        } for _ in range(n)]
+    return out
+
+
+def test_jedwali_lina_lango_la_pamoja():
+    t = NF.floor_from_rows(_safu(), metrics=NF.DEFAULT_METRICS,
+                           families=NF.S.FAMILIES, n_replicates=50,
+                           variants=[1000] * 150, seed=1)
+    assert t.joint is not None
+    assert set(t.joint.reference) == set(t.entries)
+    assert 0.0 < t.joint.null_pass_rate < 0.05
+
+
+def test_lango_la_pamoja_linarudishwa_kutoka_faili(tmp_path):
+    t = NF.floor_from_rows(_safu(), metrics=NF.DEFAULT_METRICS,
+                           families=NF.S.FAMILIES, n_replicates=50,
+                           variants=[1000] * 150, seed=1)
+    rudi = NF.NoiseFloor.read(t.write(tmp_path / "f.json"))
+    assert rudi.joint is not None
+    assert rudi.joint.floor == pytest.approx(t.joint.floor)
+    assert rudi.joint.higher_is == t.joint.higher_is
+    for m in t.joint.reference:
+        assert rudi.joint.reference[m] == pytest.approx(t.joint.reference[m])
+
+
+def test_jedwali_la_zamani_linasomeka_bila_lango_la_pamoja(tmp_path):
+    """Faili zilizoandikwa kabla ya §9.9 hazipaswi kulipuka — `joint is None`
+    ndiyo inayowafanya `discover.py` waseme, badala ya kuhukumu kimya."""
+    import json
+
+    t = NF.floor_from_rows(_safu(), metrics=NF.DEFAULT_METRICS,
+                           families=NF.S.FAMILIES, n_replicates=50,
+                           variants=[1000] * 150, seed=1)
+    njia = t.write(tmp_path / "f.json")
+    raw = json.loads(njia.read_text(encoding="utf-8"))
+    del raw["joint"]
+    njia.write_text(json.dumps(raw), encoding="utf-8")
+    assert NF.NoiseFloor.read(njia).joint is None
+
+
+def test_kujenga_upya_kutoka_SAFU_kunatoa_sakafu_ZILEZILE():
+    """Dai la `rebuild_floor.py`: hakuna hesabu ya pili inayokaribiana — ni
+    njia ILE ILE, kwa hiyo namba zilezile."""
+    safu = _safu(seed=8)
+    a = NF.floor_from_rows(safu, metrics=NF.DEFAULT_METRICS,
+                           families=NF.S.FAMILIES, n_replicates=50,
+                           variants=[1000] * 150, seed=4)
+    b = NF.floor_from_rows(safu, metrics=NF.DEFAULT_METRICS,
+                           families=NF.S.FAMILIES, n_replicates=50,
+                           variants=[1000] * 150, seed=4)
+    assert set(a.entries) == set(b.entries)
+    for jina, e in a.entries.items():
+        assert b.entries[jina].floor == pytest.approx(e.floor)
+        assert b.entries[jina].ci_low == pytest.approx(e.ci_low)
+    assert b.joint.floor == pytest.approx(a.joint.floor)
+    assert b.joint.null_pass_rate == pytest.approx(a.joint.null_pass_rate)
+
+
+def test_metric_isiyo_na_sakafu_HAIINGII_kwenye_lango_la_pamoja():
+    """`fill_rate` ni diagnostic (§9.5) — haipaswi kurudi kama lango kwa
+    mlango wa nyuma."""
+    t = NF.floor_from_rows(_safu(), metrics=NF.DEFAULT_METRICS,
+                           families=NF.S.FAMILIES, n_replicates=50,
+                           variants=[1000] * 150, seed=1)
+    assert "fill_rate" not in t.joint.reference
+    assert "fill_rate" in t.without_floor
+
+
+def test_render_inaonyesha_lango_la_pamoja():
+    t = NF.floor_from_rows(_safu(), metrics=NF.DEFAULT_METRICS,
+                           families=NF.S.FAMILIES, n_replicates=50,
+                           variants=[1000] * 150, seed=1)
+    maandishi = t.render()
+    assert "LANGO LA PAMOJA" in maandishi
+    assert "null inayopita" in maandishi

@@ -85,17 +85,31 @@ def main() -> int:
     args = ap.parse_args()
 
     # ---- R5: mlango, si ukaguzi ----
+    floor_path = (Path(args.noise_floor) if args.noise_floor
+                  else RIPOTI / "noise_floor.json")
     floor = open_generator(
-        noise_floor_path=Path(args.noise_floor) if args.noise_floor
-        else RIPOTI / "noise_floor.json",
+        noise_floor_path=floor_path,
         cost_calibration_path=Path(args.cost_calibration) if args.cost_calibration
         else RIPOTI / "calibration_a.json",
     )
-    print(f"R5 imefunguka · malango {len(floor.entries)} · {floor.source}")
+    kanuni = "§9.9 lango la pamoja" if floor.joint else "§9.2 kila sakafu peke yake"
+    print(f"R5 imefunguka · malango {len(floor.entries)} · [{kanuni}] · {floor.source}")
     if floor.haipitiki:
         raise SystemExit(
             f"sakafu zisizopitika: {', '.join(floor.haipitiki)} — §13 ingebaki tupu"
         )
+    if floor.joint is None:
+        # Jedwali lililoandikwa kabla ya §9.9 lingehukumu kwa mkusanyiko wa
+        # sakafu ambao ulipimwa ukiwa na kosa la aina-I chini ya 0.7% wakati
+        # ukidai `p95` — na lingefanya hivyo bila kelele yoyote.
+        raise SystemExit(
+            f"{floor_path.name} halina lango la pamoja (§9.9).\n"
+            f"   Lijenge upya kutoka checkpoint — hakuna cha kuendeshwa tena:\n"
+            f"      python scripts/rebuild_floor.py --checkpoint "
+            f"{floor_path.stem}_checkpoint.jsonl"
+        )
+    print(f"   T lazima izidi {floor.joint.floor:.4f} · "
+          f"null inayopita {floor.joint.null_pass_rate:.2%}")
 
     # `K` ya utafutaji lazima ilingane na iliyopima sakafu. Kutafuta zaidi ni
     # kutafuta kwa bahati kubwa kuliko sakafu inavyojua (§9.1); kutafuta pungufu

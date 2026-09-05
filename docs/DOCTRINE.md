@@ -620,6 +620,11 @@ kutokuwa na uhakika hakupunguzi bar.
 Kile ambacho injini "inagundua" pale ndiyo **sakafu**. Kizingiti cha strategy halisi ni
 sakafu ile — si 50%, si 85%, si namba yoyote iliyochaguliwa na binadamu.
 
+**Jinsi malango yanavyounganishwa: ona §9.9.** Kudai kila sakafu peke yake, zote
+kwa wakati mmoja, kulitumia uangalifu wa `max` mara moja kwa kila metric — na
+kipimo kilionyesha lango lililotangaza `p95` likiwa na kosa la aina-I chini ya
+0.7%. Uamuzi sasa unapitia takwimu MOJA ya pamoja, `T = min(u)`.
+
 ### 9.3 Sheria tatu
 
 **S1** — `variants_tested` inahesabiwa daima, ikiwemo waliokufa mapema, na inaingia
@@ -946,14 +951,124 @@ kubwa zaidi** kuliko surrogate zake, kwa uthabiti — lakini kwa **hatari kubwa
 zaidi**, na bila faida ya wazi kwenye vipimo vya ubora.
 
 **Hilo halibatilishi ishara.** Sakafu ya kelele haihukumu metric moja: `§9.2`
-inadai malango YOTE, na `max_drawdown` ni mojawapo. Lango la DD ndilo la
-kuangalia pale Calibration B ya GBPUSD itakapoendeshwa — na ndilo linaloweza
-kukataa yote.
+inadai ubora kwenye kila mwelekeo, na `max_drawdown` ni mojawapo. Lango la DD
+ndilo la kuangalia pale Calibration B ya GBPUSD itakapoendeshwa — na ndilo
+linaloweza kukataa yote. (Jinsi madai hayo yanavyounganishwa yalibadilika
+baadaye — ona §9.9.)
 
 **Kilichoongezwa kutokana na hili:** `Comparison.kwa_kila_metric()`. Kipimo
 kilikuwa kinaonyesha percentile ya metric yenye mamlaka pekee, kwa hiyo tofauti
 kati ya "faida" na "ubora" ilihitaji kuhesabiwa kwa mkono — na ingeweza kupita
 bila kuonekana.
+
+---
+
+### 9.9 Malango yalikuwa sahihi; mkusanyiko wao haukuwa (2026-09-05)
+
+Calibration B ya GBPUSD ilitoa malango matano halali. Discovery ikatoa wagombea
+84 waliopita §8.4, na **wote 84 wakakataliwa** — matatu kati ya malango
+yakikataa kwa kauli moja, 84/84.
+
+Dhana ya kwanza ilikuwa mzunguko: labda null inatoa nafasi nyingi zaidi za
+kutrade. `scripts/signal_rate.py` iliipima na kuikataa — **1.02×**, ishara
+11,477 dhidi ya 11,663.
+
+Dhana ya pili ilipimwa kwa `scripts/floor_selfcheck.py`: chukua washindi 150 wa
+null wenyewe — **wale walioijenga sakafu** — na uwapime dhidi yake.
+
+```
+WASHINDI WA NULL DHIDI YA SAKAFU YAO WENYEWE: 0/150 = 0.0%
+
+   kila lango PEKE YAKE:
+      net_pips_month              3/150  (2.0%)
+      net_account_return_month    3/150  (2.0%)
+      profitable_month_fraction   2/150  (1.3%)
+      sharpe                      5/150  (3.3%)
+      max_drawdown                4/150  (2.7%)
+```
+
+Safu ya pili ndiyo yenye maana. Kila lango peke yake linapitisha 1.3%–3.3% —
+sahihi kabisa: sakafu si `p95` ya replicates 150 bali `max(p95_A, p95_B, p95_C)`,
+yaani `p95` ya **familia ngumu zaidi**, ambayo ni `2.5/150 ≈ 1.7%`.
+
+Kudai zote kwa wakati mmoja kunatumia uangalifu huo **mara tano**, na kila mara
+kwa replicate tofauti. Hakuna mgombea wa null aliyewahi kulazimika kuvuka zote;
+mgombea halisi analazimika kila mara. Lango lililotangaza `p95` lilikuwa na kosa
+la aina-I **chini ya 0.7%** — halikufanya kile doctrine ilisema linafanya, na
+hakuna namba yoyote kwenye faili iliyoonyesha hilo.
+
+---
+
+**Hatari ya kurekebisha kipimo kilichokataa kila kitu ni §9.1 yenyewe**, kwa
+ngazi ya mtafiti badala ya ya strategy. Kinga tatu zilitumika:
+
+1. Sababu ya kubadilisha haikuhusiana na GBPUSD. Lango lilikuwa na kasoro ile
+   ile kama GBPUSD ingepita kwa wingi.
+2. Kanuni mpya ilijengwa, ikathibitishwa dhidi ya null, na **ika-commit kabla ya
+   kuiendesha kwenye GBPUSD.**
+3. Kiasi cha ulegevu kinapimwa na kuandikwa kwenye faili, si kudhaniwa.
+
+---
+
+**Kanuni (inarekebisha jinsi §9.2 inavyounganisha malango, si §9.2 yenyewe):**
+
+```
+u_i(c) = (k_i + 1) / (n + 1)     k_i = null ngapi c anazizidi kwenye metric i
+T(c)   = min_i u_i(c)            ← mwelekeo DHAIFU zaidi wa mgombea
+sakafu = max_familia ( p95 ya T ndani ya familia hiyo )
+kupita = T(c) > sakafu
+```
+
+`min`, si wastani. §9.2 inakataa wastani kwa sababu Sharpe kubwa ingeweza
+kulipia drawdown mbaya; `min` inakataa hilo hilo — mgombea ana thamani ya
+mwelekeo wake dhaifu zaidi. **Sharti la ubora kwenye kila mwelekeo halijaondoka.**
+Kilichoondolewa ni mkusanyiko wa uangalifu uliokuwa ukijilimbikiza bila kupimwa.
+
+`(k+1)/(n+1)` ni fomu ile ile ya §9.8. Mgombea mwenyewe yumo kwenye seti ya
+marejeo, kwa hiyo null na halisi wanapimwa kwa kipimo kilekile hasa; vinginevyo
+null ingefika `149/150` pekee wakati halisi anafika `150/150`, na lango
+lingekuwa rahisi kwa halisi kwa sababu ya hesabu, si ya soko.
+
+**Sakafu za kila metric zinabaki**, lakini kama **maelezo** ya kila mwelekeo
+peke yake — si malango yanayozidishwa. Mgombea anayepita §9.9 akiwa chini ya
+sakafu ya metric yake mwenyewe anaandikwa kwenye ripoti (`below_own_floor`).
+
+---
+
+**Kiwango cha null kinachopita hakitabiriki — kinapimwa na kuandikwa.**
+
+`max` juu ya familia tatu inabaki; kiasi inachoongeza kinategemea jinsi familia
+zinavyotofautiana, ambacho ni kitu cha soko:
+
+| familia | `max` inaongeza | kiwango |
+|---|---|---|
+| zenye ugumu ule ule | kidogo | kuelekea 5% |
+| moja ngumu kupita zote | kubwa | kuelekea 1.7% |
+
+Hata katika safu ya kwanza kiwango hakifikii 5%: `max` ya makadirio matatu ya
+`p95`, kila moja kutoka pointi 50, iko juu ya `p95` halisi kwa sababu ya kelele
+ya sampuli pekee. Masafa yanaegemea upande wa chini — upande salama.
+
+`null_pass_rate` inaandikwa kwenye faili la sakafu. Ikitoka nje ya
+`[1.7%, 5%]`, si soko — ni hesabu iliyoharibika, na `JointGate.render()`
+inasema hivyo.
+
+---
+
+**Athari kwa vitendo:**
+
+* `noise_floor.floor_from_rows()` ni njia MOJA ya kujenga jedwali, ikitumiwa na
+  `calibrate()` na na `scripts/rebuild_floor.py`. Calibration B inakusanya
+  **safu** (metrics za mgombea mmoja pamoja), si nguzo — `T` ni `min` juu ya
+  metrics za mgombea YULE YULE, na nguzo zilizotenganishwa zingepoteza upangaji
+  huo bila kuonekana.
+* Jedwali lililoandikwa kabla ya §9.9 halina lango la pamoja. `discover.py`
+  **inakataa kuendesha** juu yake badala ya kuhukumu kwa kanuni ya zamani kimya;
+  linajengwa upya kutoka checkpoint kwa sekunde, bila kuendesha pipeline tena.
+* `scripts/floor_selfcheck.py` sasa ni ukaguzi wa **utimilifu**: kizingiti
+  KINAFAFANULIWA kama `p95` ya `T`, kwa hiyo uchujaji na ukalibrishaji lazima
+  vitoe jibu lile lile. Tofauti yoyote ni ya code — mwelekeo uliogeuzwa,
+  `reference` iliyoharibika wakati wa kusoma faili.
 
 ---
 

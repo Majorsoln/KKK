@@ -362,10 +362,24 @@ def main() -> int:
               f"   §13 ingebaki tupu bila kosa lolote kuonekana. Ona §9.5.")
         return 3
 
+    # §9.9 — lango linaloamua. Kiwango chake cha null kinafafanuliwa na ujenzi,
+    # kwa hiyo kikitoka nje ya masafa ni hesabu iliyoharibika, si soko: jedwali
+    # lingehukumu discovery yote kwa kizingiti kisichojulikana.
+    if floor.joint is None:
+        print("\nHAKUNA LANGO LA PAMOJA (§9.9) — jedwali haliwezi kuhukumu.")
+        return 4
+    if not floor.joint.ndani_ya_masafa:
+        print(f"\nKIWANGO CHA NULL NI {floor.joint.null_pass_rate:.2%} — nje ya "
+              f"masafa yanayowezekana kwa `p95` ya `T`.\n"
+              f"   Ni hesabu, si soko. Ona §9.9.")
+        return 5
+
     hafifu = [e.metric for e in floor.entries.values() if e.uncertainty > 0.5]
     if hafifu:
         print(f"\n   ONYO: sakafu tete (CI pana kuliko 50%): {', '.join(hafifu)}")
-    print(f"\nsakafu {len(floor.entries)} · bila sakafu {len(floor.without_floor)}")
+    print(f"\nsakafu {len(floor.entries)} · bila sakafu {len(floor.without_floor)} · "
+          f"lango la pamoja T > {floor.joint.floor:.4f} "
+          f"(null {floor.joint.null_pass_rate:.2%})")
     return 0
 
 

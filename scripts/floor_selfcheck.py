@@ -27,6 +27,18 @@ uwapime dhidi yake. Kama ~5% wanapita, lango limejengwa vizuri: `p95` inamaanish
 
 Hakuna kinachoendeshwa upya. Checkpoint ya Calibration B ina metrics za kila
 replicate; sakafu iko kwenye faili lake. Ni sekunde.
+
+---
+
+**Baada ya §9.9 (2026-09-05), maana ya kipimo hiki inabadilika.**
+
+Jibu lilikuwa `0/150`, na §9.9 ilijenga lango la pamoja ambalo kizingiti chake
+NI `p95` ya `T`. Kwa hiyo kiwango cha null kinachopita sasa kimewekwa **kwa
+ufafanuzi** — si ugunduzi. Kipimo kinabaki kwa sababu nyingine: kinathibitisha
+kwamba code inayohukumu inahesabu kile `calibrate_joint()` ilipima. Kosa la
+mwelekeo kwenye `max_drawdown`, au `reference` iliyoharibika wakati wa kusoma
+faili, lingeonekana hapa mara moja kama tofauti kati ya kilichotarajiwa na
+kilichopimwa.
 """
 
 from __future__ import annotations
@@ -79,9 +91,13 @@ def main() -> int:
     floor = NoiseFloor.read(floor_path)
     washindi = _soma_checkpoint(ck_path)
 
-    print(f"sakafu: {floor_path.name} · malango {len(floor.entries)}")
+    kanuni = "§9.9 lango la pamoja" if floor.joint else "§9.2 kila sakafu peke yake"
+    print(f"sakafu: {floor_path.name} · malango {len(floor.entries)}  [{kanuni}]")
     print(f"washindi wa null: {len(washindi)} (kutoka {ck_path.name})")
     print(f"chanzo: {floor.source}\n")
+    if floor.joint is not None:
+        print(floor.joint.render())
+        print()
 
     uchujaji = SV.Screening()
     kwa_familia: dict[str, list[bool]] = {}
@@ -95,12 +111,13 @@ def main() -> int:
     print(f"WASHINDI WA NULL DHIDI YA SAKAFU YAO WENYEWE: "
           f"{walipita}/{n} = {walipita / n:.1%}\n")
 
-    print("   lango lililokata:")
+    print("   mwelekeo uliokata:")
     for jina, idadi in uchujaji.by_failed_metric().items():
         e = floor.entries[jina]
         ishara = ">" if e.higher_is == "better" else "<"
-        print(f"      {jina:<28} {idadi:>4}/{n}  ({idadi / n:>5.1%})  "
-              f"dai {ishara} {e.floor:,.4f}")
+        dai = (f"u ≤ {floor.joint.floor:.4f}" if floor.joint
+               else f"dai {ishara} {e.floor:,.4f}")
+        print(f"      {jina:<28} {idadi:>4}/{n}  ({idadi / n:>5.1%})  {dai}")
 
     print("\n   kwa familia:")
     for familia, matokeo in sorted(kwa_familia.items()):
@@ -114,6 +131,31 @@ def main() -> int:
     for jina, e in floor.entries.items():
         peke = sum(1 for _, _, m in washindi if e.passes(m.get(jina)))
         print(f"      {jina:<28} {peke:>4}/{n}  ({peke / n:>5.1%})")
+
+    if floor.joint is not None:
+        tarajio = floor.joint.null_pass_rate
+        halisi = walipita / n
+        print(f"\n   kilichotarajiwa {tarajio:.2%} · kilichopimwa {halisi:.2%}")
+        # Kizingiti ni `p95` ya `T` yenyewe, kwa hiyo hesabu mbili zinapaswa
+        # kutoa jibu LILE LILE. Tofauti yoyote ni ya code, si ya soko — na
+        # `1/n` ni ukubwa wa punje ndogo kabisa inayoweza kuwepo.
+        if abs(halisi - tarajio) > 1.5 / n:
+            print("\nKOSA · uchujaji na ukalibrishaji hawakubaliani.\n"
+                  "   Kizingiti KINAFAFANULIWA kama `p95` ya `T`, kwa hiyo\n"
+                  "   hesabu mbili zinapaswa kutoa jibu lile lile. Tofauti hii\n"
+                  "   inatoka kwenye code — mwelekeo, `reference` iliyoharibika\n"
+                  "   wakati wa kusoma faili, au metrics zisizolingana.")
+            return 3
+        if walipita == 0:
+            print("\nKOSA · lango la pamoja halipitishi hata mmoja.\n"
+                  "   `p95` ya `T` haiwezi kutoa sifuri isipokuwa `T` ni ileile\n"
+                  "   kwa replicates zote — angalia kama metrics zinahesabika.")
+            return 2
+        print(f"\nLANGO LA PAMOJA LINAFANYA KAZI · linapitisha {halisi:.2%} ya null.\n"
+              f"   Uangalifu wa `max` juu ya familia tatu unabaki (§9.2), lakini\n"
+              f"   unatumika MARA MOJA juu ya `T` badala ya mara {len(floor.entries)}\n"
+              f"   kimya. Kukataa kwa data halisi sasa ni hukumu kuhusu data hiyo.")
+        return 0
 
     print()
     if walipita == 0:
