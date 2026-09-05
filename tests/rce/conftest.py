@@ -11,7 +11,7 @@ from pathlib import Path
 
 import pytest
 
-from src.data.config import load_config
+from src.rce.config import load_config
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 

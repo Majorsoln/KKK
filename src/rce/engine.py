@@ -124,7 +124,9 @@ def evaluate(cfg, proposal: Proposal, ctx: MarketContext) -> TradeOrder:
     budget = compute_budget(cfg, ctx.account)
 
     spread = spread_effective(ctx.h1_spreads, ctx.m5_spreads, cfg)
-    slippage = slippage_cap_pips(proposal.order_type, cfg, ctx.m5_slippage_estimate)
+    slippage = slippage_cap_pips(
+        proposal.order_type, cfg, ctx.m5_slippage_estimate, symbol=proposal.symbol
+    )
     cost = CostBreakdown(
         spread_pips=spread,
         slippage_pips=slippage,
@@ -204,7 +206,9 @@ def cost_context_for_model(cfg, ctx: MarketContext, order_type: str = "market") 
     inayotumika kwenye sizing — ndiyo maana function hii iko hapa, si kwa model.
     """
     spread = spread_effective(ctx.h1_spreads, ctx.m5_spreads, cfg)
-    slippage = slippage_cap_pips(order_type, cfg, ctx.m5_slippage_estimate)
+    slippage = slippage_cap_pips(
+        order_type, cfg, ctx.m5_slippage_estimate, symbol=ctx.spec.symbol
+    )
     cost = CostBreakdown(
         spread_pips=spread,
         slippage_pips=slippage,

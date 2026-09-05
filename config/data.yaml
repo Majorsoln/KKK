@@ -35,6 +35,8 @@ storage:
   research_root:  "${ELITEFX_RESEARCH_ROOT}"                 # mf. C:\Users\Hp\project\elitefx-engine\research
   l0_root:        "${ELITEFX_RESEARCH_ROOT}/data/L0_raw"     # partitions za L0 (immutable)
   l0_manifest:    "${ELITEFX_RESEARCH_ROOT}/data/L0_raw/manifest_l0.json"   # SHA256 + provenance
+  l2_root:        "${ELITEFX_RESEARCH_ROOT}/data/L2_bars"    # bars za TF 7 (T1, DF-06)
+  reports_root:   "${ELITEFX_RESEARCH_ROOT}/reports"         # ripoti za R0..R9 (§9)
   holdout_root:   "${ELITEFX_HOLDOUT_ROOT}"                  # G2: ruhusa ya R8 pekee (§4.3, T1)
 
 # ---------- RECORDER WA FEED YA BROKER (spec §2.2 sharti 1; DF-03, DF-04) ----------
@@ -71,13 +73,60 @@ recorder:
 
 # ---------- L1: MALANGO YA UBORA (spec §3) ----------
 quality:
-  min_coverage:        0.995            # bars zilizopo / zinazotarajiwa (kalenda ya session)
-  max_gap_bars:        3                # gap ndani ya session, bars za M1
-  max_flat_bars:       10               # mfululizo wa high==low -> stale feed
-  max_plausible_spread_pips:            # kikomo cha akili timamu, si cha trading
-    default:   50.0
-    XAUUSD:   200.0
-  fail_action:         "exclude"        # partition iliyofeli HAIINGII L2
+  # KIZINGITI CHA BIASHARA, si cha ukamilifu wa feed (PD APPROVED 2026-08-09).
+  # 0.995 ilimaanisha dakika 7 zinazokosekana kwa siku zinatosha kufelisha siku
+  # nzima — kipimo cha jinsi feed ilivyo kamili, si cha kama siku inaweza
+  # kufanyiwa biashara. Ilikuwa sababu kubwa kuliko zote: siku 3,342 (9.54%).
+  # Kwa 0.95, jumla ya kufeli inashuka 4,384 -> 2,001; siku 2,383 zinarudi
+  # (`quality-stats --what-if coverage=0.95`, 2026-08-08).
+  min_coverage:        0.95             # dakika zenye quote / zinazotarajiwa (kalenda ya session)
+  max_gap_seconds:                      # pengo ndani ya session (L0 ni TICKS, si bars)
+    default:  3600
+    XAUUSD:   5400                      # dhahabu ina MAPUMZIKO YA KILA SIKU (~saa 1). Kipimo
+                                        # cha 2026-08-08: partitions ZOTE za XAUUSD zilifeli
+                                        # kwa 3600 (p99 = 3600.2 haswa) — hilo ni soko, si data
+  max_gap_bars:        3                # pengo ndani ya session kwa bars za L2
+  session_tolerance_minutes: 15         # mipaka ya session dhidi ya kalenda (DST inanaswa hapa)
+  max_duplicate_frac:  0.001            # ticks zenye timestamp ILE ILE. MT5 inatoa µs/ms; quotes
+                                        # mbili kutua kipimo kimoja ni la lazima kitakwimu, si
+                                        # kasoro. KURUDI NYUMA hakuvumiliwi kamwe (kikomo ni 0).
+  partial_day_frac:    0.25             # siku yenye ticks < hii x wastani wa mwezi = `partial`
+  max_stale_seconds:                    # L0: quote ILE ILE kwa muda huu -> feed imeganda
+    default:  1800                      # (kuhesabu ticks ni kipimo kisicho na maana:
+    XAUUSD:   5400                      #  dakika tulivu ya Asia ina ticks 40 zenye quote moja)
+                                        # XAUUSD: mapumziko yale yale ya kila siku yanaonekana
+                                        # kama ukimya — ni pengo la kalenda, si feed iliyoganda
+  max_flat_bars:       10               # L2: mfululizo wa BARS zenye high==low (§3 check 8)
+  # KIKOMO CHA QUOTE ILIYOHARIBIKA — si cha "spread pana" (PD 2026-08-08).
+  # Kipimo cha kwanza kilifelisha siku 835: GBPJPY siku za Krismasi/msukosuko, na
+  # XAUUSD ya 2025-26. Hakuna `crossed` hata moja. Kutoa nje siku za spread pana
+  # kungeondoa hasa siku ambazo gharama ni kubwa — model ya gharama ingejifunza
+  # soko lisilo na sikukuu, na kila EV ingekuwa ya matumaini. Siku hizo ni DATA.
+  max_plausible_spread_pips:            # sakafu; quote inafeli ikizidi HII **NA** mult
+    default:  300.0
+    XAUUSD:  3000.0                     # $30 — dhahabu ya $4,000 ina spread ya $2 kwa kawaida
+  spread_outlier_mult: 50               # ... NA ikizidi hii x median ya SIKU yenyewe.
+                                        # Krismasi ina median pana yenyewe, kwa hiyo inabaki;
+                                        # tick iliyoharibika (mara 1,000) inaondoka.
+  fail_action:         "exclude"        # siku iliyofeli HAIINGII L2 (§3)
+  # KUTOLEWA NJE KWA UAMUZI, si kwa check. Checks zinakamata siku moja moja;
+  # zinashindwa pale kasoro ni ya KIPINDI. Kila kifungu kinahitaji sababu, na
+  # kinaingia `config_hash` — hivyo ni sehemu ya `dataset_id`.
+  excluded_ranges:
+    - symbols: [EURCHF, GBPJPY, XAUUSD]
+      from:    "2023-01-01"
+      to:      "2023-12-31"
+      reason: >-
+        Chanzo cha Toleo B kilipungua saa 1-2 KWA SIKU mwaka 2023 pekee, kisha
+        kikarudi 2024 (symbol-profile 2026-08-08: dakika za median 1429->1315,
+        1435->1320, 1380->1319). Symbols hizo tatu hazina kinachofanana kama
+        vyombo vya soko; kinachofanana ni CHANZO — kwa hiyo ni feed, si soko.
+        Gaps check inakamata asilimia 45 pekee; nyingine zina kasoro ile ile
+        ndogo zaidi. Labels za touch (§5) zinatatuliwa kwa PATH YA TICKS, kwa
+        hiyo pengo la saa 2 kila siku lingeficha barrier zilizoguswa humo, na
+        label ingesema `timeout` wakati SL/TP iliguswa. Si kelele — ni jibu la
+        uongo. Gharama: siku 777 kati ya 35,025 (2.2%).
+        PD APPROVED 2026-08-09 (DF-05, ona docs/SIGNATURES.md).
 
 # ---------- L2: BARS ----------
 bars:
@@ -97,6 +146,45 @@ features:
   families:            [F1, F2, F3, F4, F5, F6, F7]
   training_mode:       "pooled"         # symbols zote pamoja; per-symbol ni calibration pekee
 
+# ---------- DECISION POINTS: SHERIA YA SETUP (spec §4.3 — PD 2026-08-07) ----------
+setups:
+  rule_id:             "SETUP-v1"       # inaingia dataset_id — kubadilisha = dataset MPYA
+  spread_gate_mult:    1.5              # spread_p50 ya bar <= hii x median ya symbol/mwezi
+  # "Mwezi" wa spread gate ni dirisha la NYUMA la bars za H1 (~siku 22 za
+  # trading x 24). Median ya mwezi wa KALENDA ingejumuisha bars za BAADAYE za
+  # mwezi ule ule — uvujaji ambao sentinel ingeukamata. Rolling ya nyuma pekee.
+  spread_median_window_bars: 528
+  atr_band_pct:        [0.20, 0.95]     # ATR14 ndani ya percentile band ya rolling
+  atr_band_window_months: 6
+  trigger:
+    kind:              "momentum_impulse"
+    lookback_bars:     4                # |close - close[k]| ...
+    # KIZINGITI KIMETUNWA KWA RATE, KABLA YA LABELS (§4.3 sheria 2 — PD
+    # 2026-08-11). `--sweep` juu ya data yote ya TRAIN+VAL (eligible 591,098):
+    #   1.0 -> 26.33%   1.5 -> 15.21%   2.0 -> 8.42%   2.5 -> 4.46%   3.0 -> 2.32%
+    # 1.0 ilikuwa haichuji: bei inatembea ~2 sigma ndani ya bars 4 na ATR14 ni
+    # ~1.3 sigma, kwa hiyo "msukumo wa 1 ATR" ni wa KAWAIDA. 2.5 inatua kwenye
+    # lengo la 5% ambalo bajeti nzima ya §0.1 ilijengwa juu yake (labels
+    # ~30,800 za TRAIN+VAL; tunapata 26,390).
+    # Ushahidi kwamba kigezo ni scale-free: kwa 2.5, symbols zote 12 ziko kati
+    # ya 4.0% na 4.9% — EURCHF tulivu na XAUUSD ya wazimu zinatoa namba ile ile.
+    min_atr_mult:      2.5              # ... >= hii x ATR14
+    # MWELEKEO wa trade unatoka kwenye ISHARA ya impulse ile ile: close >
+    # close[k] -> BUY, chini -> SELL. Labels (§5) zinahitaji upande, na §4.3
+    # haikuutaja — sheria yoyote nyingine ingekuwa hukumu isiyo mechanical.
+    # Control bars (§4.3 sheria 3) hazina impulse ya kutosha lakini ishara
+    # ile ile ndogo inatumika — mechanical, point-in-time, bila upendeleo.
+    direction:         "impulse_sign"
+  target_rate:         0.05             # kutuna kufikia RATE inaruhusiwa KABLA ya labels (§4.3)
+  # CONTROL 0.10 -> 0.05 (PD 2026-08-11, kabla ya labels). Kichujio kikiwa
+  # kikali (4.46%), "10% ya bars zisizo setup" ilitoa control 56,471 dhidi ya
+  # setups 26,390 — MARA MBILI ya kile tunachokipima. Nguvu ya ulinganisho
+  # inategemea kundi DOGO, kwa hiyo control ya ziada haikuwa inanunua chochote;
+  # ilikuwa inagharimu 68% ya kazi ya kutatua paths. 0.05 inatoa ~28,235 —
+  # sawia na setups, nguvu ile ile, jumla ya kazi 82,861 -> 54,625.
+  control_sample_frac: 0.05             # bars zisizo setup zinazopata labels (is_control=true)
+  control_seed:        20260807         # nasibu inayozalishika upya
+
 # ---------- L4: LABELS (spec §5) ----------
 labels:
   horizon_bars:        24               # bars za H1
@@ -106,13 +194,35 @@ labels:
   quantile:
     quantiles:         [0.10, 0.50, 0.90]
     units:             "atr"            # SI pips (hoja ya S3)
+    entry_price:       "mid"            # §5.1 (PD 2026-08-07): L-A inapendekeza, haihukumu (S1);
+    exit_price:        "mid"            # spread inaingia path (§5.2) na RCE — si mara tatu
   barrier:
-    sl_atr:            [0.5, 0.75, 1.0, 1.5, 2.0]   # GRID = input ya model, si derived (anti-S1)
-    tp_atr:            [0.5, 1.0, 1.5, 2.0, 3.0]
+    # GRID = input ya model, si derived (anti-S1).
+    #
+    # IMEPANULIWA 2026-08-17 (T5, docs/T5_GRID.md). Grid ya awali iliishia
+    # `sl 2.0 / tp 3.0`, na `cost-audit` ilionyesha `EV net` ikiwa **monotone
+    # hadi ukingo kwenye mihimili YOTE MIWILI**, bila kugeuka:
+    #   sl:  -0.2006  -0.1023  -0.0589  -0.0062  +0.0039
+    #   tp:  -0.0329  -0.0210  -0.0162  -0.0050  +0.0039
+    # Cell bora tuliyoipata ilikuwa cell ya PEMBENI. Utambulisho unaeleza kwa
+    # nini: `commission_R = commission_pips / sl_pips`, kwa hiyo stop pana
+    # inagawanya gharama ile ile kwa `R` kubwa zaidi, na overshoot pia
+    # inapungua. Optimum haikuonekana kwa sababu HAIKUTAZAMWA.
+    sl_atr:            [0.5, 0.75, 1.0, 1.5, 2.0, 3.0, 4.0]
+    tp_atr:            [0.5, 1.0, 1.5, 2.0, 3.0, 4.0, 6.0]
+    tie_break:         "sl_first"       # §5.2 (PD 2026-08-07): gap ikifunika zote mbili -> SL;
+                                        # live stop inatekelezwa upande mbaya kwanza. R1 inaripoti
+                                        # mzunguko; > 1% ya labels -> inapanda kwa PD
     timeout_class:     true             # darasa la tatu, halitupwi kimya
     timeout_record_return: true         # terminal return ya timeout -> E[R|timeout] (EV madarasa 3)
     max_timeout_frac:  0.35
     min_labels_per_cell: 200
+  # Ukaguzi wa M1-dhidi-ya-tick (T2): decision points hizi hizi zinatatuliwa
+  # MARA YA PILI kwa high/low za M1 ili gharama ya kutotumia ticks ipimwe kwa
+  # namba. Ni sampuli kwa sababu jibu halitofautiani kwa point moja moja —
+  # 5% ya cells 1.3M bado ni cells 65,000, zaidi ya inavyohitajika.
+  m1_check_frac:       0.05
+  m1_check_seed:       20260812
   fill:
     order_types:       [market, stop, limit]
     cap_source:        "config/risk.yaml:slippage_cap_pips"   # chanzo KIMOJA
@@ -145,7 +255,13 @@ splits:
 # ---------- VIZINGITI VYA UTAFITI (RESEARCH_PLAN_R0) ----------
 research:
   screening:                            # R2
-    ic_min:             0.02            # pooled pekee (~38k labels, SE~0.005); per-symbol = kelele
+    ic_min:             0.02            # FLOOR pekee; kizingiti halisi = max(hii, p99 ya null
+                                        # ya bootstrap). Symbols 12 si huru (USD kwenye 7) —
+                                        # effective N ~9k si 38k, hivyo 0.02 ni ~2sigma si 4
+    ic_weighting:       "per_decision_point"   # kamwe si rows za grid (zinahusiana x25)
+    block_bootstrap:                    # SE kutoka DATA (PD 2026-08-07)
+      block_days:       10              # blocks za muda, symbols ZOTE pamoja ndani ya block
+      n_boot:           1000
     ic_sign_stability:  0.60
     permutation_test:   true            # feature isiyoshinda toleo lake la bahati -> LESSON
     fdr_method:         "benjamini_hochberg"   # multiple testing kwa candidates ~770
@@ -170,6 +286,12 @@ research:
 pretraining:
   enabled:            true
   corpus_end:         "2024-03-31"      # = trainval_end; kupretrain kwenye HOLDOUT = uvujaji
+  protocol:           "walk_forward"    # §5A (PD 2026-08-07): pretrain kwa data <= val_start -
+                                        # embargo kwa kila fold; warm-start inaruhusiwa. Encoder
+                                        # ni model iliyofit (sheria 8 + S6) — full-sample
+                                        # pretrain inavujisha distribution ya validation
+  baseline_same_protocol: true          # GBM ya R4 inapimwa walk-forward ILE ILE — vinginevyo
+                                        # lango la GO/NO-GO linalinganisha vitu viwili tofauti
   objectives:         [next_bar_direction, masked_bar, contrastive_regime]
   fine_tune:          "heads_only"      # encoder ganda/nusu-ganda; heads kwenye trade labels
   gate:               "R4_baseline"     # model iliyopretrainiwa inashindana kama kila mtu
