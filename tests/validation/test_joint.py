@@ -293,3 +293,71 @@ def test_kiwango_cha_nje_ya_masafa_kinatangazwa():
 
     sifuri = dataclasses.replace(gate, null_pass_rate=0.0)
     assert not sifuri.ndani_ya_masafa
+
+
+# ===========================================================================
+# `p_value` — umbali, si uamuzi
+# ===========================================================================
+
+
+def test_p_value_ni_fomu_ya_permutation():
+    rng = np.random.default_rng(81)
+    gate = JT.calibrate_joint(_familia(rng), {"a": BORA, "b": BORA, "c": BORA})
+    v = {"a": 0.0, "b": 0.0, "c": 0.0}
+    k = sum(1 for x in gate.t_null if x >= gate.t(v))
+    assert gate.p_value(v) == pytest.approx((k + 1) / (len(gate.t_null) + 1))
+
+
+def test_p_value_ya_bora_kupita_zote_ni_NDOGO_kabisa():
+    rng = np.random.default_rng(82)
+    gate = JT.calibrate_joint(_familia(rng), {"a": BORA, "b": BORA, "c": BORA})
+    n = len(gate.t_null)
+    assert gate.p_value({"a": 9e9, "b": 9e9, "c": 9e9}) == pytest.approx(1 / (n + 1))
+
+
+def test_p_value_ya_mbaya_kupita_zote_ni_MOJA():
+    rng = np.random.default_rng(83)
+    gate = JT.calibrate_joint(_familia(rng), {"a": BORA, "b": BORA, "c": BORA})
+    assert gate.p_value({"a": -9e9, "b": -9e9, "c": -9e9}) == pytest.approx(1.0)
+
+
+def test_p_value_inapungua_T_inapoongezeka():
+    rng = np.random.default_rng(84)
+    gate = JT.calibrate_joint(_familia(rng), {"a": BORA, "b": BORA})
+    ps = [gate.p_value({"a": x, "b": x}) for x in (-3.0, -1.0, 0.0, 1.0, 3.0)]
+    assert ps == sorted(ps, reverse=True)
+
+
+def test_p_value_ya_kizingiti_inalingana_na_kiwango_cha_null():
+    """Uthabiti kati ya namba mbili zinazoelezea kitu kimoja: mgombea aliye
+    sawasawa na sakafu ana `p` inayokaribia `null_pass_rate`."""
+    rng = np.random.default_rng(85)
+    gate = JT.calibrate_joint(_familia(rng, metrics=tuple("abcd")),
+                              {m: BORA for m in "abcd"})
+    kwenye_sakafu = [x for x in gate.t_null if x > gate.floor]
+    p = (len(kwenye_sakafu) + 1) / (len(gate.t_null) + 1)
+    assert abs(p - gate.null_pass_rate) < 2.0 / len(gate.t_null)
+
+
+def test_bila_t_null_p_value_ni_NaN_si_namba_iliyobuniwa():
+    import dataclasses
+
+    rng = np.random.default_rng(86)
+    gate = JT.calibrate_joint(_familia(rng), {"a": BORA, "b": BORA, "c": BORA})
+    zamani = dataclasses.replace(gate, t_null=())
+    assert math.isnan(zamani.p_value({"a": 1.0, "b": 1.0, "c": 1.0}))
+
+
+def test_t_null_inarudishwa_kutoka_JSON():
+    rng = np.random.default_rng(87)
+    gate = JT.calibrate_joint(_familia(rng), {"a": BORA, "b": BORA, "c": BORA})
+    rudi = JT.JointGate.from_json(gate.to_json())
+    assert rudi.t_null == pytest.approx(gate.t_null)
+    v = {"a": 0.5, "b": 0.5, "c": 0.5}
+    assert rudi.p_value(v) == pytest.approx(gate.p_value(v))
+
+
+def test_t_null_ina_replicate_ZOTE():
+    rng = np.random.default_rng(88)
+    gate = JT.calibrate_joint(_familia(rng), {"a": BORA, "b": BORA})
+    assert len(gate.t_null) == gate.n_null == 150

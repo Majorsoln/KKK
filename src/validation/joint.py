@@ -107,6 +107,11 @@ class JointGate:
     n_null: int
     null_pass_rate: float
     n_incomplete: int = 0
+    # `T` ya kila replicate ya null. `reference` ni NGUZO — upangaji ndani ya
+    # replicate umepotea humo, kwa hiyo `T` haiwezi kuhesabiwa upya kutoka kwake.
+    # Bila hizi, swali "mgombea huyu yuko karibu kiasi gani" lingehitaji
+    # checkpoint, na lango lisiloweza kujieleza si lango kamili.
+    t_null: tuple[float, ...] = ()
 
     @property
     def metrics(self) -> tuple[str, ...]:
@@ -135,6 +140,23 @@ class JointGate:
 
     def passes(self, values: Mapping[str, Any]) -> bool:
         return not self.failed(values)
+
+    def p_value(self, values: Mapping[str, Any]) -> float:
+        """`(k+1)/(n+1)` ambapo `k` = replicates za null zenye `T` isiyopungua.
+
+        Ndiyo namba inayojibu *"yuko karibu kiasi gani"* bila kizingiti chochote
+        kipya. Fomu ni ile ile ya §9.8, na inasoma moja kwa moja: `p = 0.30`
+        ni mgombea wa kawaida kabisa chini ya null; `p = 0.07` ni aliyekaribia
+        bila kufika.
+
+        `K` ya utafutaji wa null na wa halisi ni ile ile (§9.4), kwa hiyo tatizo
+        la `max` ya §9.1 tayari liko ndani ya pande zote mbili.
+        """
+        if not self.t_null:
+            return float("nan")
+        t = self.t(values)
+        k = sum(1 for x in self.t_null if x >= t)
+        return (k + 1) / (len(self.t_null) + 1)
 
     @property
     def ndani_ya_masafa(self) -> bool:
@@ -179,6 +201,7 @@ class JointGate:
             "null_pass_rate": self.null_pass_rate,
             "n_incomplete": self.n_incomplete,
             "reference": {k: list(v) for k, v in self.reference.items()},
+            "t_null": list(self.t_null),
         }
 
     @classmethod
@@ -192,6 +215,7 @@ class JointGate:
             n_null=int(raw["n_null"]),
             null_pass_rate=float(raw["null_pass_rate"]),
             n_incomplete=int(raw.get("n_incomplete", 0)),
+            t_null=tuple(float(x) for x in raw.get("t_null", ())),
         )
 
 
@@ -231,8 +255,8 @@ def calibrate_joint(
 
     by_family: dict[str, float] = {}
     t_zote: list[float] = []
-    for fam, rows in rows_by_family.items():
-        t_fam = [tupu.t(r) for r in rows]
+    for fam in sorted(rows_by_family):
+        t_fam = [tupu.t(r) for r in rows_by_family[fam]]
         if not t_fam:
             continue
         by_family[fam] = float(np.quantile(t_fam, P_JOINT))
@@ -250,6 +274,7 @@ def calibrate_joint(
         floor=float(floor), by_family=by_family, reference=reference,
         higher_is=dict(higher_is), n_null=len(zote),
         null_pass_rate=float(kiwango), n_incomplete=int(pungufu),
+        t_null=tuple(t_zote),
     )
 
 
