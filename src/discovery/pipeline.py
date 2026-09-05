@@ -184,7 +184,9 @@ class SearchResult:
 def search(bars, spec: PipelineSpec, *, cfg_risk, seed: int,
            starting_balance: float | None = None,
            progress: Callable[[str], None] | None = None,
-           on_pass: Callable[[Any, Any, Any, Any], None] | None = None) -> SearchResult:
+           on_pass: Callable[[Any, Any, Any, Any], None] | None = None,
+           on_result: Callable[[Any, Any, Any, Any, str], None] | None = None
+           ) -> SearchResult:
     """Endesha wagombea `n` juu ya bars zile zile, rudisha bora.
 
     `seed` inatawala kila kitu cha nasibu hapa. Ikipewa bars zile zile na seed
@@ -194,6 +196,12 @@ def search(bars, spec: PipelineSpec, *, cfg_risk, seed: int,
     lango la uchumi, akiwa na **kila kitu §13 inachohitaji**: rekodi ya ledger
     (`candidate_id`, `variant_hash`, kizazi, wazazi), DNA yenyewe, matokeo, na
     uchumi.
+
+    `on_result(record, strategy, result, economics, reason)` inaitwa kwa kila
+    aliyefanyiwa backtest — **hata aliyekataliwa na §8.4**. Ni ya kulinganisha
+    substrate mbili kwa sheria ZILEZILE: lango la uchumi linapitisha wagombea
+    tofauti kwenye data halisi na kwenye bandia, kwa hiyo `on_pass` peke yake
+    ingelinganisha seti mbili tofauti za sheria na kuita jibu tofauti ya soko.
 
     `SearchResult` inashikilia bora PEKEE — kwa runs 150 za Calibration B,
     kushikilia kila `BacktestResult` kungejaza kumbukumbu bila sababu. Anayehitaji
@@ -231,18 +239,19 @@ def search(bars, spec: PipelineSpec, *, cfg_risk, seed: int,
             _hesabu(out.by_reason, record.reject_reason)
             continue
 
-        sababu, result = _pima(candidate, feats, njia, spec, cfg_risk,
-                               starting_balance, miezi)
+        sababu, result, eco = _pima(candidate, feats, njia, spec, cfg_risk,
+                                    starting_balance, miezi)
         ledger.advance(record.candidate_id, BACKTEST, reject_reason=sababu)
         _hesabu(out.by_reason, sababu or "SAWA")
 
+        if on_result is not None and result is not None:
+            on_result(record, candidate, result, eco, sababu)
         if progress:
             progress(f"   {record.candidate_id}  {sababu or 'SAWA'}")
         if sababu:
             continue
 
         out.n_passed_economics += 1
-        eco = ECO.measure(result)
         if on_pass is not None:
             on_pass(record, candidate, result, eco)
 
@@ -280,8 +289,8 @@ def for_calibration(spec: PipelineSpec, *, cfg_risk, seed: int,
 
 
 def _pima(candidate, feats, njia, spec: PipelineSpec, cfg_risk,
-          starting_balance, miezi=None) -> tuple[str, Any]:
-    """Mgombea mmoja: backtest kisha lango la uchumi. Rudisha (sababu, matokeo)."""
+          starting_balance, miezi=None) -> tuple[str, Any, Any]:
+    """Mgombea mmoja: backtest kisha lango la uchumi. (sababu, matokeo, uchumi)."""
     from src.discovery.evaluate import signals as tafuta
 
     try:
@@ -289,9 +298,9 @@ def _pima(candidate, feats, njia, spec: PipelineSpec, cfg_risk,
     except EvaluateError:
         # Feature isiyopo kwenye frame hii — mgombea hakuweza kutathminiwa
         # kabisa. Si kufeli kwake; ni kwamba hakugusa data.
-        return NO_FEATURES, None
+        return NO_FEATURES, None, None
     if sig.degenerate in DEGENERATE:
-        return DEGENERATE_ENTRY, None
+        return DEGENERATE_ENTRY, None, None
 
     # Spreads hazipelekwi hapa: `run()` inazitoa yenyewe kwenye `features`, kwa
     # dirisha linalofuata bei. Kuzipeleka kama orodha moja kutoka hapa
@@ -301,7 +310,7 @@ def _pima(candidate, feats, njia, spec: PipelineSpec, cfg_risk,
                  day_tz=spec.day_tz, starting_balance=starting_balance,
                  months=miezi)
     eco = ECO.measure(result)
-    return ("" if eco.passes else eco.reject_reason), result
+    return ("" if eco.passes else eco.reject_reason), result, eco
 
 
 def _hesabu(mahali: dict[str, int], jina: str) -> None:

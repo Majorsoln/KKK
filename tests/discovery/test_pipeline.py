@@ -368,3 +368,50 @@ def test_sakafu_KALI_inakata_wote(bars_zenye_mwelekeo, cfg_risk):
 
     assert uchujaji.survivors == []
     assert uchujaji.by_failed_metric()["sharpe"] == uchujaji.n_screened
+
+
+# ===========================================================================
+# `on_result` — kulinganisha substrate mbili kwa sheria ZILEZILE (§9.5)
+# ===========================================================================
+
+
+def test_on_result_inaitwa_HATA_kwa_aliyekataliwa_na_uchumi(bars, cfg_risk):
+    """`on_pass` inapitisha wagombea tofauti kwenye substrate tofauti, kwa hiyo
+    ingelinganisha seti mbili tofauti za sheria na kuita jibu tofauti ya soko."""
+    walipita, wote = [], []
+    P.search(bars, _spec(40), cfg_risk=cfg_risk, seed=3,
+             on_pass=lambda r, s, res, e: walipita.append(r.candidate_id),
+             on_result=lambda r, s, res, e, sab: wote.append((r.candidate_id, sab)))
+
+    assert wote
+    assert {c for c, _ in wote} >= set(walipita)
+    assert all(sab == "" for c, sab in wote if c in walipita)
+    assert len(wote) > len(walipita), "hakuna aliyekataliwa — jaribio halipimi kitu"
+
+
+def test_on_result_ina_matokeo_na_uchumi(bars, cfg_risk):
+    kila = []
+    P.search(bars, _spec(25), cfg_risk=cfg_risk, seed=4,
+             on_result=lambda r, s, res, e, sab: kila.append((res, e)))
+    assert kila
+    for res, eco in kila:
+        assert res is not None and eco is not None
+        assert "profitable_month_fraction" in res.metrics()
+
+
+def test_sheria_ZILEZILE_zinaonekana_kwenye_substrate_mbili(bars, cfg_risk):
+    """Msingi wa kuoanisha: `candidate_id` inatokana na DNA, si data."""
+    from src.validation import surrogates as S
+
+    def kusanya(frame):
+        out = []
+        P.search(frame, _spec(30), cfg_risk=cfg_risk, seed=5,
+                 on_result=lambda r, s, res, e, sab: out.append(r.candidate_id))
+        return out
+
+    halisi = kusanya(bars)
+    bandia = kusanya(S.make(bars, S.BLOCK, seed=11).frame)
+    assert halisi and bandia
+    # Si lazima ziwe sawa (`DEGENERATE_ENTRY` inategemea data), lakini lazima
+    # ziingiliane — vinginevyo kuoanisha hakuwezekani kabisa.
+    assert set(halisi) & set(bandia)
