@@ -46,6 +46,71 @@ def _asilimia(orodha, q):
     return float(np.quantile(orodha, q)) if orodha else float("nan")
 
 
+PMF = "profitable_month_fraction"
+
+
+def _dari_ya_mzunguko(verdicts, floor, lango, kizingiti) -> None:
+    """Je lango la `profitable_month_fraction` linaweza kufikiwa KIHESABU?
+
+    `pmf = (pips > 0).mean()` juu ya miezi YOTE ya dirisha, sifuri zikijazwa
+    (engine.py, 2026-08-26). Mwezi usio na trade ni mwezi wa sifuri, si mwezi
+    usiokuwepo — na hiyo ni sahihi. Lakini inazalisha kikomo kigumu:
+
+    ```
+    pmf ≤ miezi_zilizotradiwa / n_months ≤ n_trades / n_months
+    ```
+
+    Mgombea mwenye trades 38 kwenye miezi 99 hawezi kuzidi `0.384` hata akiwa
+    na faida kwenye KILA trade. Sakafu ya `0.5758` haiko juu kwake — iko nje ya
+    uwezekano.
+
+    `FloorEntry.inapitika` haiwezi kuiona hii: `0.5758 < 1.0`, kwa hiyo sakafu
+    inaonekana halali. Ni §9.5 tena, lakini isiyopitika **kwa masharti** badala
+    ya kwa jumla — na hakuna kinachokikagua.
+
+    Hii ni hesabu, si kipimo: `n_trades` na `n_months` tayari ziko kwenye
+    ripoti. Hakuna kinachoendeshwa upya, na hakuna kizingiti kipya.
+    """
+    kwa_dari = []
+    for v in verdicts:
+        d = v.get("diagnostics", {})
+        n_t, n_m = d.get("n_trades"), d.get("n_months")
+        if not n_t or not n_m:
+            continue
+        kwa_dari.append((v, min(1.0, float(n_t) / float(n_m)), float(n_t)))
+
+    if not kwa_dari:
+        print("\n   (`n_trades`/`n_months` hazipo kwenye ripoti — dari "
+              "haiwezi kuhesabiwa)")
+        return
+
+    n = len(kwa_dari)
+    e = floor.entries.get(PMF) if floor is not None else None
+    print(f"\n   DARI YA HESABU kwa `{PMF}`:")
+    print(f"      pmf ≤ n_trades / n_months  —  miezi isiyo na trade ni miezi "
+          f"ya sifuri")
+    dari_zote = sorted(x[1] for x in kwa_dari)
+    print(f"      dari: juu {dari_zote[-1]:.4f} · kati "
+          f"{dari_zote[n // 2]:.4f} · chini {dari_zote[0]:.4f}")
+
+    if e is not None:
+        hawawezi = sum(1 for _, dari, _ in kwa_dari if dari <= e.floor)
+        print(f"      sakafu ya metric {e.floor:.4f} — HAIFIKIKI kwa "
+              f"{hawawezi}/{n} ({hawawezi / n:.1%})")
+
+    # Chini ya §9.9 uamuzi uko kwenye `u`, si kwenye sakafu ghafi. Dari ya `u`
+    # ni fungu la null ambazo pmf ya juu kabisa ingezizidi.
+    if lango is not None and PMF in lango.reference:
+        ref = lango.reference[PMF]
+        hawawezi = 0
+        for _, dari, _ in kwa_dari:
+            u_dari = (sum(1 for r in ref if dari > r) + 1) / (len(ref) + 1)
+            hawawezi += int(u_dari <= kizingiti)
+        print(f"      lango la pamoja {kizingiti:.4f} — HALIFIKIKI kwa "
+              f"{hawawezi}/{n} ({hawawezi / n:.1%})")
+        print("         (T = min(u), kwa hiyo dari ya u hapa ni dari ya T)")
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--discovery", required=True)
@@ -109,6 +174,8 @@ def main() -> int:
               f"dhaifu: {dhaifu} (u {v['u'][dhaifu]:.4f})")
         print("         " + " · ".join(
             f"{k[:12]} {v['u'][k]:.2f}" for k in metrics))
+
+    _dari_ya_mzunguko(verdicts, floor, lango, kizingiti)
 
     if lango is None or not lango.t_null:
         print("\n   (p-value inahitaji --noise-floor lenye `t_null`; "
