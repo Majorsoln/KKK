@@ -1159,6 +1159,65 @@ litakavyosomwa kabla ya kuliona**, kisha kulisoma hivyo hata linapokataa dhana.
 
 ---
 
+### 9.11 TF ndogo si njia, na sababu si TF (2026-09-06)
+
+§9.10 iliisha na `n_trades = 38` kwenye miezi 99 — ushahidi mwembamba, si
+lango kali. R11 inafunga entry kwenye `bars.decision_tf`, na H1 ilikuwa
+imechaguliwa mwanzoni bila kupimwa. `scripts/tf_probe.py` iliipima kwa wagombea
+60 walezile (seed moja, generator mmoja) juu ya H1 · M30 · M15.
+
+Masharti ya kusoma jibu yaliandikwa **kabla ya kuliendesha**: trades na miezi
+iliyotradiwa zipande, NA kiwango cha kupita §8.4 kisianguke.
+
+```
+                       H1        M30       M15
+bars               50,164    100,423   200,939
+trades (kati)          33         35        56
+miezi/jumla          2/99       2/99      1/99
+SAWA kwa §8.4     7 (12%)     0 (0%)    0 (0%)
+```
+
+Sharti la kwanza halikutimia: **miezi iliyotradiwa haikupanda hata kidogo.**
+Sharti la pili lilianguka kabisa: kiwango cha kupita kilishuka kutoka 12% hadi
+sifuri. Kama kiwango cha M15 kingekuwa sawa na cha H1, nafasi ya `0/60` ni
+`0.8833⁶⁰ ≈ 0.0006`.
+
+Gharama haikupanda (`live cost` 3.53 → 3.36). **Edge ndiyo iliyoshuka.**
+Mienendo ya M15 ni midogo dhidi ya gharama ileile, na §8.4 inadai `2×` ya
+ukingo wa chini.
+
+---
+
+**Kikwazo cha kipimo, kilichotangazwa mapema.** Features ni za **idadi ya
+bars**, si za saa: `EMA(20)` ni saa 20 kwenye H1, saa 5 kwenye M15. Kwa hiyo
+kilichopimwa si *"M15 ni mbaya"* bali *"generator huyu, kama alivyo, kwenye M15
+ni mbaya"* — lookback fupi ina kelele zaidi, na edge ndogo inaweza kutoka hapo
+badala ya kwenye TF. Kutenganisha kungehitaji generator inayopima parameters
+kwa **saa**, ambayo ni mabadiliko ya §10.3, si kipimo.
+
+Uamuzi haubadiliki: kwa injini tuliyonayo, TF ndogo si njia. Gharama ya kujua:
+dakika 20, si saa 20 za Calibration B.
+
+---
+
+**Kilichogunduliwa kilikuwa kikubwa kuliko swali lililoulizwa.**
+
+`miezi/jumla = 2/99` kwenye **TF zote tatu**. Mgombea wa kati anafanya trades
+33 ndani ya miezi 2, kisha kimya kwa miezi 97. Si strategy — ni **tukio**. Na
+haibadiliki na TF, kwa hiyo si sifa ya substrate; ni sifa ya **kile generator
+anachozalisha** (§10.3: masharti 3–5 yaliyounganishwa kwa `AND` yanawaka kwa
+mifumo, si kwa mfululizo).
+
+Hii inaeleza kila lango tulilogonga: dari ya `profitable_month_fraction`
+(`2/99 = 0.0202`), Sharpe ya miezi iliyo kelele, adhabu ya `t·s/√n` ya §8.4.1.
+
+**Lakini kati si mkia.** `p90` ya trades ni **201**. Wale 7 waliopita §8.4
+wanatoka kwenye mkia, na sakafu ya §9.2 nayo inajengwa kutoka kwa **washindi**,
+si kutoka kati. Kwa hiyo hili halivunji sakafu wala halibatilishi §9.10 —
+linaeleza kwa nini utafutaji wa 1,000 unatoa 84 pekee wanaogusa lango.
+
+---
+
 ## 10. Strategy — ufafanuzi na muundo
 
 ### 10.1 Ufafanuzi
