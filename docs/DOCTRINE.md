@@ -1072,6 +1072,93 @@ inasema hivyo.
 
 ---
 
+### 9.10 GBPUSD H1: hukumu, na dhana MBILI zilizokufa (2026-09-06)
+
+Chini ya lango la §9.9 lililothibitishwa (`null inayopita 2.00%`), discovery ya
+GBPUSD ilitoa **0 kati ya 84** waliopita §8.4.
+
+```
+p-VALUE YA PAMOJA YA BORA: 0.762      null 114/150 zina T isiyopungua
+```
+
+Mgombea bora wa GBPUSD ana `T` ndogo kuliko replicates 114 kati ya 150 za null.
+Si karibu.
+
+---
+
+**Dhana ya kwanza: data bandia ni rahisi zaidi.** `u` za wagombea halisi
+hazikuwa **za kawaida** chini ya null; zilikuwa chini kabisa yake kwenye vipimo
+vitatu (`profitable_month_fraction` kati 0.0132). "Hakuna edge" kunatabiri `u`
+sawia, kati ≈ 0.50 — kwa hiyo kitu kingine kilikuwa kikiendelea. Hiyo ilikuwa
+umbo la §9.5 (`fill_rate`) na §9.7 (drift ya `block_resample`), zote mbili
+zikiwa sifa za ujenzi wa null.
+
+`scripts/month_structure.py` ilipima kwa **sheria zilezile juu ya substrate
+nne** — hakuna uteuzi, hakuna `max`, kwa hiyo hakuna tatizo la §9.1. Wagombea
+102 walioanishwa:
+
+```
+profitable_month_fraction   bandia juu   block 21.6% · regim 40.4% · retur 16.1%
+```
+
+**50% ingekuwa sarafu isiyo na upendeleo.** Zote tatu ziko chini yake — kama
+kuna upendeleo wowote, surrogate ni *ngumu zaidi*. Dhana imekufa.
+
+---
+
+**Dhana ya pili: dari ya hesabu.** Kipimo hicho hicho kilionyesha kuwa mgombea
+wa kawaida ana `n_trades = 38` kwenye miezi 99. Kwa kuwa `pmf = (pips > 0).mean()`
+juu ya miezi YOTE za dirisha (sifuri zikijazwa — sahihi, engine.py 2026-08-26):
+
+```
+pmf ≤ miezi_zilizotradiwa / n_months ≤ n_trades / n_months
+```
+
+Trades 38 kwenye miezi 99 zinatoa dari ya `0.384`, chini ya sakafu ya `0.5758`.
+`FloorEntry.inapitika` haiwezi kuiona hii: `0.5758 < 1.0`, kwa hiyo sakafu
+inaonekana halali. Ni §9.5 tena, lakini **isiyopitika kwa masharti** badala ya
+kwa jumla.
+
+Dari ni ya kweli, **na haikusababisha kukataliwa huku**:
+
+```
+lango la pamoja 0.6695 — HALIFIKIKI kwa 29/84 (34.5%)
+```
+
+Yaani **55 kati ya 84 walikuwa na nafasi ya kihesabu**. Kilele cha `u` ya
+`pmf` kwa wote 84 ni `0.0993`. Hata kama dari ingeondolewa kabisa, hakuna
+aliyekuwa akifika karibu na `0.6695`. Dhana ya pili imekufa pia.
+
+> **Dari inabaki kwenye rekodi kama kasoro inayojulikana isiyorekebishwa.**
+> Haikuathiri hukumu hii, kwa hiyo kuirekebisha sasa — baada ya kuona matokeo —
+> kungekuwa §9.1 kwa ngazi ya mtafiti. Itarekebishwa pale itakapokuwa kikwazo
+> kilichopimwa, si mapema.
+
+---
+
+**Hukumu imepimwa kwa njia tatu huru, zote zikitoa jibu lile lile:**
+
+| kipimo | swali | jibu |
+|---|---|---|
+| `signal_rate.py` | je null ina nafasi nyingi zaidi za kutrade? | 1.02× — hapana |
+| `month_structure.py` | je null ni rahisi kwa sheria ileile? | 21%/40%/16% — hapana |
+| dari ya hesabu | je lango lilifikika? | 55/84 ndiyo, kilele 0.0993 — hapana |
+
+**GBPUSD H1, `K = 1000`, rule discovery: hakuna kitu juu ya kelele.** §9.8
+ilionyesha muundo unaorudia kwenye `net_account_return_month` (`p ≈ 0.024` kwa
+seeds mbili) — lakini muundo huo ni **faida yenye hatari kubwa**, si ubora, na
+hauvuki lango linalodai mielekeo yote mitano.
+
+---
+
+**Somo la kimchakato.** Dhana zote mbili zilielekea upande uleule: *lango lina
+kasoro*. Zote mbili zilikuja baada ya lango kukataa kila kitu. Hiyo ndiyo tabia
+ambayo §9.1 inaonya dhidi yake, ikihamishwa kutoka kwa strategy hadi kwa
+mtafiti — na haizuiliwi na nia njema, inazuiliwa na **kutangaza jinsi jibu
+litakavyosomwa kabla ya kuliona**, kisha kulisoma hivyo hata linapokataa dhana.
+
+---
+
 ## 10. Strategy — ufafanuzi na muundo
 
 ### 10.1 Ufafanuzi
