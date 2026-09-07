@@ -1,14 +1,11 @@
 # ELITEFX
 
-Repo hii ina vitu viwili pekee: **RCE** (code inayofanya kazi) na **DOCTRINE** (kile
-kinachojengwa baadaye).
+Repo hii ina kitu kimoja: **RCE** — Risk & Cost Engine.
 
 ```
 ├── docs/RISK_COST_ENGINE.md    spec ya RCE — HAIGUSWI
-├── docs/DOCTRINE.md            injini ya kugundua strategy — bado haijajengwa
 ├── config/risk.yaml            vigezo vya risk/cost (PD anahariri, hakuna code)
 ├── config/broker_costs.yaml    commission + gharama za usiku (PD)
-├── config/data.yaml            vigezo vya data/symbols/splits kwa injini ijayo
 ├── src/rce/                    budget · cost · sizing · gate · engine · config
 └── tests/rce/                  tests za spec — ziliandikwa KABLA ya code
 ```
@@ -18,27 +15,21 @@ kinachojengwa baadaye).
 Mamlaka pekee ya **gharama**, **ukubwa wa position**, na **ruhusa ya kutrade**.
 
 * Model **haikadirii** gharama. Inaipokea.
-* Model **haiamui** ukubwa wala ruhusa.
-* RCE **haiamui** entry wala mwelekeo.
+* Model **haichagui** lots. Inaomba, RCE inaamua.
+* Gharama inatoka kwenye data ya broker, si kwenye dhana.
 
-RCE haitegemei chochote nje yake — inasoma config yake yenyewe (`src/rce/config.py`)
-na YAML pekee. Sehemu nyingine yoyote ya mfumo ikibadilika au ikiondolewa, RCE
-inabaki ikifanya kazi.
+Spec iko `docs/RISK_COST_ENGINE.md`. Tests zilizoandikwa kabla ya code ziko
+`tests/rce/`, na zinapima dhidi ya `config/risk.yaml` **halisi** — kigezo
+kikibadilishwa bila spec kubadilika, test inafeli.
+
+## Kuendesha
 
 ```
+pip install -e ".[dev]"
 python -m pytest -q
 ```
 
-## Injini ya kugundua strategy
+## Kilichofuata
 
-`docs/DOCTRINE.md` inaelezea inachopaswa kuwa: ticks za bid/ask → bar builder →
-features → regimes → events → generator → lango la uchumi → backtest → sakafu ya
-kelele → models → holdout ya mara moja.
-
-**Bado haijajengwa.** Doctrine ina sheria 13 zisizovunjika (§19) na maamuzi matatu
-yanayosubiri PD (§21). Hakuna code itakayoandikwa kabla ya hayo.
-
-Sheria ya kwanza inayotawala kila kingine (§2):
-
-> Namba yoyote inayoingia kwenye uamuzi lazima **ipimwe na injini yenyewe**, kwenye
-> mchakato huu, kabla ya kutumika. Hakuna constant inayorithiwa.
+Injini ya kugundua strategy **bado haijajengwa**. Mbinu itakayotumika
+inajadiliwa; hakuna code ya utafutaji kwenye repo hii kwa sasa.
