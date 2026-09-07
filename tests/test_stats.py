@@ -108,3 +108,62 @@ def test_NaN_zinaondolewa_kabla_ya_hesabu():
     safi = ST.mean_lower_bound([1.0, 2.0, 3.0])
     na_nan = ST.mean_lower_bound([1.0, float("nan"), 2.0, 3.0])
     assert na_nan == pytest.approx(safi)
+
+
+# ===========================================================================
+# `spearman` — uhusiano wa CHEO
+# ===========================================================================
+
+
+def test_uhusiano_kamili_chanya_ni_MOJA():
+    assert ST.spearman([1, 2, 3, 4, 5], [10, 20, 30, 40, 50]) == pytest.approx(1.0)
+
+
+def test_uhusiano_kamili_hasi_ni_HASI_MOJA():
+    assert ST.spearman([1, 2, 3, 4], [9, 7, 5, 3]) == pytest.approx(-1.0)
+
+
+def test_ni_cheo_si_thamani():
+    """Ndiyo sababu ya kuchagua Spearman: umbo halibadilishi jibu."""
+    x = [1, 2, 3, 4, 5]
+    assert ST.spearman(x, [1, 2, 3, 4, 5]) == pytest.approx(
+        ST.spearman(x, [1, 4, 9, 16, 25]))
+
+
+def test_thamani_MOJA_kubwa_haiTAWALI():
+    """Pearson ingeitwa uhusiano mkubwa; cheo hakidanganyiki."""
+    import numpy as np
+
+    rng = np.random.default_rng(3)
+    x = list(rng.normal(0, 1, 40))
+    y = list(rng.normal(0, 1, 40))
+    x[0], y[0] = 1e6, 1e6
+    assert abs(ST.spearman(x, y)) < 0.5
+
+
+def test_zilizosawa_zinapata_cheo_cha_WASTANI():
+    # x haibadiliki kwa jozi ya kati; jibu linabaki thabiti.
+    assert ST.spearman([1, 2, 2, 3], [1, 2, 2, 3]) == pytest.approx(1.0)
+    assert ST.spearman([1, 2, 2, 3], [3, 2, 2, 1]) == pytest.approx(-1.0)
+
+
+def test_jozi_yenye_NaN_inaachwa_NZIMA():
+    """Kubaki na nusu kungeoanisha `x` ya mmoja na `y` ya mwingine."""
+    safi = ST.spearman([1, 2, 3, 4], [1, 2, 3, 4])
+    na_nan = ST.spearman([1, 2, float("nan"), 3, 4], [1, 2, 9.0, 3, 4])
+    assert na_nan == pytest.approx(safi)
+
+
+def test_upande_USIOBADILIKA_ni_NaN_si_sifuri():
+    """`0.0` ingesomeka kama 'hakuna uhusiano' — jibu lililobuniwa."""
+    assert math.isnan(ST.spearman([1, 1, 1, 1], [1, 2, 3, 4]))
+
+
+def test_jozi_moja_haina_uhusiano():
+    assert math.isnan(ST.spearman([1.0], [2.0]))
+    assert math.isnan(ST.spearman([], []))
+
+
+def test_urefu_tofauti_unalipuka():
+    with pytest.raises(ST.StatsError, match="urefu"):
+        ST.spearman([1, 2, 3], [1, 2])

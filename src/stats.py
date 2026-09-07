@@ -153,3 +153,63 @@ def _betacf(a: float, b: float, x: float) -> float:
         if abs(delta - 1.0) < _EPS:
             break
     return h
+
+
+# ===========================================================================
+# Uhusiano wa CHEO — DOCTRINE §2
+# ===========================================================================
+
+
+def spearman(x, y) -> float:
+    """Uhusiano wa cheo kati ya `x` na `y`, kwenye `[-1, 1]`.
+
+    Cheo, si thamani. Vipimo vya strategy vina mikia mizito — `net_pips_month`
+    moja ya 5,000 ingetawala Pearson yote na kuita jibu la mgombea MMOJA jibu
+    la mgawanyo. Cheo hakina tabia hiyo.
+
+    Jozi yenye thamani isiyohesabika inaachwa **nzima**: kubaki na nusu ya jozi
+    kungeoanisha `x` ya mgombea mmoja na `y` ya mwingine.
+
+    `NaN` inarudishwa pale kusipokuwa na jozi mbili, au pale upande mmoja
+    usipobadilika — uhusiano hapo haujafafanuliwa, na `0.0` ingekuwa jibu
+    lililobuniwa linalosomeka kama "hakuna uhusiano".
+    """
+    import numpy as np
+
+    a = np.asarray(list(x), dtype=float)
+    b = np.asarray(list(y), dtype=float)
+    if a.shape != b.shape:
+        raise StatsError(f"urefu hautoshani: {a.shape} dhidi ya {b.shape}")
+
+    nzuri = np.isfinite(a) & np.isfinite(b)
+    a, b = a[nzuri], b[nzuri]
+    if a.size < 2:
+        return float("nan")
+
+    ra, rb = _cheo(a), _cheo(b)
+    sa, sb = ra.std(), rb.std()
+    if sa == 0.0 or sb == 0.0:
+        return float("nan")
+    return float(((ra - ra.mean()) * (rb - rb.mean())).mean() / (sa * sb))
+
+
+def _cheo(a):
+    """Cheo cha wastani kwa zilizosawa (`1, 2.5, 2.5, 4`)."""
+    import numpy as np
+
+    mpangilio = a.argsort(kind="mergesort")
+    cheo = np.empty(a.size, dtype=float)
+    cheo[mpangilio] = np.arange(a.size, dtype=float)
+
+    # Zilizosawa zinapata wastani wa vyeo vyao — vinginevyo mpangilio wa
+    # kuingia kwenye orodha ungebeba maana ambayo haupo.
+    zilizopangwa = a[mpangilio]
+    i = 0
+    while i < a.size:
+        j = i
+        while j + 1 < a.size and zilizopangwa[j + 1] == zilizopangwa[i]:
+            j += 1
+        if j > i:
+            cheo[mpangilio[i:j + 1]] = (i + j) / 2.0
+        i = j + 1
+    return cheo
