@@ -357,3 +357,178 @@ def test_F1_inaingia_na_kutoka_kwa_nyakati_SAHIHI_majira_yote():
         bei_ndani = C.vwap(ticks, ndani, 300, C.SELL)
         bei_nje = C.vwap(ticks, nje, 300, C.BUY)
         assert bei_nje.start > bei_ndani.end
+
+
+# ===========================================================================
+# Swap: Jumatano ni MARA TATU — DOCTRINE §11
+# ===========================================================================
+
+
+def test_trade_ya_ndani_ya_kikao_HAILIPI_swap():
+    """Hali ya kawaida ya familia zote za mzunguko wa kwanza."""
+    ndani = datetime(2021, 6, 15, 7, 0, tzinfo=UTC)      # 03:00 NY
+    nje = datetime(2021, 6, 15, 16, 0, tzinfo=UTC)       # 12:00 NY
+    r = C.usiku_wa_swap(ndani, nje)
+    assert r.nights == 0 and r.triple_nights == 0 and r.billed_nights == 0
+
+
+def test_kuvuka_rollover_MOJA_ni_usiku_mmoja():
+    # Jumanne 15 Juni → Jumatano 16 Juni, kikivuka 17:00 NY ya Jumanne.
+    ndani = datetime(2021, 6, 15, 18, 0, tzinfo=UTC)     # 14:00 NY Jumanne
+    nje = datetime(2021, 6, 16, 14, 0, tzinfo=UTC)       # 10:00 NY Jumatano
+    r = C.usiku_wa_swap(ndani, nje)
+    assert (r.nights, r.triple_nights, r.billed_nights) == (1, 0, 1)
+
+
+def test_rollover_ya_JUMATANO_ni_mara_TATU():
+    """T+2 inamaanisha rollover ya Jumatano inabeba wikendi."""
+    ndani = datetime(2021, 6, 16, 14, 0, tzinfo=UTC)     # 10:00 NY Jumatano
+    nje = datetime(2021, 6, 17, 14, 0, tzinfo=UTC)       # 10:00 NY Alhamisi
+    r = C.usiku_wa_swap(ndani, nje)
+    assert (r.nights, r.triple_nights, r.billed_nights) == (1, 1, 3)
+
+
+def test_FOMC_ya_saa_24_INAVUKA_Jumatano_daima():
+    """§11 — FOMC inatangaza Jumatano 14:00 NY. Kushikilia saa 24 kunavuka
+    rollover ya Jumatano **kila mara**, na kwa position ya sarafu yenye riba
+    kubwa hiyo ni gharama inayohusiana na MWELEKEO.
+
+    Ndiyo sababu F2 ingeonyesha tofauti kati ya kipindi cha kupandisha na cha
+    kushusha riba — na tofauti hiyo ingeonekana kama uthibitisho wa
+    mekanizimu badala ya kama gharama.
+    """
+    for tarehe in (date(2021, 3, 17), date(2021, 6, 16), date(2021, 11, 3)):
+        assert tarehe.weekday() == 2
+        ndani = datetime.combine(tarehe, datetime.min.time(),
+                                 tzinfo=ZoneInfo("America/New_York")).replace(hour=14)
+        r = C.usiku_wa_swap(ndani, ndani + timedelta(hours=24))
+        assert r.triple_nights == 1, tarehe
+        assert r.billed_nights == 3
+
+
+def test_wikendi_nzima():
+    """Ijumaa 14:00 NY → Jumatatu 10:00 NY: rollover moja tu (ya Jumapili)."""
+    ndani = datetime(2021, 6, 18, 18, 0, tzinfo=UTC)     # 14:00 NY Ijumaa
+    nje = datetime(2021, 6, 21, 14, 0, tzinfo=UTC)       # 10:00 NY Jumatatu
+    r = C.usiku_wa_swap(ndani, nje)
+    assert r.triple_nights == 0
+    assert r.nights >= 1
+
+
+def test_wiki_nzima_ina_Jumatano_MOJA():
+    ndani = datetime(2021, 6, 14, 14, 0, tzinfo=UTC)     # Jumatatu
+    nje = datetime(2021, 6, 21, 14, 0, tzinfo=UTC)       # Jumatatu inayofuata
+    r = C.usiku_wa_swap(ndani, nje)
+    assert r.triple_nights == 1
+
+
+def test_rollover_HASA_wakati_wa_kutoka_haihesabiki():
+    """Kutoka 17:00:00 NY kamili — position imefungwa, haijalala."""
+    ny = ZoneInfo("America/New_York")
+    ndani = datetime(2021, 6, 15, 10, 0, tzinfo=ny)
+    nje = datetime(2021, 6, 15, 17, 0, tzinfo=ny)
+    assert C.usiku_wa_swap(ndani, nje).billed_nights == 1
+
+
+def test_kuingia_BAADA_ya_rollover_hakuhesabu_ya_siku_hiyo():
+    ny = ZoneInfo("America/New_York")
+    ndani = datetime(2021, 6, 15, 18, 0, tzinfo=ny)      # baada ya 17:00
+    nje = datetime(2021, 6, 15, 23, 0, tzinfo=ny)
+    assert C.usiku_wa_swap(ndani, nje).billed_nights == 0
+
+
+def test_swap_inaheshimu_DST_ya_New_York():
+    """17:00 NY ni 21:00 UTC (kiangazi) au 22:00 UTC (baridi)."""
+    # Jumanne, ili Jumatano isiingilie kipimo.
+    kiangazi = C.usiku_wa_swap(datetime(2021, 7, 13, 20, 30, tzinfo=UTC),
+                               datetime(2021, 7, 13, 21, 30, tzinfo=UTC))
+    baridi = C.usiku_wa_swap(datetime(2021, 1, 12, 20, 30, tzinfo=UTC),
+                             datetime(2021, 1, 12, 21, 30, tzinfo=UTC))
+    assert kiangazi.billed_nights == 1        # imevuka 21:00 UTC
+    assert baridi.billed_nights == 0          # rollover ni 22:00 UTC
+
+
+def test_kutoka_kabla_ya_kuingia_kunalipuka():
+    t = datetime(2021, 6, 15, 12, 0, tzinfo=UTC)
+    with pytest.raises(C.ClockError, match="kabla"):
+        C.usiku_wa_swap(t, t - timedelta(hours=1))
+
+
+# ===========================================================================
+# Jumapili ni sehemu ya siku — DOCTRINE §11
+# ===========================================================================
+
+
+def test_Jumapili_ni_sehemu_ya_siku_ya_soko_ya_Jumatatu():
+    """FX inafunguka Jumapili 17:00 NY. Saa hizo ni za siku ya soko ya
+    Jumatatu — lakini ni chache, kwa hiyo bar ya D1 ya Jumatatu ina saa 24
+    wakati nyingine zina 24 pia... isipokuwa ya kwanza ya wiki.
+
+    Familia hazishikwi Jumapili; jaribio hili linahakikisha kwamba ramani ya
+    siku ya soko inaielekeza mahali sahihi badala ya kuiacha peke yake.
+    """
+    jumapili = datetime(2021, 6, 13, 22, 0, tzinfo=UTC)   # 18:00 NY Jumapili
+    assert jumapili.weekday() == 6
+    assert C.siku_ya_soko(jumapili) == date(2021, 6, 14)  # Jumatatu
+    assert C.siku_ya_soko(jumapili).weekday() == 0
+
+
+def test_Ijumaa_jioni_HAIINGII_kwenye_Jumamosi():
+    """Soko linafunga Ijumaa 17:00 NY. Hakuna siku ya soko ya Jumamosi."""
+    kabla = datetime(2021, 6, 18, 20, 0, tzinfo=UTC)      # 16:00 NY Ijumaa
+    assert C.siku_ya_soko(kabla) == date(2021, 6, 18)
+
+
+def test_RCE_count_rollovers_INAKOSEA_kwenye_mpaka_wa_17_00():
+    """Mtego uliogunduliwa 2026-09-07 — ndiyo sababu tunahesabu wenyewe.
+
+    `count_rollovers` inapima Jumatano kwa `(cursor − siku 1).weekday()`,
+    mantiki ya mpaka wa usiku wa manane. Ikihamishiwa 17:00 inakosea kwa siku
+    moja. RCE haiguswi; hii ni dhana isiyotangazwa kwenye function yake.
+    """
+    from src.rce.cost import count_rollovers
+
+    ny = ZoneInfo("America/New_York")
+    ndani = datetime(2021, 6, 16, 10, 0, tzinfo=ny)      # Jumatano
+    nje = datetime(2021, 6, 17, 10, 0, tzinfo=ny)        # Alhamisi
+
+    # Soko: rollover MOJA (Jumatano 17:00), inatozwa mara tatu.
+    r = C.usiku_wa_swap(ndani, nje)
+    assert (r.nights, r.triple_nights, r.billed_nights) == (1, 1, 3)
+
+    # RCE ikihamishiwa 17:00: inaiita ya kawaida.
+    kawaida, triple = count_rollovers(ndani, nje, rollover_hour=17)
+    assert (kawaida, triple) == (1, 0)
+
+    # RCE kwa chaguo-msingi chake (usiku wa manane): sahihi, mpaka tofauti.
+    kawaida0, triple0 = count_rollovers(ndani, nje)
+    assert triple0 == 1
+
+
+def test_mkataba_wa_swap_pips_unaheshimiwa():
+    """`swap_pips` inadai triple iwe SEHEMU ya nights, si nyongeza."""
+    ndani = datetime(2021, 6, 14, 18, 0, tzinfo=UTC)     # Jumatatu
+    nje = datetime(2021, 6, 18, 18, 0, tzinfo=UTC)       # Ijumaa
+    r = C.usiku_wa_swap(ndani, nje)
+    assert r.triple_nights == 1
+    assert r.nights == 4                                  # Jumatano imo humo
+    assert r.billed_nights == 6                           # 3 + (1 × 3)
+
+
+def test_swap_pips_inakubali_matokeo_yetu():
+    """Uthibitisho wa mwisho: RCE haiilipuki, na jibu ni la usiku sita."""
+    from src.rce.cost import SWAP_MODE_CURRENCY, SymbolSpec, swap_pips
+
+    spec = SymbolSpec(symbol="EURUSD", point=0.00001, contract_size=100_000,
+                      volume_min=0.01, volume_step=0.01, volume_max=50.0,
+                      swap_long=-1.0, swap_mode=SWAP_MODE_CURRENCY)
+    r = C.usiku_wa_swap(datetime(2021, 6, 14, 18, 0, tzinfo=UTC),
+                        datetime(2021, 6, 18, 18, 0, tzinfo=UTC))
+    pips = swap_pips("BUY", spec, nights=r.nights, pip_value_per_lot=10.0,
+                     triple_nights=r.triple_nights)
+    assert pips == pytest.approx(-6.0 / 10.0)
+
+
+def test_triple_kuzidi_nights_kunalipuka():
+    with pytest.raises(C.ClockError, match="SEHEMU"):
+        C.Rollovers(nights=1, triple_nights=2)

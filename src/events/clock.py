@@ -263,6 +263,94 @@ def vwap(
     )
 
 
+@dataclass(frozen=True)
+class Rollovers:
+    """Rollovers zilizovukwa, kwa **mkataba wa `rce.cost.swap_pips`**.
+
+    `triple_nights` ni **sehemu ya** `nights`, si nyongeza yake. Ndio mkataba
+    ambao `swap_pips` inaudai (`triple_nights > nights` inalipuka), na test
+    yake inauandika: `nights=3, triple=1` → *"usiku 2 + (1 × 3) = 5"*.
+
+    **Mtego:** `rce.cost.count_rollovers` inarudisha `(kawaida, triple)`
+    **zilizotenganishwa** — jumla ni `kawaida + triple`. Kupeleka matokeo yake
+    moja kwa moja kwenye `swap_pips` kunashusha usiku mmoja kwa kila Jumatano.
+    Si kasoro ndani ya RCE — `engine.py` inapokea namba hizo kutoka nje — ni
+    mtego kwa anayeiita. Darasa hili ndiyo mahali pekee ambapo ubadilishaji
+    unafanyika, ili usije ukafanyika kwa namna tofauti kila mahali.
+    """
+
+    nights: int
+    triple_nights: int
+
+    def __post_init__(self) -> None:
+        if self.triple_nights > self.nights:
+            raise ClockError(
+                f"triple {self.triple_nights} > nights {self.nights} — "
+                f"`swap_pips` inadai triple iwe SEHEMU ya nights"
+            )
+
+    @property
+    def billed_nights(self) -> int:
+        """Usiku wa kulipiwa: za kawaida mara moja, za Jumatano mara tatu."""
+        return self.nights + 2 * self.triple_nights
+
+    def render(self) -> str:
+        tatu = f", triple {self.triple_nights}" if self.triple_nights else ""
+        return f"rollovers {self.nights}{tatu} → kulipiwa {self.billed_nights}"
+
+
+def usiku_wa_swap(entry: datetime, exit_at: datetime) -> Rollovers:
+    """Rollovers kati ya kuingia na kutoka — DOCTRINE §11.
+
+    Sheria ya soko: **rollover ya Jumatano 17:00 New York inatozwa mara tatu**,
+    kwa sababu tarehe ya thamani inaruka Ijumaa → Jumatatu (T+2).
+
+    **Kwa nini `rce.cost.count_rollovers` haitumiki hapa.** Inapima Jumatano
+    kwa `(cursor − siku 1).weekday()` — mantiki iliyoandikwa kwa mpaka wa
+    **usiku wa manane**, ambapo `cursor` inakaa mwishoni mwa usiku. Ikihamishiwa
+    `rollover_hour=17` inakosea kwa siku moja:
+
+    ```
+    Jumatano 10:00 NY → Alhamisi 10:00 NY   (inavuka rollover MOJA ya Jumatano)
+        soko:          mara tatu
+        RCE @ 17:00:   ya kawaida        ← imekosea
+        RCE @ 00:00:   mara tatu         ← sahihi, lakini mpaka si wa FX
+    ```
+
+    Si kasoro ndani ya RCE — `engine.py` inapokea `nights`/`triple_nights`
+    kutoka nje, na chaguo-msingi cha usiku wa manane ni sahihi kwa matumizi
+    yake. Ni **dhana isiyotangazwa** kwenye function, na RCE haiguswi.
+
+    Kwa nini hii inatokea kwa mifumo: FOMC inatangaza Jumatano 14:00 New York.
+    Kushikilia saa 24 kunavuka rollover ya Jumatano **daima**. Kwa position ya
+    sarafu yenye riba kubwa hiyo ni gharama inayohusiana na **mwelekeo** — na
+    ingeonekana kama uthibitisho wa mekanizimu badala ya kama gharama.
+
+    Trade ya masaa manne ndani ya kikao kimoja hairudishi chochote — ndiyo hali
+    ya kawaida ya familia zote za mzunguko wa kwanza.
+    """
+    if exit_at < entry:
+        raise ClockError("kutoka kabla ya kuingia")
+
+    ny = ZoneInfo("America/New_York")
+    a = entry.astimezone(ny)
+    b = exit_at.astimezone(ny)
+
+    nights = triple = 0
+    # `datetime + timedelta` kwenye datetime yenye tz inaongeza saa za MTAA na
+    # kubakiza tzinfo — kwa hiyo 17:00 inabaki 17:00 hata kwenye mpito wa DST.
+    cursor = a.replace(hour=17, minute=0, second=0, microsecond=0)
+    if cursor <= a:
+        cursor += timedelta(days=1)
+    while cursor <= b:
+        nights += 1
+        if cursor.weekday() == 2:              # Jumatano
+            triple += 1
+        cursor += timedelta(days=1)
+
+    return Rollovers(nights=nights, triple_nights=triple)
+
+
 def dirisha_la_tukio(anchor: Anchor, day: date, *, offset_minutes: int = 0
                      ) -> datetime:
     """Nanga siku hiyo, ikiwa imesogezwa kwa dakika, ikiwa UTC.
@@ -280,5 +368,5 @@ __all__ = [
     "TOKYO_FIX",
     "ni_siku_ya_kazi", "siku_za_kazi_za_mwezi", "siku_ya_mwisho_ya_mwezi",
     "ni_siku_ya_mwisho_ya_mwezi", "ni_gotobi", "siku_ya_soko",
-    "vwap", "dirisha_la_tukio",
+    "Rollovers", "usiku_wa_swap", "vwap", "dirisha_la_tukio",
 ]
