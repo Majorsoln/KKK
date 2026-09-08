@@ -166,6 +166,63 @@ Ripoti dhidi ya `δ = (μ/σ)√n`.
 > familia zetu, **hakuna familia inayojengwa.** Kasoro inatafutwa, kisha
 > inaendeshwa tena.
 
+**7.1a · Matokeo ya LANGO 1 (2026-09-08 · `2e8e5ef`).** Siku 500 · SL 25 pips ·
+spread 1.6 · σ 13 pips/saa · replicates 10 · B 400 · α 0.05. Mnyororo mzima
+ulipimwa: ticks → kikapu → RCE → trades → curve ya siku → block bootstrap.
+
+```
+umbo         pips        δ   iliyopimwa  kinadharia    pengo
+CONSTANT     0.00    -1.12         0.0%        0.3%    +0.3%
+CONSTANT     4.00     1.13        30.0%       30.5%    +0.5%
+CONSTANT     8.00     3.36       100.0%       95.7%    -4.3%
+CLUSTERED    4.00     1.15        20.0%       31.0%   +11.0%
+CLUSTERED    8.00     3.27        90.0%       94.8%    +4.8%
+SERIAL       4.00     1.29        40.0%       36.2%    -3.8%
+SERIAL       8.00     3.58        90.0%       97.4%    +7.4%
+```
+
+Pengo kubwa kuliko yote (pale kinadharia > 50%): **+7.4%**, chini ya kikomo cha
+30%. **Lango limepita.** Injini inaona edge iliyopandwa karibu na kikomo cha
+kinadharia; hakuna hatua inayopoteza ushahidi kwa kiasi kikubwa.
+
+Mipaka mitatu ya usomaji, ambayo lazima isemwe pamoja na jibu:
+
+1. **`pips = 0` si kipimo cha UKUBWA.** Hapo wastani wa kweli ni **hasi**
+   (`δ = −1.12`, ni gharama), kwa hiyo 0% inaonyesha tu kwamba injini
+   haitangazi strategy inayopoteza. Ukubwa halisi wa bootstrap umepimwa
+   pekee kwenye `tests/analysis/test_bootstrap.py`: **1–12%** kwa replicates
+   120, `ρ = 0` na `0.5`.
+2. **Replicates 10 zinatoa azimio la ±15%** kwa kila kiwango. Pengo la ±7% liko
+   ndani ya kelele. Hitimisho la kweli ni *"hakuna pengo kubwa lililoonekana"*,
+   si *"pengo ni 7.4%"*.
+3. Kupanda kunafanywa kwenye **ticks za bandia** zenye σ iliyotangazwa. Kwa
+   familia halisi, σ ya kila tukio itapimwa kwenye data halisi kabla ya
+   kutafsiri nguvu.
+
+**7.1b · Kalibrisheni inayotokana nayo.** `δ` ni ya mstari kwa pips na inakua
+kwa `√n`:
+
+```
+δ(pips, n) = (−1.12 + 0.5625·pips) · √(n / 500)
+```
+
+| edge gross | δ @ vikao 2,100 | nguvu @ 2,100 |
+|-----------:|----------------:|--------------:|
+| 2 pips     | 0.01            | 5%            |
+| 3 pips     | 1.17            | 32%           |
+| 4 pips     | 2.33            | 75%           |
+| 5 pips     | 3.48            | 97%           |
+
+Edge inayohitajika kwa nguvu 50% (`δ = 1.645`): siku 500 → **4.9 pips** ·
+F0 kwa vikao 2,100 → **3.4 pips** · F1 kwa matukio 99 → **8.5 pips**.
+
+Maana yake kwa mzunguko wa kwanza, ikiwa σ ya kila tukio ni karibu na
+iliyotangazwa hapa: **F0 inaonekana tu ikiwa iko juu ya safu yake
+inayotarajiwa (2–4 pips gross).** Hilo si sababu ya kuiacha — ni sababu ya
+kujua, kabla ya kujenga, kwamba jibu la "hakuna" litamaanisha *"chini ya
+3.4 pips"* na si *"sifuri"*. F1 yenye matukio 99 pekee inahitaji edge kubwa
+mara mbili na nusu; ndiyo gharama halisi ya familia ya mara moja kwa mwezi.
+
 **7.2 · Kitengo cha uchambuzi.** Curve ya P&L ya portfolio kwa siku, katika
 vipimo vya R. Block bootstrap, urefu kutoka Politis–White, chini kabisa siku
 21. Siku **hai** zinaripotiwa, si siku za kalenda.
