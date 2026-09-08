@@ -309,6 +309,16 @@ hiyo `n` ya bootstrap ni 1,924 — `√(1924/2100) = 0.957` ya nguvu ya §7.1b.
 Legs mbili kwa siku zinarudisha sehemu ya hiyo, kwa sababu wastani wa siku
 unabeba matukio mawili.
 
+**Stop ni `4.0 × wastani wa |kutoka − kuingia|` kwa vikao 20 vilivyopita.** Si
+ATR: injini inasoma ncha mbili za dirisha (dakika 20 kati ya 1,440), si dirisha
+zima, kwa hiyo high-low haipatikani. `4.0` inatoka kwenye hesabu, si ladha:
+`E|X| = 0.798σ`, kwa hiyo stop ni `3.19σ` na `P(kuvuka) ≈ 0.3%`.
+
+**Lango la 6.2 linapimwa kwa KILA leg.** Leg A ni masaa 9, leg B ni 4.4 —
+`σ ∝ √muda`, kwa hiyo uwiano wa gharama wa leg B ni mbaya kwa mara ~1.4.
+Kuchanganya legs kungefanya leg fupi ijifiche nyuma ya ndefu. Familia ni
+yote-au-hakuna, kwa hiyo lango linaamuliwa na **leg mbaya kabisa**.
+
 **Jumla ya majaribio ya mzunguko 1 = 8.** `0.020/8 = 0.0025` → **z ≈ 2.81**.
 
 F1 ina matukio **99**, si 594. Legs sita kwa tarehe moja ni uchunguzi mmoja.
@@ -364,6 +374,13 @@ Zote zinatokea **kwa mifumo**, si kwa nasibu, kwa hiyo hazionekani kama kelele.
 - **RCE inategemea mpangilio wa kuwasili.** `max_open_trades` inaangusha trade
   zipi ikitegemea nani amefika kwanza. Jaribio linalochanganya mpangilio na
   kudai P&L ile ile lazima liandikwe.
+- **Njia kati ya kuingia na kutoka HAIIGWI.** `backtest/runner.execute`
+  inachukua bei mbili; haijui kama stop iligongwa katikati. Ni dhana
+  **iliyotangazwa**, si iliyosahaulika, na inapimwa kwa
+  `scripts/f0_run.py --angalia-stop` (inasoma dirisha zima kwa sampuli ya
+  vikao na kuripoti mwendo mbaya kabisa). Ikizidi kinadharia kwa kiasi
+  kikubwa, `k` inapanda au njia inaigwa — **uamuzi utakaoandikwa**, si
+  marekebisho ya kimya.
 
 ---
 

@@ -48,13 +48,35 @@ sababu mbadala haujaendeshwa wala hautaendeshwa.
 ---
 
 **Kutoka ni kwa saa** (§4.1) — mekanizimu una umri unaojulikana, unaisha
-madawati yanapofungwa. **Stop ni bima** (§4.2): `k × ATR(dirisha)`, na ATR
-inapimwa kwa **vikao vilivyopita pekee**. Hiyo inatoa `lots ∝ 1/ATR` bila
-mfumo wa pili wa ukubwa (§5.1).
+madawati yanapofungwa.
 
-`k` si kigezo huru cha kubadilishwa mpaka jibu lipendeze: `R = net_pips /
-(sl_pips + cost_pips)`, kwa hiyo `k` ni **kipimo**, si ishara. Inabadilisha
-ukubwa wa R, si alama yake wala mpangilio wa siku.
+**Stop ni bima** (§4.2), na hapa ni `k × mwendo`, ambapo `mwendo` ni wastani
+wa `|kutoka − kuingia|` kwa **vikao vilivyopita pekee**. Si ATR: injini
+inasoma ncha mbili za dirisha, si dirisha zima, kwa hiyo high-low haipatikani
+na kuiita ATR kungekuwa jina lisilo sahihi linalosafiri.
+
+Hiyo inatoa `lots ∝ 1/mwendo` bila mfumo wa pili wa ukubwa (§5.1). `k` si
+kigezo huru cha kubadilishwa mpaka jibu lipendeze: `R = net_pips / (sl_pips +
+cost_pips)`, kwa hiyo `k` ni **kipimo**, si ishara — inabadilisha ukubwa wa R,
+si alama yake wala mpangilio wa siku.
+
+---
+
+**Dhana inayotangazwa: stop haigongwi.** `runner.execute` inachukua bei ya
+kuingia na ya kutoka; **haiangalii njia kati yao**. Kwa hiyo `k` lazima iwe
+kubwa vya kutosha kwamba kugongwa ni nadra kweli, si tu kwa matumaini:
+
+```
+mwendo wa wastani  = σ·√(2/π) = 0.798 σ
+k = 4              → stop = 3.19 σ
+P(kuvuka)          ≈ 4·P(Z > 3.19) ≈ 0.3%   (vikao ~5 kati ya 1,924)
+```
+
+Namba hiyo ni ya kinadharia, kwa hiyo **inapimwa** badala ya kuaminiwa:
+`scripts/f0_run.py --angalia-stop` inasoma dirisha ZIMA kwa sampuli ya vikao
+na kuripoti mwendo mbaya kabisa uliofikiwa. Ikizidi 0.3% kwa kiasi kikubwa,
+`k` inahitaji kupanda au njia inahitaji kuigwa — na hilo ni **uamuzi**
+utakaoandikwa, si marekebisho ya kimya.
 
 **Hakuna ishara.** Uzito ni 1.0 kila siku. F0 ni ya kalenda tupu — ndiyo maana
 inaendeshwa kwanza, na ndiyo maana ina **jaribio moja**.
@@ -97,11 +119,15 @@ WINDOW_SECONDS = 300
 # za symbol moja kwa dakika tano (arbiter ingekataa ya pili).
 B_ENTRY_DELAY = timedelta(seconds=WINDOW_SECONDS)
 
-# §5.1 — stop ni mizidisho ya mwendo wa dirisha. Ona docstring: hii ni kipimo,
-# si ishara.
-SL_ATR_MULT = 2.0
+# §5.1 — stop ni mizidisho ya mwendo wa wastani wa dirisha. Ona docstring:
+# `4.0` inatoka kwenye P(kuvuka) ≈ 0.3%, si kwenye ladha.
+SL_MOVE_MULT = 4.0
 
-# Vikao vya nyuma vinavyotumika kupima ATR. Ni vya NYUMA pekee.
+# `E|X| = σ√(2/π)` kwa mgawanyo wa normal. Inatumika kugeuza mwendo wa wastani
+# kuwa `σ` kwa lango la gharama la §6.2, ambalo linadai σ ya DIRISHA.
+MOVE_TO_SIGMA = 1.2533141373155003
+
+# Vikao vya nyuma vinavyotumika kupima mwendo. Ni vya NYUMA pekee.
 SL_LOOKBACK_SESSIONS = 20
 SL_MIN_SESSIONS = 10
 
@@ -127,18 +153,18 @@ DECLARATION = Declaration(
               f"B: {BUY} {SYMBOL} (saa za ndani za dola)"),
     kuingia=(f"tick-VWAP ya upande unaotekelezeka kwenye sekunde "
              f"{WINDOW_SECONDS} kutoka nanga (ask kununua, bid kuuza)"),
-    stop=(f"{SL_ATR_MULT} × ATR ya dirisha lile lile kwa vikao "
+    stop=(f"{SL_MOVE_MULT} × wastani wa |kutoka − kuingia| kwa vikao "
           f"{SL_LOOKBACK_SESSIONS} VILIVYOPITA (chini kabisa "
-          f"{SL_MIN_SESSIONS}); bima pekee, si mkakati"),
+          f"{SL_MIN_SESSIONS}); bima pekee, si mkakati; njia haiigwi"),
     kutoka="kwa SAA, kwenye nanga ya kutoka; stop haitumiki kama lengo",
-    ukubwa="uzito 1.0 — hakuna ishara; hatari inatoka RCE, lots ∝ 1/ATR",
+    ukubwa="uzito 1.0 — hakuna ishara; hatari inatoka RCE, lots ∝ 1/mwendo",
     mechanism=MECHANISM,
     eligible_regimes=(NORMAL,),
     trials=1,
     source="Ranaldo (2009) · Breedon & Ranaldo (2013) — ushahidi unaishia ~2007",
     params={
         "window_seconds": WINDOW_SECONDS,
-        "sl_atr_mult": SL_ATR_MULT,
+        "sl_move_mult": SL_MOVE_MULT,
         "sl_lookback_sessions": SL_LOOKBACK_SESSIONS,
         "sl_min_sessions": SL_MIN_SESSIONS,
         "priority": PRIORITY,
@@ -148,19 +174,53 @@ DECLARATION = Declaration(
 
 
 # ===========================================================================
-# ATR — vikao vilivyopita PEKEE
+# Mwendo wa kikao — vikao vilivyopita PEKEE
 # ===========================================================================
 
 
-def atr_from_ranges(
-    ranges: Mapping[tuple[date, str], float],
+def session_move_pips(ndani, nje, *, pip: float) -> float:
+    """`|kutoka − kuingia|` kwa **mid**, katika pips.
+
+    Mid, si bei ya utekelezaji: hiki ni kipimo cha **volatility**, na spread
+    si volatility. Kutumia bei ya utekelezaji kungeongeza spread nzima kwenye
+    kila kipimo, na stop ingekua kwa gharama badala ya kwa mwendo.
+    """
+    return abs(nje.mid - ndani.mid) / pip
+
+
+def stop_from_history(
+    history: Sequence[float],
+    *,
+    lookback: int = SL_LOOKBACK_SESSIONS,
+    min_sessions: int = SL_MIN_SESSIONS,
+) -> float | None:
+    """Wastani wa mwendo kwa vikao `lookback` vya mwisho, au `None`.
+
+    Kanuni ipo **hapa pekee**. `stop_from_moves` (batch) na `f0_run.sweep`
+    (mtiririko) zote zinaiita hii, ili zisije zikatofautiana kwa siku moja
+    kwenye mpaka wa historia — tofauti ambayo ingebadilisha lots bila
+    kuonekana popote.
+    """
+    if lookback < 1:
+        raise FamilyError(f"lookback ni {lookback}, si ≥ 1")
+    if min_sessions < 1 or min_sessions > lookback:
+        raise FamilyError(
+            f"min_sessions {min_sessions} haiko kati ya 1 na lookback {lookback}")
+    if len(history) < min_sessions:
+        return None
+    teule = list(history[-lookback:])
+    return sum(teule) / len(teule)
+
+
+def stop_from_moves(
+    moves: Mapping[tuple[date, str], float],
     *,
     lookback: int = SL_LOOKBACK_SESSIONS,
     min_sessions: int = SL_MIN_SESSIONS,
 ) -> dict[tuple[date, str], float]:
     """Wastani wa mwendo wa dirisha kwa vikao vilivyotangulia.
 
-    `ranges[(siku, leg)]` ni mwendo ULIOPIMWA wa dirisha hilo siku hiyo. Jibu
+    `moves[(siku, leg)]` ni mwendo ULIOPIMWA wa dirisha hilo siku hiyo. Jibu
     la siku fulani linatumia **siku zilizotangulia pekee** — siku yenyewe
     haiingii. Bila hilo, stop ingejua mwendo wa siku ambayo bado
     haijatokea, na ukubwa wa position ungekuwa na lookahead: siku zenye mwendo
@@ -169,20 +229,15 @@ def atr_from_ranges(
     Siku zisizo na vikao `min_sessions` vya nyuma hazipati jibu, kwa hiyo
     hazizalishi kikapu. Ni gharama ya kuanzia, si uteuzi.
     """
-    if lookback < 1:
-        raise FamilyError(f"lookback ni {lookback}, si ≥ 1")
-    if min_sessions < 1 or min_sessions > lookback:
-        raise FamilyError(
-            f"min_sessions {min_sessions} haiko kati ya 1 na lookback {lookback}")
-
     out: dict[tuple[date, str], float] = {}
     kwa_leg: dict[str, list[float]] = {}
-    for (siku, leg) in sorted(ranges, key=lambda k: (k[1], k[0])):
+    for (siku, leg) in sorted(moves, key=lambda k: (k[1], k[0])):
         nyuma = kwa_leg.setdefault(leg, [])
-        if len(nyuma) >= min_sessions:
-            teule = nyuma[-lookback:]
-            out[(siku, leg)] = sum(teule) / len(teule)
-        thamani = float(ranges[(siku, leg)])
+        jibu = stop_from_history(nyuma, lookback=lookback,
+                                 min_sessions=min_sessions)
+        if jibu is not None:
+            out[(siku, leg)] = jibu
+        thamani = float(moves[(siku, leg)])
         if thamani <= 0:
             raise FamilyError(f"mwendo si chanya: {siku} {leg} → {thamani}")
         nyuma.append(thamani)
@@ -261,7 +316,7 @@ def eligible_days(
 def baskets(
     days: Sequence[date],
     *,
-    atr_pips: Mapping[tuple[date, str], float] | Callable[[date, str], float | None],
+    move_pips: Mapping[tuple[date, str], float] | Callable[[date, str], float | None],
     holidays: Iterable[date] = (),
     cb_days: Iterable[date] = (),
 ) -> list[Basket]:
@@ -271,29 +326,29 @@ def baskets(
     `entry_at` tofauti, na `Basket` ni **nia moja kwenye dirisha moja**.
     Kuzichanganya kungelazimisha nanga moja kwa mbili.
 
-    `atr_pips` inaweza kuwa mapping au function. Ikirudisha `None` (au ikikosa
+    `move_pips` inaweza kuwa mapping au function. Ikirudisha `None` (au ikikosa
     ufunguo), siku hiyo **hairuki kimya**: leg hiyo haizalishwi, kwa sababu
     bila stop hakuna lots (§5).
     """
-    pata = (atr_pips.get if hasattr(atr_pips, "get")
-            else lambda k, _=None: atr_pips(k[0], k[1]))
+    pata = (move_pips.get if hasattr(move_pips, "get")
+            else lambda k, _=None: move_pips(k[0], k[1]))
 
     out: list[Basket] = []
     for d in eligible_days(days, holidays=holidays, cb_days=cb_days):
         for s in sessions_for(d):
-            atr = pata((d, s.leg), None)
-            if atr is None:
+            mwendo = pata((d, s.leg), None)
+            if mwendo is None:
                 continue
-            atr = float(atr)
-            if atr <= 0:
-                raise FamilyError(f"{d} {s.leg}: ATR si chanya ({atr})")
+            mwendo = float(mwendo)
+            if mwendo <= 0:
+                raise FamilyError(f"{d} {s.leg}: mwendo si chanya ({mwendo})")
             out.append(Basket(
                 family=FAMILY,
                 basket_id=f"{FAMILY}:{d.isoformat()}:{s.leg}",
                 legs=(Leg(symbol=SYMBOL, side=s.side,
-                          sl_pips=SL_ATR_MULT * atr,
+                          sl_pips=SL_MOVE_MULT * mwendo,
                           weight=1.0,
-                          meta={"leg": s.leg, "atr_pips": atr}),),
+                          meta={"leg": s.leg, "move_pips": mwendo}),),
                 entry_at=s.entry_at,
                 planned_exit_at=s.exit_at,
                 priority=PRIORITY,
@@ -318,8 +373,9 @@ def windows_to_read(baskets_: Sequence[Basket]) -> list[tuple[datetime, int]]:
 
 __all__ = [
     "FAMILY", "SYMBOL", "LEG_A", "LEG_B", "A_ENTRY", "A_EXIT", "B_EXIT",
-    "WINDOW_SECONDS", "B_ENTRY_DELAY", "SL_ATR_MULT", "SL_LOOKBACK_SESSIONS",
-    "SL_MIN_SESSIONS", "PRIORITY", "MECHANISM", "DECLARATION",
-    "Session", "atr_from_ranges", "sessions_for", "eligible_days", "baskets",
-    "windows_to_read",
+    "WINDOW_SECONDS", "B_ENTRY_DELAY", "SL_MOVE_MULT", "MOVE_TO_SIGMA",
+    "SL_LOOKBACK_SESSIONS", "SL_MIN_SESSIONS", "PRIORITY", "MECHANISM",
+    "DECLARATION", "Session", "session_move_pips", "stop_from_history",
+    "stop_from_moves",
+    "sessions_for", "eligible_days", "baskets", "windows_to_read",
 ]

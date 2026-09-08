@@ -3,7 +3,7 @@
 Madai yanayopimwa hapa ni ya **ufafanuzi**, si ya utendaji. F0 haijaendeshwa
 kwenye data yoyote bado, na haitaendeshwa mpaka tangazo lake liwe limefungwa.
 Kila kitu kinachoweza kuharibu tafsiri ya matokeo kimya — nanga inayohama kwa
-DST, ATR yenye lookahead, siku ya mwisho wa mwezi ikiingia kimya — kinapimwa
+DST, stop yenye lookahead, siku ya mwisho wa mwezi ikiingia kimya — kinapimwa
 hapa, kabla ya row moja ya ticks kusomwa.
 """
 
@@ -31,8 +31,8 @@ def siku_zote(a: date, b: date) -> list[date]:
 MIAKA_NANE = siku_zote(date(2018, 1, 1), date(2025, 12, 31))
 
 
-def atr_thabiti(pips: float = 20.0):
-    """ATR isiyobadilika — kwa majaribio yanayopima kalenda, si ukubwa."""
+def mwendo_thabiti(pips: float = 20.0):
+    """Mwendo usiobadilika — kwa majaribio yanayopima kalenda, si ukubwa."""
     return lambda day, leg: pips
 
 
@@ -59,7 +59,7 @@ def test_fingerprint_ni_THABITI():
 def test_kubadilisha_kigezo_KUNABADILISHA_fingerprint():
     from dataclasses import replace
     nyingine = replace(f0.DECLARATION,
-                       params={**f0.DECLARATION.params, "sl_atr_mult": 3.0})
+                       params={**f0.DECLARATION.params, "sl_move_mult": 3.0})
     assert nyingine.fingerprint() != f0.DECLARATION.fingerprint()
 
 
@@ -85,7 +85,7 @@ def test_legs_mbili_zina_mielekeo_TOFAUTI():
 
 def test_kikapu_kimoja_kwa_kila_leg():
     """Legs zina nanga tofauti; kikapu ni nia moja kwenye dirisha MOJA."""
-    v = f0.baskets([date(2021, 6, 15)], atr_pips=atr_thabiti())
+    v = f0.baskets([date(2021, 6, 15)], move_pips=mwendo_thabiti())
     assert len(v) == 2
     assert [len(k.legs) for k in v] == [1, 1]
     assert {k.basket_id for k in v} == {"F0:2021-06-15:A", "F0:2021-06-15:B"}
@@ -158,20 +158,20 @@ def test_leg_B_HAIWEZI_kuwa_na_urefu_hasi_kwa_miaka_kumi():
 def test_siku_ya_mwisho_wa_mwezi_HAIZALISHI_kikapu():
     d = date(2021, 6, 30)
     assert regime_of(d) == MONTH_END_FIX
-    assert f0.baskets([d], atr_pips=atr_thabiti()) == []
+    assert f0.baskets([d], move_pips=mwendo_thabiti()) == []
 
 
 def test_mwisho_wa_mwaka_HAUZALISHI_kikapu():
     d = date(2021, 12, 23)
     assert regime_of(d) == TURN_OF_YEAR
-    assert f0.baskets([d], atr_pips=atr_thabiti()) == []
+    assert f0.baskets([d], move_pips=mwendo_thabiti()) == []
 
 
 def test_wikendi_na_sikukuu_HAZIZALISHI_kikapu():
     jumamosi = date(2021, 6, 19)
     sikukuu = date(2021, 6, 15)
-    assert f0.baskets([jumamosi], atr_pips=atr_thabiti()) == []
-    assert f0.baskets([sikukuu], atr_pips=atr_thabiti(),
+    assert f0.baskets([jumamosi], move_pips=mwendo_thabiti()) == []
+    assert f0.baskets([sikukuu], move_pips=mwendo_thabiti(),
                       holidays=[sikukuu]) == []
 
 
@@ -186,16 +186,16 @@ def test_idadi_ya_matukio_kwa_miaka_NANE():
     """
     hai = f0.eligible_days(MIAKA_NANE)
     assert len(hai) == 1924, len(hai)
-    v = f0.baskets(MIAKA_NANE, atr_pips=atr_thabiti())
+    v = f0.baskets(MIAKA_NANE, move_pips=mwendo_thabiti())
     assert len(v) == 3848, len(v)
 
 
 # ===========================================================================
-# ATR — stop ni bima, na haijui yajayo
+# Mwendo — stop ni bima, na haijui yajayo
 # ===========================================================================
 
 
-def test_ATR_inatumia_vikao_VILIVYOPITA_pekee():
+def test_mwendo_unatumia_vikao_VILIVYOPITA_pekee():
     """Lookahead hapa isingeonekana kama kosa: siku zenye mwendo mkubwa
     zingepewa lots ndogo *kwa sababu* mwendo ulikuwa mkubwa, na curve
     ingeonekana laini kuliko ilivyo."""
@@ -203,43 +203,43 @@ def test_ATR_inatumia_vikao_VILIVYOPITA_pekee():
     ranges = {(d, f0.LEG_A): 10.0 for d in siku}
     ranges[(siku[-1], f0.LEG_A)] = 1_000.0                 # mruko wa siku ya mwisho
 
-    atr = f0.atr_from_ranges(ranges, lookback=20, min_sessions=10)
+    stop = f0.stop_from_moves(ranges, lookback=20, min_sessions=10)
     # Siku ya mruko yenyewe haioni mruko wake.
-    assert atr[(siku[-1], f0.LEG_A)] == pytest.approx(10.0)
+    assert stop[(siku[-1], f0.LEG_A)] == pytest.approx(10.0)
 
 
 def test_vikao_vichache_mno_HAVIPATI_stop():
     siku = [date(2021, 1, d) for d in range(4, 16)]        # siku 12
     ranges = {(d, f0.LEG_A): 10.0 for d in siku}
-    atr = f0.atr_from_ranges(ranges, lookback=20, min_sessions=10)
-    assert siku[0] not in {k[0] for k in atr}
-    assert len(atr) == 2                                   # 12 − 10
+    stop = f0.stop_from_moves(ranges, lookback=20, min_sessions=10)
+    assert siku[0] not in {k[0] for k in stop}
+    assert len(stop) == 2                                   # 12 − 10
 
 
-def test_siku_isiyo_na_ATR_HAIZALISHI_kikapu_kimya():
+def test_siku_isiyo_na_mwendo_HAIZALISHI_kikapu_kimya():
     """Bila stop hakuna lots (§5). Kuruka siku ni sahihi; kubuni stop si."""
     d = date(2021, 6, 15)
-    assert f0.baskets([d], atr_pips=lambda day, leg: None) == []
-    assert len(f0.baskets([d], atr_pips={(d, f0.LEG_A): 20.0})) == 1
+    assert f0.baskets([d], move_pips=lambda day, leg: None) == []
+    assert len(f0.baskets([d], move_pips={(d, f0.LEG_A): 20.0})) == 1
 
 
-def test_stop_ni_MIZIDISHO_ya_ATR():
-    v = f0.baskets([date(2021, 6, 15)], atr_pips=atr_thabiti(17.0))
+def test_stop_ni_MIZIDISHO_ya_mwendo():
+    v = f0.baskets([date(2021, 6, 15)], move_pips=mwendo_thabiti(17.0))
     for k in v:
-        assert k.legs[0].sl_pips == pytest.approx(f0.SL_ATR_MULT * 17.0)
-        assert k.legs[0].meta["atr_pips"] == 17.0
+        assert k.legs[0].sl_pips == pytest.approx(f0.SL_MOVE_MULT * 17.0)
+        assert k.legs[0].meta["move_pips"] == 17.0
 
 
-def test_ATR_kubwa_inatoa_stop_kubwa_na_hivyo_lots_NDOGO():
-    """§5.1 — `lots ∝ 1/ATR`. Kulenga volatility hakuhitaji mfumo wa pili."""
-    ndogo = f0.baskets([date(2021, 6, 15)], atr_pips=atr_thabiti(10.0))
-    kubwa = f0.baskets([date(2021, 6, 15)], atr_pips=atr_thabiti(40.0))
+def test_mwendo_mkubwa_unatoa_stop_kubwa_na_hivyo_lots_NDOGO():
+    """§5.1 — `lots ∝ 1/mwendo`. Kulenga volatility hakuhitaji mfumo wa pili."""
+    ndogo = f0.baskets([date(2021, 6, 15)], move_pips=mwendo_thabiti(10.0))
+    kubwa = f0.baskets([date(2021, 6, 15)], move_pips=mwendo_thabiti(40.0))
     assert kubwa[0].legs[0].sl_pips == 4 * ndogo[0].legs[0].sl_pips
 
 
 def test_mwendo_usio_chanya_UNALIPUKA():
     with pytest.raises(FamilyError, match="chanya"):
-        f0.atr_from_ranges({(date(2021, 1, 4), f0.LEG_A): 0.0},
+        f0.stop_from_moves({(date(2021, 1, 4), f0.LEG_A): 0.0},
                            lookback=20, min_sessions=1)
 
 
@@ -249,7 +249,7 @@ def test_mwendo_usio_chanya_UNALIPUKA():
 
 
 def test_vikapu_ni_ATOMIKI_na_vinatangaza_NORMAL_pekee():
-    for k in f0.baskets([date(2021, 6, 15)], atr_pips=atr_thabiti()):
+    for k in f0.baskets([date(2021, 6, 15)], move_pips=mwendo_thabiti()):
         assert k.atomic is True
         assert k.eligible_regimes == (NORMAL,)
         assert k.priority == f0.PRIORITY
@@ -257,7 +257,7 @@ def test_vikapu_ni_ATOMIKI_na_vinatangaza_NORMAL_pekee():
 
 
 def test_uzito_ni_MOJA_kwa_sababu_hakuna_ishara():
-    for k in f0.baskets([date(2021, 6, 15)], atr_pips=atr_thabiti()):
+    for k in f0.baskets([date(2021, 6, 15)], move_pips=mwendo_thabiti()):
         assert k.legs[0].weight == 1.0
         assert abs(k.net_weight) == 1.0
 
@@ -267,14 +267,14 @@ def test_hakuna_kikapu_kinachoshikilia_USIKU():
     Jumatano ya mara tatu (§11)."""
     from src.events.clock import usiku_wa_swap
     for d in f0.eligible_days(siku_zote(date(2021, 1, 1), date(2021, 12, 31))):
-        for k in f0.baskets([d], atr_pips=atr_thabiti()):
+        for k in f0.baskets([d], move_pips=mwendo_thabiti()):
             assert usiku_wa_swap(k.entry_at, k.planned_exit_at).billed_nights == 0
 
 
 def test_madirisha_ya_kusoma_ni_MANNE_kwa_siku():
     """Dakika 20 kati ya 1,440 — ndiyo tofauti kati ya dakika na masaa
     tunaposoma miaka minane ya ticks."""
-    v = f0.baskets([date(2021, 6, 15)], atr_pips=atr_thabiti())
+    v = f0.baskets([date(2021, 6, 15)], move_pips=mwendo_thabiti())
     madirisha = f0.windows_to_read(v)
     assert len(madirisha) == 4
     assert {w for _, w in madirisha} == {f0.WINDOW_SECONDS}

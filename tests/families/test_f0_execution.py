@@ -46,10 +46,10 @@ def _windows(vikapu):
     return [Window(k.entry_at, k.planned_exit_at, k.legs[0].side) for k in vikapu]
 
 
-def _run(cfg, siku, *, pips=0.0, seed=1, atr=20.0):
+def _run(cfg, siku, *, pips=0.0, seed=1, mwendo=20.0):
     """F0 kamili: vikapu → ticks → RCE → trades → curve."""
-    spec = ProbeSpec(sl_pips=f0.SL_ATR_MULT * atr)
-    vikapu = f0.baskets(siku, atr_pips=lambda d, leg: atr)
+    spec = ProbeSpec(sl_pips=f0.SL_MOVE_MULT * mwendo)
+    vikapu = f0.baskets(siku, move_pips=lambda d, leg: mwendo)
     madirisha = _windows(vikapu)
     ticks = synthetic_ticks(madirisha, spec, seed=seed)
 
@@ -128,19 +128,19 @@ def test_pengo_la_spread_LINAPIMWA_kwa_kila_trade(cfg):
 
 def test_R_ni_net_pips_juu_ya_stop_pamoja_na_gharama(cfg):
     """Utambulisho wa §5: `R = net_pips / (sl_pips + cost_pips)`."""
-    _, trades, _, _ = _run(cfg, MWEZI_MMOJA, atr=20.0)
+    _, trades, _, _ = _run(cfg, MWEZI_MMOJA, mwendo=20.0)
     t = trades[0]
     gharama = t.spread_rce_pips + t.commission_pips
     # `cost_pips` ya RCE inajumuisha spread + commission + slippage; slippage
     # ni ndogo lakini si sifuri, kwa hiyo ulinganisho ni wa takribani.
     assert t.r == pytest.approx(
-        t.net_pips / (f0.SL_ATR_MULT * 20.0 + gharama), rel=0.05)
+        t.net_pips / (f0.SL_MOVE_MULT * 20.0 + gharama), rel=0.05)
 
 
-def test_ATR_kubwa_inatoa_lots_NDOGO(cfg):
+def test_mwendo_mkubwa_unatoa_lots_NDOGO(cfg):
     """§5.1 — kulenga volatility bila mfumo wa pili."""
-    _, ndogo, _, _ = _run(cfg, MWEZI_MMOJA, atr=10.0)
-    _, kubwa, _, _ = _run(cfg, MWEZI_MMOJA, atr=40.0)
+    _, ndogo, _, _ = _run(cfg, MWEZI_MMOJA, mwendo=10.0)
+    _, kubwa, _, _ = _run(cfg, MWEZI_MMOJA, mwendo=40.0)
     assert kubwa[0].lots < ndogo[0].lots
     assert kubwa[0].lots == pytest.approx(ndogo[0].lots / 4, rel=0.25)
 
