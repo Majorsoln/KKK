@@ -16,3 +16,17 @@ from .bootstrap import (  # noqa: F401
     test_mean_positive,
 )
 from .curve import Curve, CurveError, combine, daily_r  # noqa: F401
+from .control import (  # noqa: F401
+    CLUSTER_FRACTION,
+    CLUSTERED,
+    CONSTANT,
+    SERIAL,
+    SHAPES,
+    ControlError,
+    PowerPoint,
+    Window,
+    delta,
+    edge_per_window,
+    inject,
+    theoretical_power,
+)

@@ -1,0 +1,50 @@
+{
+  "spec": {
+    "n_days": 250,
+    "sl_pips": 25.0,
+    "spread_pips": 1.6,
+    "sigma_pips_per_hour": 13.0
+  },
+  "alpha": 0.05,
+  "B": 300,
+  "replicates": 6,
+  "seed": 0,
+  "points": [
+    {
+      "shape": "CONSTANT",
+      "pips": 0.0,
+      "n_replicates": 6,
+      "detected": 0,
+      "rate": 0.0,
+      "delta": -1.0823245764414735,
+      "theoretical": 0.003193926518579929,
+      "gap": 0.003193926518579929,
+      "n_days": 250.0,
+      "n_active": 250.0
+    },
+    {
+      "shape": "CONSTANT",
+      "pips": 2.0,
+      "n_replicates": 6,
+      "detected": 0,
+      "rate": 0.0,
+      "delta": -0.3143624414373881,
+      "theoretical": 0.025043744061718186,
+      "gap": 0.025043744061718186,
+      "n_days": 250.0,
+      "n_active": 250.0
+    },
+    {
+      "shape": "CONSTANT",
+      "pips": 5.0,
+      "n_replicates": 6,
+      "detected": 1,
+      "rate": 0.16666666666666666,
+      "delta": 0.8375818307738931,
+      "theoretical": 0.20975495471939848,
+      "gap": 0.04308828805273182,
+      "n_days": 250.0,
+      "n_active": 250.0
+    }
+  ]
+}
