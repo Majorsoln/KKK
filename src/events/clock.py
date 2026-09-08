@@ -103,6 +103,7 @@ class Anchor:
 # tena kila moja kwa namna yake.
 LONDON_OPEN = Anchor(8, 0, "Europe/London", "kufunguka London")
 LONDON_FIX = Anchor(16, 0, "Europe/London", "fix ya London")
+LONDON_CLOSE = Anchor(17, 0, "Europe/London", "kufunga London")
 NY_NOON = Anchor(12, 0, "America/New_York", "adhuhuri New York")
 NY_CLOSE = Anchor(16, 30, "America/New_York", "kufunga New York")
 NY_ROLLOVER = Anchor(17, 0, "America/New_York", "rollover — mpaka wa siku")
@@ -399,7 +400,8 @@ def dirisha_la_tukio(anchor: Anchor, day: date, *, offset_minutes: int = 0
 
 __all__ = [
     "BUY", "SELL", "Anchor", "ClockError", "Fill",
-    "LONDON_OPEN", "LONDON_FIX", "NY_NOON", "NY_CLOSE", "NY_ROLLOVER",
+    "LONDON_OPEN", "LONDON_FIX", "LONDON_CLOSE", "NY_NOON", "NY_CLOSE",
+    "NY_ROLLOVER",
     "TOKYO_FIX",
     "ni_siku_ya_kazi", "siku_za_kazi_za_mwezi", "siku_ya_mwisho_ya_mwezi",
     "ni_siku_ya_mwisho_ya_mwezi", "ni_gotobi", "siku_ya_soko",

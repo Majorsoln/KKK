@@ -284,9 +284,30 @@ hiyo hatujui itafanya kazi — lakini tutajua **jibu**.
 
 | | familia | nanga | matukio | kizingiti | majaribio |
 |---|---|---|---|---|---|
-| **F0** | Mtiririko wa saa za nchi | 08:00 London · 12:00 NY | ~2,100 | 3.4 bps | 1 |
+| **F0** | Mtiririko wa saa za nchi | 08:00 · 17:00 London · 16:30 NY | **1,924** siku (legs 3,848) | 3.4 bps | 1 |
 | **Gotobi** | Malipo ya waagizaji wa Japani | siku ÷ 5, 09:55 JST | ~600 | 2.8 bps | 2 |
 | **F1** | Hedge ya hisa → fix ya mwisho wa mwezi | 16:00 London | **99** | 5.2 bps | 5 |
+
+**9.0 · F0 imetangazwa** (`src/families/f0.py`, fingerprint kwenye ledger).
+Legs mbili kwa siku, mielekeo tofauti: `A` kufunguka→kufunga London **SELL**
+(saa za ndani za euro), `B` kufunga London→kufunga New York **BUY** (saa za
+ndani za dola). Kwamba zinapingana ndiyo inayofanya F0 isiwe bet ya mwelekeo
+wa dola.
+
+**Nanga ya kati ni 17:00 Europe/London, si 12:00 NY** kama jedwali
+lilivyoandika kwa kifupi. Ni kitu kile kile kwa wiki 49/52; zinatofautiana
+kwenye wiki za mpito wa DST. Kipimo 2018–2025: **siku 131 kati ya 1,924
+(6.8%)**. Mekanizimu unasema *"madawati ya Ulaya yanaenda nyumbani"* — hiyo ni
+saa ya London. Kushika mpaka wa Ulaya kwenye saa ya Marekani kungefupisha leg A
+hadi masaa 8 kwa siku hizo 131, kwa sababu ya nchi isiyohusika. Ndiyo kasoro
+ambayo §11 inaionya. Marekebisho haya ni **tangazo**, si uteuzi: yameandikwa
+kabla ya row moja ya data kusomwa, mbadala haujaendeshwa, na hayagharimu
+jaribio.
+
+Matukio ni **siku 1,924**, si 2,100 kama ilivyokadiriwa. Curve ni ya siku, kwa
+hiyo `n` ya bootstrap ni 1,924 — `√(1924/2100) = 0.957` ya nguvu ya §7.1b.
+Legs mbili kwa siku zinarudisha sehemu ya hiyo, kwa sababu wastani wa siku
+unabeba matukio mawili.
 
 **Jumla ya majaribio ya mzunguko 1 = 8.** `0.020/8 = 0.0025` → **z ≈ 2.81**.
 
