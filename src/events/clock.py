@@ -351,6 +351,41 @@ def usiku_wa_swap(entry: datetime, exit_at: datetime) -> Rollovers:
     return Rollovers(nights=nights, triple_nights=triple)
 
 
+@dataclass(frozen=True)
+class Quotes:
+    """Pande zote mbili kwenye dirisha moja — ili `mid` isihesabiwe mara mbili.
+
+    Bei ya utekelezaji ni `ask` kwa kununua na `bid` kwa kuuza. `mid` ni ya
+    **kuripoti pekee**: `gross_pips` (mid→mid) dhidi ya `net_pips`
+    (utekelezaji→utekelezaji) inatoa spread iliyolipwa HALISI, na hiyo
+    inalinganishwa na iliyokadiriwa na RCE.
+    """
+
+    bid: float
+    ask: float
+    n_ticks: int
+    start: datetime
+    end: datetime
+
+    @property
+    def mid(self) -> float:
+        return (self.bid + self.ask) / 2.0
+
+    def executable(self, side: str) -> float:
+        return self.ask if side.upper() == BUY else self.bid
+
+    def spread_pips(self, pip: float) -> float:
+        return (self.ask - self.bid) / pip
+
+
+def quotes(ticks, start: datetime, window_seconds: int) -> Quotes:
+    """`bid` na `ask` VWAP kwenye dirisha lilelile, kwa kupita mara moja."""
+    b = vwap(ticks, start, window_seconds, SELL)
+    a = vwap(ticks, start, window_seconds, BUY)
+    return Quotes(bid=b.price, ask=a.price, n_ticks=a.n_ticks,
+                  start=a.start, end=a.end)
+
+
 def dirisha_la_tukio(anchor: Anchor, day: date, *, offset_minutes: int = 0
                      ) -> datetime:
     """Nanga siku hiyo, ikiwa imesogezwa kwa dakika, ikiwa UTC.
@@ -368,5 +403,6 @@ __all__ = [
     "TOKYO_FIX",
     "ni_siku_ya_kazi", "siku_za_kazi_za_mwezi", "siku_ya_mwisho_ya_mwezi",
     "ni_siku_ya_mwisho_ya_mwezi", "ni_gotobi", "siku_ya_soko",
-    "Rollovers", "usiku_wa_swap", "vwap", "dirisha_la_tukio",
+    "Rollovers", "usiku_wa_swap", "Quotes", "quotes", "vwap",
+    "dirisha_la_tukio",
 ]
