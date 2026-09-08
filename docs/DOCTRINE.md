@@ -327,6 +327,54 @@ Kitu chochote chini ya **3 bps** ni null bila kujali `p`.
 **Kupungua kwa mwaka kunapimwa kwa kila familia.** Ushahidi wa F0 unaishia
 2007; Gotobi inauzwa kama EA sokoni. Msongamano unatarajiwa.
 
+### 9.2 · F0 — JIBU (2026-09-08, EURUSD, 2018–2025)
+
+Malango yote matatu ya §6 yamepita **kabla ya `p` kuhesabiwa**: sababu ·
+gharama 6.6% (leg B, kikomo 8%) · matukio 1,913 dhidi ya 86 yanayohitajika.
+Kisha:
+
+```
+trades 3,825 · siku hai 1,913/1,924
+wastani  −0.02323 R/siku   ·   p 0.9740   ·   CI95 [−0.04515, −0.00095]
+kizingiti: p ≤ 0.0025
+```
+
+**F0 HAIJANUSURIKA.** Jaribio **1 kati ya 8** limetumika; yaliyobaki 7.
+
+**Kuvunja namba.** Gharama pekee, bila edge yoyote, ingetoa:
+
+```
+leg A   1R = 124.8 pips   gharama 1.00p   →  −0.00801 R/siku
+leg B   1R =  51.7 pips   gharama 1.05p   →  −0.02033 R/siku
+                                    jumla  =  −0.02834 R/siku
+```
+
+Iliyopimwa ni **−0.02323**. Kwa hiyo gross ni **+0.00511 R/siku** —
+**pips 0.26–0.64 kwa siku**, dhidi ya gharama ya **pips 2.05**. CI ya gross ni
+`[−0.017, +0.027]`, yaani **sifuri iko ndani yake**, na ncha ya juu kabisa
+inayoruhusiwa na data ni pips 1.4–3.4 — hasa kizingiti tulichotangaza kwamba
+tunaweza kuona (§7.1b: pips 3.4 kwa nguvu 50%).
+
+Mekanizimu **haujageuka; umepungua chini ya gharama.** Ishara iko upande
+uliotangazwa, ni ndogo mno kuliko spread. Ushahidi wa Ranaldo unaishia ~2007;
+sampuli yetu inaanza 2018.
+
+**Hii ndiyo aina ya jibu §12 iliyoahidi.** Si "hatujui" — ni "chini ya pips
+3.4, na uwezekano mkubwa karibu na 0.4", ikiwa na kizingiti kilichoandikwa
+kabla ya run.
+
+F0 haielezwi, hairekebishwi, haiendeshwi upya kwa vigezo vipya (§8).
+
+**Vitu vitatu vilivyopatikana wakati wa run hii, ambavyo si vya F0:**
+
+1. **RCE haihitaji v2 (Lango 3 limejibiwa).** Pengo kati ya kadirio la RCE na
+   spread halisi ya ticks: wastani **+0.022 pips**, p95 **+0.096 pips** kwa
+   trades 3,825. Kadirio ni sahihi ndani ya pip moja ya kumi. **RCE inabaki
+   kama ilivyo.**
+2. **Gharama halisi ni nusu ya iliyodhaniwa:** round-turn **1.00–1.05 pips**,
+   si 2.3. Namba hii inaingia kwenye malango ya familia zinazofuata.
+3. **Kanuni ya normal inakadiria stop chini kwa mara ~10.** Ona §11.
+
 ### 9.1 · Zilizosimamishwa, kwa hesabu
 
 | | sababu |
@@ -378,9 +426,24 @@ Zote zinatokea **kwa mifumo**, si kwa nasibu, kwa hiyo hazionekani kama kelele.
   inachukua bei mbili; haijui kama stop iligongwa katikati. Ni dhana
   **iliyotangazwa**, si iliyosahaulika, na inapimwa kwa
   `scripts/f0_run.py --angalia-stop` (inasoma dirisha zima kwa sampuli ya
-  vikao na kuripoti mwendo mbaya kabisa). Ikizidi kinadharia kwa kiasi
-  kikubwa, `k` inapanda au njia inaigwa — **uamuzi utakaoandikwa**, si
-  marekebisho ya kimya.
+  vikao na kuripoti mwendo mbaya kabisa).
+
+  **IMEPIMWA (2026-09-08, vikao 200 vya F0): 3.0%, si 0.3%.** Kanuni ya
+  normal inakadiria chini kwa **mara 10**. Sababu ni mikia minene ya FX:
+  `k = 4` inatoa stop ya `3.19σ` chini ya normal, lakini kwenye mfululizo
+  halisi wa ndani ya siku, kuvuka `3σ` kunatokea mara kadhaa zaidi. Zaidi ya
+  hapo, toleo la kwanza la kipimo lilitumia upande wa **kufungua** badala ya
+  wa **kufunga** (bid kwa SELL, si ask), kwa hiyo 3.0% ni **kikomo cha
+  chini**.
+
+  Athari kwa F0: **hakuna** — matokeo yake ni hasi tayari, na kuiga stop
+  kunaweza tu kufanya iwe mbaya zaidi (stop inakata trade iliyokuwa
+  itapona, haiongezi faida kamwe). Kwa hiyo hitimisho la §9.2 linasimama
+  kwa nguvu zaidi, si kidogo.
+
+  **Athari kwa familia zinazofuata: kubwa.** Familia yoyote inayoonekana
+  **chanya** lazima iige njia kabla ya kuaminiwa, au `k` ipande hadi
+  kugongwa kupimwe chini ya 0.5%. Uamuzi huu unaandikwa kabla ya Gotobi.
 
 ---
 

@@ -165,7 +165,11 @@ def angalia_stop(inv, siku, args, mwendo, *, n=100, seed=0):
         if frame.empty:
             continue
         ndani = quotes(frame, s.entry_at, f0.WINDOW_SECONDS)
-        bei = frame["bid"] if s.side == "SELL" else frame["ask"]
+        # Stop inagongwa kwa bei ya KUFUNGA, si ya kufungua. SELL inafungwa
+        # kwa `ask`; BUY inafungwa kwa `bid`. Kutumia upande wa kufungua
+        # kungepunguza mwendo mbaya kwa spread nzima na kuripoti kugongwa
+        # kuchache kuliko halisi.
+        bei = frame["ask"] if s.side == "SELL" else frame["bid"]
         ishara = -1.0 if s.side == "SELL" else 1.0
         mae = float((ishara * (bei - ndani.executable(s.side)) / PIP).min())
         sl = f0.SL_MOVE_MULT * stop[(d, leg)]
