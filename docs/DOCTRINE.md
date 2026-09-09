@@ -426,6 +426,67 @@ kwa `√muda`, gharama haikui. Ninabashiri `gharama/σ ≈ 17%` dhidi ya bajeti 
 Makadirio yangu yameshakosea mara mbili kwenye mradi huu (kugongwa kwa stop
 kwa mara 6; marekebisho ya §9.3 kwa mara 15). Lango linapimwa, halikadiriwi.
 
+---
+
+#### JIBU (2026-09-09) — Gotobi HAIINGII, na haiwezi kuingia
+
+```
+trades 276/500 · siku hai 276 · zilizogongwa stop 3 (1.09%)
+σ 15.17 pips · gharama 1.41 pips · uwiano 9.3%  dhidi ya bajeti 8%
+LANGO LA GHARAMA (§6.2) LIMEKATAA. `p` haijahesabiwa.
+```
+
+**Jaribio HALIJATUMIKA.** Symbol iliyokataliwa na §6 haiingii kwenye hesabu ya
+majaribio wala kwenye pooling. Mzunguko bado una **6** kati ya 7.
+
+**Ubashiri wangu ulikuwa mbaya kwa mara 1.8** — nilibashiri 17%, halisi ni
+9.3%. σ ilikuwa kubwa (15.17 dhidi ya 12) na gharama ndogo (1.41 dhidi ya
+2.1) kuliko nilivyokadiria. Ni ubashiri wangu wa **tatu** uliokosea kwenye
+mradi huu.
+
+**Haiwezi kuingia kwa nanga yoyote inayokubalika na mekanizimu.** Hii si
+maoni; ni hesabu:
+
+```
+σ inayohitajika kwa 8%     =  1.41 / 0.08  =  17.62 pips
+σ ∝ √muda                  →  dirisha  1.80 saa
+kuingia kungekuwa                          08:02 JST
+Tokyo inafunguka                           09:00 JST
+```
+
+Kuingia mapema zaidi kunahitajika ili kupita, lakini mapema zaidi ni
+**mbali zaidi na mtiririko**, si karibu. Na kwenda upande mwingine kunazidi
+kuwa mbaya:
+
+```
+kuingia 09:00 (kufunguka Tokyo)   saa 0.83   σ 11.99   uwiano 11.8%
+kuingia 08:30 (iliyotangazwa)     saa 1.33   σ 15.17   uwiano  9.3%
+```
+
+Hakuna nanga inayopita. **Gotobi imefungwa.**
+
+**Kilichokataa si soko — ni muundo wa akaunti.** Kwa bei ~130:
+
+```
+commission   0.91 pips   (65% ya gharama)
+spread       0.50 pips   (35%)
+bila commission:  uwiano 3.3%   ← lingepita kwa urahisi
+```
+
+`$7` kwa lot round-turn ni ndogo kwa dirisha la saa 9; kwa dirisha la saa 1.3
+ni **theluthi mbili ya gharama yote**. Familia za dirisha fupi zimezuiwa na
+muundo wa gharama, si na kukosa edge — na hilo halijulikani mpaka lipimwe.
+**Ni uamuzi wa broker, si wa utafiti**, na ukifanywa lazima utangazwe kabla
+ya run yoyote.
+
+**Kasoro ya data iliyopatikana njiani.** Madirisha **185 kati ya 500 (37%)**
+hayakuwa na tick hata moja saa 23:30 UTC — yaani **08:30 JST, kabla Tokyo
+haijafunguka**. Nanga niliyoichagua ilikuwa na kasoro ya mekanizimu tangu
+mwanzo: flow ya nakane haipo kabla ya soko kufunguka, na feed inathibitisha.
+Haibadilishi jibu (lango limekataa kwa sababu nyingine), lakini inaandikwa:
+**familia yoyote ya baadaye yenye nanga kabla ya 09:00 JST lazima ithibitishe
+ukwasi kwanza.**
+
 ### 9.3 · F0 inapimwa upya MARA MOJA, kwenye injini iliyorekebishwa
 
 Namba za §9.2 zilitolewa na injini yenye kasoro inayojulikana (§11): stop
