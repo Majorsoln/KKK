@@ -90,12 +90,25 @@ from src.events.clock import (
     Anchor,
     ni_siku_ya_kazi,
 )
+from src.families import stops as STOPS
 from src.families.base import Declaration, FamilyError
 from src.portfolio.basket import BUY, SELL, Basket, Leg
 from src.portfolio.regime import NORMAL, regime_of
 
 FAMILY = "F0"
 SYMBOL = "EURUSD"
+
+# EURUSD: pip ni 0.0001, na thamani yake kwa akaunti ya USD ni THABITI —
+# `100,000 × 0.0001 = $10` kwa lot, bila kujali bei. Familia zenye JPY
+# hazina bahati hiyo (ona `gotobi.pip_value`).
+PIP = 0.0001
+POINT = 0.00001
+CONTRACT_SIZE = 100_000.0
+
+
+def pip_value(mid: float) -> float:
+    """Thamani ya pip kwa lot moja, kwa akaunti ya USD."""
+    return CONTRACT_SIZE * PIP
 
 LEG_A = "A"                             # saa za Ulaya
 LEG_B = "B"                             # saa za Marekani
@@ -118,18 +131,22 @@ B_ENTRY_DELAY = timedelta(seconds=WINDOW_SECONDS)
 # `4.0` inatoka kwenye P(kuvuka) ≈ 0.3%, si kwenye ladha.
 SL_MOVE_MULT = 4.0
 
-# `E|X| = σ√(2/π)` kwa mgawanyo wa normal. Inatumika kugeuza mwendo wa wastani
-# kuwa `σ` kwa lango la gharama la §6.2, ambalo linadai σ ya DIRISHA.
-MOVE_TO_SIGMA = 1.2533141373155003
-
-# Vikao vya nyuma vinavyotumika kupima mwendo. Ni vya NYUMA pekee.
-SL_LOOKBACK_SESSIONS = 20
-SL_MIN_SESSIONS = 10
+# Sheria ya stop ni ya pamoja kwa familia zote — `families/stops.py`.
+SL_LOOKBACK_SESSIONS = STOPS.LOOKBACK_SESSIONS
+SL_MIN_SESSIONS = STOPS.MIN_SESSIONS
+MOVE_TO_SIGMA = STOPS.MOVE_TO_SIGMA
+session_move_pips = STOPS.session_move_pips
+stop_from_history = STOPS.stop_from_history
+stop_from_moves = STOPS.stop_from_moves
 
 # Kipaumbele kwenye arbiter: namba kubwa = inasubiri. F0 ina matukio ~1,900;
 # F1 ina 99. Familia adimu inapewa nafasi kwanza kwa sababu kupoteza tukio
 # moja kati ya 99 ni 1% ya ushahidi wake, dhidi ya 0.05% kwa F0.
 PRIORITY = 3
+
+# Edge iliyotangazwa §9 (kizingiti 3.4 bps), kwa lango la 6.3. Inatoka kwenye
+# kalibrisheni ya §7.1b — pips 3.4 kwa nguvu 50% kwa vikao 2,100.
+DECLARED_EDGE_PIPS = 3.4
 
 MECHANISM = (
     "Sarafu inashuka wakati wa saa za biashara za nchi yake na inapanda wakati "
@@ -166,77 +183,6 @@ DECLARATION = Declaration(
         "pivot_tz": A_EXIT.tz,
     },
 )
-
-
-# ===========================================================================
-# Mwendo wa kikao — vikao vilivyopita PEKEE
-# ===========================================================================
-
-
-def session_move_pips(ndani, nje, *, pip: float) -> float:
-    """`|kutoka − kuingia|` kwa **mid**, katika pips.
-
-    Mid, si bei ya utekelezaji: hiki ni kipimo cha **volatility**, na spread
-    si volatility. Kutumia bei ya utekelezaji kungeongeza spread nzima kwenye
-    kila kipimo, na stop ingekua kwa gharama badala ya kwa mwendo.
-    """
-    return abs(nje.mid - ndani.mid) / pip
-
-
-def stop_from_history(
-    history: Sequence[float],
-    *,
-    lookback: int = SL_LOOKBACK_SESSIONS,
-    min_sessions: int = SL_MIN_SESSIONS,
-) -> float | None:
-    """Wastani wa mwendo kwa vikao `lookback` vya mwisho, au `None`.
-
-    Kanuni ipo **hapa pekee**. `stop_from_moves` (batch) na `f0_run.sweep`
-    (mtiririko) zote zinaiita hii, ili zisije zikatofautiana kwa siku moja
-    kwenye mpaka wa historia — tofauti ambayo ingebadilisha lots bila
-    kuonekana popote.
-    """
-    if lookback < 1:
-        raise FamilyError(f"lookback ni {lookback}, si ≥ 1")
-    if min_sessions < 1 or min_sessions > lookback:
-        raise FamilyError(
-            f"min_sessions {min_sessions} haiko kati ya 1 na lookback {lookback}")
-    if len(history) < min_sessions:
-        return None
-    teule = list(history[-lookback:])
-    return sum(teule) / len(teule)
-
-
-def stop_from_moves(
-    moves: Mapping[tuple[date, str], float],
-    *,
-    lookback: int = SL_LOOKBACK_SESSIONS,
-    min_sessions: int = SL_MIN_SESSIONS,
-) -> dict[tuple[date, str], float]:
-    """Wastani wa mwendo wa dirisha kwa vikao vilivyotangulia.
-
-    `moves[(siku, leg)]` ni mwendo ULIOPIMWA wa dirisha hilo siku hiyo. Jibu
-    la siku fulani linatumia **siku zilizotangulia pekee** — siku yenyewe
-    haiingii. Bila hilo, stop ingejua mwendo wa siku ambayo bado
-    haijatokea, na ukubwa wa position ungekuwa na lookahead: siku zenye mwendo
-    mkubwa zingepewa lots ndogo *kwa sababu* mwendo ulikuwa mkubwa.
-
-    Siku zisizo na vikao `min_sessions` vya nyuma hazipati jibu, kwa hiyo
-    hazizalishi kikapu. Ni gharama ya kuanzia, si uteuzi.
-    """
-    out: dict[tuple[date, str], float] = {}
-    kwa_leg: dict[str, list[float]] = {}
-    for (siku, leg) in sorted(moves, key=lambda k: (k[1], k[0])):
-        nyuma = kwa_leg.setdefault(leg, [])
-        jibu = stop_from_history(nyuma, lookback=lookback,
-                                 min_sessions=min_sessions)
-        if jibu is not None:
-            out[(siku, leg)] = jibu
-        thamani = float(moves[(siku, leg)])
-        if thamani <= 0:
-            raise FamilyError(f"mwendo si chanya: {siku} {leg} → {thamani}")
-        nyuma.append(thamani)
-    return out
 
 
 # ===========================================================================
@@ -367,7 +313,8 @@ def windows_to_read(baskets_: Sequence[Basket]) -> list[tuple[datetime, int]]:
 
 
 __all__ = [
-    "FAMILY", "SYMBOL", "LEG_A", "LEG_B", "A_ENTRY", "A_EXIT", "B_EXIT",
+    "FAMILY", "SYMBOL", "PIP", "POINT", "CONTRACT_SIZE", "pip_value",
+    "LEG_A", "LEG_B", "A_ENTRY", "A_EXIT", "B_EXIT",
     "WINDOW_SECONDS", "B_ENTRY_DELAY", "SL_MOVE_MULT", "MOVE_TO_SIGMA",
     "SL_LOOKBACK_SESSIONS", "SL_MIN_SESSIONS", "PRIORITY", "MECHANISM",
     "DECLARATION", "Session", "session_move_pips", "stop_from_history",

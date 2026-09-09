@@ -285,7 +285,7 @@ hiyo hatujui itafanya kazi — lakini tutajua **jibu**.
 | | familia | nanga | matukio | kizingiti | majaribio |
 |---|---|---|---|---|---|
 | **F0** | Mtiririko wa saa za nchi | 08:00 · 17:00 London · 16:30 NY | **1,924** siku (legs 3,848) | 3.4 bps | 1 |
-| **Gotobi** | Malipo ya waagizaji wa Japani | siku ÷ 5, 09:55 JST | ~600 | 2.8 bps | 2 |
+| **Gotobi** | Malipo ya waagizaji wa Japani | 08:30 → 09:50 JST, siku ÷ 5 | **500** | 2.8 bps (pips 3.9) | **1** |
 | **F1** | Hedge ya hisa → fix ya mwisho wa mwezi | 16:00 London | **99** | 5.2 bps | 5 |
 
 **9.0 · F0 imetangazwa** (`src/families/f0.py`, fingerprint kwenye ledger).
@@ -385,6 +385,46 @@ F0 haielezwi, hairekebishwi, haiendeshwi upya kwa vigezo vipya (§8).
 2. **Gharama halisi ni nusu ya iliyodhaniwa:** round-turn **1.00–1.05 pips**,
    si 2.3. Namba hii inaingia kwenye malango ya familia zinazofuata.
 3. **Kanuni ya normal inakadiria stop chini kwa mara ~10.** Ona §11.
+
+### 9.4 · Gotobi imetangazwa (`src/families/gotobi.py`, `06a78b1b…`)
+
+Benki za Japani zinaweka **nakane** (仲値) saa 09:55 Asia/Tokyo — kiwango
+kimoja cha siku kwa miamala yote ya wateja. Waagizaji wanalipa siku za
+**gotobi** (tarehe ÷ 5), kwa hiyo mahitaji ya dola yanajilimbikiza na benki
+zinabidi zinunue dola sokoni kabla ya fix. **BUY USDJPY**, leg moja, saa
+1.33. Ni mtiririko wa **mkataba** — mwagizaji hana chaguo la kutolipa.
+
+**Jaribio 1, si 2.** Bajeti ilitenga mawili; ninatumia moja kwa sababu kuna
+ufafanuzi mmoja tu unaotokana na mekanizimu. Jumla ya mzunguko inashuka
+`8 → 7`, lakini kizingiti kinabaki `p ≤ 0.0025` (kilichotangazwa kwa 8).
+Kutumia machache kuliko bajeti ni **kali zaidi**, si laini.
+
+Vitu vitatu vilivyoamuliwa na mekanizimu, si na urahisi:
+
+1. **Kutoka kunaishia kwenye fix, hakuanzii hapo.** Shinikizo lipo kabla ya
+   09:55. `execute` inasoma `[kutoka, kutoka+300s)`, kwa hiyo nanga ni
+   `09:55 − 300s = 09:50`. Kuchukua `[09:55, 10:00)` kungekuwa kuuza baada ya
+   mtiririko — kungefuta edge **kwa ufafanuzi**, si kwa soko.
+2. **Kalenda ya benki za Japani** (`events/jp_calendar.py`). Gotobi ni siku ya
+   malipo; tarehe ÷5 ikianguka siku isiyo ya kazi, malipo yanasogezwa mbele.
+   Bila kalenda, **tarehe 66 kati ya 548 (12%)** zingeshikwa vibaya.
+   Chaguo-msingi ni kalenda, si `()` — kusahau hakupaswi kukubalika kimya.
+3. **Thamani ya pip ya JPY inabadilika kwa bei.** `1000 ÷ bei`: `$9.80` kwa
+   102, `$6.17` kwa 162 — tofauti ya **37%** kwenye sampuli yetu. Kuiweka
+   thabiti kungebadilisha `commission_pips` kwa kiasi kile kile, na lango la
+   §6.2 lingeamua kwa namba isiyo sahihi.
+
+Matukio yaliyopimwa: **500** (si ~600), ~62 kwa mwaka, thabiti. `n` ya
+bootstrap ni 500 — nguvu ni `√(500/1913) = 0.51` ya F0.
+
+**Ubashiri ulioandikwa kabla ya run.** Dirisha ni saa 1.33 pekee; `σ` inakua
+kwa `√muda`, gharama haikui. Ninabashiri `gharama/σ ≈ 17%` dhidi ya bajeti ya
+**8%** — yaani **Gotobi itakwama kwenye lango la gharama (§6.2), si kwenye
+`p`.** Likikwama, jibu ni *"dirisha ni fupi mno kwa gharama hii"*, na
+**halitagharimu α hata kidogo**.
+
+Makadirio yangu yameshakosea mara mbili kwenye mradi huu (kugongwa kwa stop
+kwa mara 6; marekebisho ya §9.3 kwa mara 15). Lango linapimwa, halikadiriwi.
 
 ### 9.3 · F0 inapimwa upya MARA MOJA, kwenye injini iliyorekebishwa
 

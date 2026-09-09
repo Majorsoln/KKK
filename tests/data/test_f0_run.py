@@ -1,8 +1,8 @@
-"""Mtiririko wa `scripts/f0_run.py` — DOCTRINE §4, §6, §7.
+"""Mtiririko wa `backtest.driver` — DOCTRINE §4, §6, §7.
 
-Script hii ndiyo PD anayoiendesha kwenye GB 33. Haiwezi kupimwa kwenye data
-hiyo hapa, kwa hiyo inapimwa kwenye L0 ndogo yenye **muundo ule ule**: folda
-za `provenance=/symbol=/year=/month=/day=`, ticks kwenye ncha nne za siku.
+Driver hii ndiyo PD anayoiendesha kwenye GB 33, kwa familia zote. Haiwezi
+kupimwa kwenye data hiyo hapa, kwa hiyo inapimwa kwenye L0 ndogo yenye
+**muundo ule ule**: folda za `provenance=/symbol=/year=/month=/day=`.
 
 Dai kubwa kuliko yote: **stop haina lookahead**. Kwenye mtiririko wa mwezi kwa
 mwezi ni rahisi mno kwa mwendo wa leo kuingia kwenye historia kabla ya kikapu
@@ -12,8 +12,6 @@ kama curve laini isiyo ya kawaida.
 
 from __future__ import annotations
 
-import importlib.util
-import sys
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
@@ -22,31 +20,12 @@ import pandas as pd
 import pytest
 
 from src.analysis.control import _nanos
+from src.backtest import driver as D
 from src.data import ticks as TK
 from src.families import f0
 from src.rce.config import load_config
 
 REPO = Path(__file__).resolve().parents[2]
-
-
-def _load_script():
-    """`scripts/` si package; script inapakiwa kwa njia yake."""
-    spec = importlib.util.spec_from_file_location(
-        "f0_run", REPO / "scripts" / "f0_run.py")
-    mod = importlib.util.module_from_spec(spec)
-    sys.modules["f0_run"] = mod
-    spec.loader.exec_module(mod)
-    return mod
-
-
-F0RUN = _load_script()
-
-
-class Args:
-    balance = 10_000.0
-    pip_value = 10.0
-    commission = 7.0
-    contract_size = 100_000.0
 
 
 @pytest.fixture(scope="module")
@@ -87,10 +66,9 @@ def sweep(L0):
     root, siku = L0
     inv = TK.discover(root)
     cfg = load_config(REPO / "config" / "risk.yaml")
-    trades, mwendo, kukosekana, kukataliwa = F0RUN.sweep(
-        inv, siku, Args(), cfg=cfg)
-    return dict(inv=inv, siku=siku, trades=trades, mwendo=mwendo,
-                kukosekana=kukosekana, kukataliwa=kukataliwa)
+    sw = D.sweep(f0, inv, siku, D.RunSpec(), cfg=cfg)
+    return dict(inv=inv, siku=siku, trades=sw.trades, mwendo=sw.moves,
+                kukosekana=sw.missing, kukataliwa=sw.rejected, sw=sw)
 
 
 # ===========================================================================
