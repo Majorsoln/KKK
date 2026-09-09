@@ -91,7 +91,7 @@ from src.events.clock import (
     ni_siku_ya_kazi,
 )
 from src.families import stops as STOPS
-from src.families.base import Declaration, FamilyError
+from src.families.base import Declaration, FamilyError, Measurement
 from src.portfolio.basket import BUY, SELL, Basket, Leg
 from src.portfolio.regime import NORMAL, regime_of
 
@@ -242,6 +242,13 @@ def sessions_for(day: date) -> tuple[Session, Session]:
     )
 
 
+def measurements(day: date) -> tuple["Measurement", ...]:
+    """Legs mbili za symbol MOJA, kwa madirisha tofauti."""
+    return tuple(Measurement(key=s.leg, symbol=SYMBOL,
+                             entry_at=s.entry_at, exit_at=s.exit_at)
+                 for s in sessions_for(day))
+
+
 def eligible_days(
     days: Iterable[date],
     *,
@@ -325,5 +332,5 @@ __all__ = [
     "SL_LOOKBACK_SESSIONS", "SL_MIN_SESSIONS", "PRIORITY", "MECHANISM",
     "DECLARATION", "Session", "session_move_pips", "stop_from_history",
     "stop_from_moves",
-    "sessions_for", "eligible_days", "baskets", "windows_to_read",
+    "sessions_for", "measurements", "eligible_days", "baskets", "windows_to_read",
 ]

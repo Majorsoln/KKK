@@ -25,10 +25,12 @@ sys.path.insert(0, str(REPO))
 from src.analysis import bootstrap as BS                       # noqa: E402
 from src.backtest import driver as D                           # noqa: E402
 from src.data import ticks as TK                               # noqa: E402
-from src.families import f0, gotobi                            # noqa: E402
+from src.data import indices as IX                             # noqa: E402
+from src.families import f0, f1, gotobi                        # noqa: E402
+from src.families import f1_signal as SIG                      # noqa: E402
 from src.rce.config import load_config                         # noqa: E402
 
-FAMILIES = {"f0": f0, "gotobi": gotobi}
+FAMILIES = {"f0": f0, "gotobi": gotobi, "f1": f1}
 RIPOTI = REPO / "research" / "reports"
 
 # §9: majaribio 8 kwenye α = 0.020 → 0.0025.
@@ -50,6 +52,8 @@ def main() -> int:
     ap.add_argument("--seed", type=int, default=1)
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--out", default=None)
+    ap.add_argument("--indices", default=None,
+                    help="folda ya faharasa (F1 pekee)")
     ap.add_argument("--verbose", action="store_true")
     args = ap.parse_args()
 
@@ -65,15 +69,16 @@ def main() -> int:
         zote.append(d)
         d += timedelta(days=1)
     siku = fam.eligible_days(zote)
-    n_legs = len(fam.sessions_for(siku[0])) if siku else 0
+    n_legs = len(fam.measurements(siku[0])) if siku else 0
 
-    print(f"{fam.FAMILY} — {fam.DECLARATION.symbols[0]}")
+    print(f"{fam.FAMILY} — {'/'.join(fam.DECLARATION.symbols)}")
     print(fam.DECLARATION.render())
     print(f"\n   dirisha {anza} → {mwisho} · siku zinazostahili {len(siku):,} "
           f"· legs {n_legs} kwa siku · matukio {n_legs * len(siku):,}")
     print(f"   edge iliyotangazwa {edge} pips · kizingiti p ≤ {KIZINGITI}")
 
-    inv = TK.discover(root, symbols=[fam.SYMBOL], provenance=args.provenance)
+    zote_symbols = list(getattr(fam, "SYMBOLS", (getattr(fam, "SYMBOL", ""),)))
+    inv = TK.discover(root, symbols=zote_symbols, provenance=args.provenance)
     print("\n" + inv.render())
     if args.dry_run:
         print("\n--dry-run: hakuna tick iliyosomwa.")
@@ -82,11 +87,32 @@ def main() -> int:
         print("\nHAKUNA SIKU INAYOSTAHILI kwenye dirisha hili.")
         return 2
 
+    # ---- ishara ya F1 ----
+    ziada = {}
+    if fam is f1:
+        folda = Path(args.indices) if args.indices else (
+            REPO / "research" / "data" / "indices")
+        inahitajika = {SIG.INDEX_FOR[s] for s in f1.QUALIFIED}
+        try:
+            series = IX.load({j: folda / f"{j}.csv" for j in inahitajika})
+        except IX.IndexError_ as exc:
+            print(f"\nISHARA HAIPO: {exc}\n   Endesha "
+                  f"`python scripts/fetch_indices.py` kwanza (§4 ya f1.py: "
+                  f"F1 haiwezi kuendeshwa bila ishara ya hisa).")
+            return 2
+        ishara = SIG.signals(siku, series)
+        print(f"\n   ishara kamili: {len(ishara)}/{len(siku)} "
+              f"({len(ishara) / max(1, len(siku)):.0%})")
+        if not ishara:
+            print("   HAKUNA ISHARA HATA MOJA.")
+            return 2
+        ziada["signal"] = lambda d: ishara.get(d)
+
     spec = D.RunSpec(balance=args.balance, commission_round_turn=args.commission)
     print(f"\n   kusoma vipande {len(D.chunks(siku)):,}…\n", flush=True)
     sw = D.sweep(fam, inv, siku, spec,
                  cfg=load_config(REPO / "config" / "risk.yaml"),
-                 progress=print if args.verbose else None)
+                 progress=print if args.verbose else None, **ziada)
 
     print(f"\n   trades {len(sw.trades):,} · muda {sw.seconds:.0f}s")
     if sw.missing:
@@ -142,7 +168,7 @@ def main() -> int:
     print(q.render())
 
     matokeo = {
-        "family": fam.FAMILY, "symbol": fam.SYMBOL,
+        "family": fam.FAMILY, "symbols": list(fam.DECLARATION.symbols),
         "declaration": fam.DECLARATION.to_json(),
         "window": {"start": args.start, "end": args.end,
                    "eligible_days": len(siku), "legs_per_day": n_legs,
@@ -159,11 +185,20 @@ def main() -> int:
     }
 
     if not q.passed:
-        print(f"\n{fam.FAMILY} × {fam.SYMBOL} HAIINGII. `p` haihesabiwi — "
+        print(f"\n{fam.FAMILY} HAIINGII. `p` haihesabiwi — "
               f"symbol iliyokataliwa\n   haiingii kwenye hesabu ya majaribio "
               f"wala kwenye pooling (§6).")
         _andika(args, fam, matokeo)
         return 3
+
+    # `PLACEHOLDER` ni ya lango pekee (§4 ya f1.py). Trade yoyote
+    # iliyoizalishwa haiwezi kuzalisha `p`.
+    if fam is f1 and any(getattr(ziada.get("signal")(d), "placeholder", False)
+                         for d in siku if ziada.get("signal")
+                         and ziada["signal"](d) is not None):
+        print("\nISHARA NI `PLACEHOLDER` — `p` haihesabiwi.")
+        _andika(args, fam, matokeo)
+        return 2
 
     r = BS.test_mean_positive(mz.curve, B=args.B, seed=args.seed)
     print("\n" + "=" * 74)

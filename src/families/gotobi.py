@@ -72,7 +72,7 @@ from typing import Callable, Iterable, Mapping, Sequence
 from src.events.clock import TOKYO_FIX, Anchor, ni_gotobi, ni_siku_ya_kazi
 from src.events.jp_calendar import holidays_between
 from src.families import stops as STOPS
-from src.families.base import Declaration, FamilyError
+from src.families.base import Declaration, FamilyError, Measurement
 from src.portfolio.basket import BUY, Basket, Leg
 from src.portfolio.regime import NORMAL, regime_of
 
@@ -219,6 +219,13 @@ def jp_holidays(days: Sequence[date]) -> set[date]:
     return holidays_between(min(days), max(days))
 
 
+def measurements(day: date) -> tuple["Measurement", ...]:
+    """Leg moja, symbol moja."""
+    return tuple(Measurement(key=s.leg, symbol=SYMBOL,
+                             entry_at=s.entry_at, exit_at=s.exit_at)
+                 for s in sessions_for(day))
+
+
 def eligible_days(
     days: Iterable[date],
     *,
@@ -290,5 +297,5 @@ __all__ = [
     "SL_LOOKBACK_SESSIONS", "SL_MIN_SESSIONS", "MOVE_TO_SIGMA", "PRIORITY",
     "DECLARED_EDGE_PIPS", "MECHANISM", "DECLARATION", "Session", "session_move_pips",
     "stop_from_history", "stop_from_moves", "sessions_for", "jp_holidays",
-    "eligible_days", "baskets", "windows_to_read",
+    "measurements", "eligible_days", "baskets", "windows_to_read",
 ]

@@ -79,6 +79,7 @@ class Sweep:
     moves: dict = field(default_factory=dict)
     missing: list = field(default_factory=list)
     rejected: list = field(default_factory=list)
+    key_of: dict = field(default_factory=dict)
     seconds: float = 0.0
 
     @property
@@ -95,10 +96,39 @@ def chunks(days: Sequence[date], *, size: int = DAYS_PER_CHUNK):
     return [list(days[i:i + size]) for i in range(0, len(days), size)]
 
 
-def market(family, spec: RunSpec, *, spread_pips: float, mid: float) -> dict:
+def symbols_of(family) -> tuple[str, ...]:
+    """Symbols zinazotradiwa — kutoka **tangazo**, si kutoka moduli.
+
+    F1 ina `SYMBOLS` sita (mekanizimu, §6.1) lakini inatradia nne
+    (`QUALIFIED`, §6.2). Tangazo ndilo lenye mamlaka: ndilo lililo-hash na
+    kufungwa, na ndilo linalosema ni nini kilichoendeshwa. Kusoma `SYMBOLS`
+    kungejaribu kusoma ticks za symbols zilizokataliwa na lango.
+    """
+    return tuple(family.DECLARATION.symbols)
+
+
+def _pip(family, symbol: str) -> float:
+    pips = getattr(family, "PIPS", None)
+    return pips[symbol] if pips else family.PIP
+
+
+def _point(family, symbol: str) -> float:
+    points = getattr(family, "POINTS", None)
+    return points[symbol] if points else family.POINT
+
+
+def _pip_value(family, symbol: str, mid: float) -> float:
+    try:
+        return family.pip_value(symbol, mid)
+    except TypeError:
+        return family.pip_value(mid)
+
+
+def market(family, spec: RunSpec, *, symbol: str, spread_pips: float,
+           mid: float) -> dict:
     """Kila kitu RCE inachohitaji, kikiwa kimepimwa kwenye bei ya sasa."""
     return {
-        "spec": SymbolSpec(symbol=family.SYMBOL, point=family.POINT,
+        "spec": SymbolSpec(symbol=symbol, point=_point(family, symbol),
                            contract_size=family.CONTRACT_SIZE,
                            volume_min=spec.volume_min,
                            volume_step=spec.volume_step,
@@ -107,63 +137,99 @@ def market(family, spec: RunSpec, *, spread_pips: float, mid: float) -> dict:
                                 today_loss=0.0, open_positions=0),
         "h1_spreads": [spread_pips] * 120,
         "m5_spreads": [spread_pips] * 300,
-        "pip_value_acct": family.pip_value(mid),
+        "pip_value_acct": _pip_value(family, symbol, mid),
         "commission_round_turn": spec.commission_round_turn,
-        "pip": family.PIP,
+        "pip": _pip(family, symbol),
     }
 
 
 def sweep(family, inv, days: Sequence[date], spec: RunSpec, *, cfg,
-          progress=None) -> Sweep:
-    """Pita vipande vyote: quotes → mwendo → stop → kikapu → trade."""
-    partitions = inv.of(family.SYMBOL)
+          progress=None, **basket_kwargs) -> Sweep:
+    """Pita vipande vyote: quotes → mwendo → stop → kikapu → trade.
+
+    `basket_kwargs` inapitishwa kwa `family.baskets` — ndipo F1 inapopokea
+    `signal` yake. Familia zisizohitaji kitu cha ziada hazibadiliki.
+
+    **Kikapu kinajengwa MARA MOJA kwa siku**, baada ya stop za `Measurement`
+    zote kupatikana. Kwa F1 hilo ni la lazima: legs nne ni kikapu kimoja, na
+    kujenga kwa kila leg peke yake kungetoa vikapu vinne vya leg moja —
+    strategy tofauti kabisa, isiyosawazishwa.
+    """
+    zote = symbols_of(family)
+    partitions = {s: inv.of(s) for s in zote}
     out = Sweep()
     historia: dict[str, list[float]] = {}
     t0 = time.time()
 
     for kundi in chunks(days):
-        maombi = []
+        maombi: dict[str, list] = {s: [] for s in zote}
         for d in kundi:
-            for s in family.sessions_for(d):
-                # Kuingia → kutoka + dirisha la kutoka, ikiwa ombi MOJA.
-                urefu = int((s.exit_at - s.entry_at).total_seconds())
-                maombi.append((s.entry_at, urefu + family.WINDOW_SECONDS))
-        frame = TK.read_windows(inv, family.SYMBOL, maombi,
-                                partitions=partitions)
+            for m in family.measurements(d):
+                urefu = int((m.exit_at - m.entry_at).total_seconds())
+                maombi[m.symbol].append(
+                    (m.entry_at, urefu + family.WINDOW_SECONDS))
+        frames = {s: TK.read_windows(inv, s, maombi[s], partitions=partitions[s])
+                  for s in zote if maombi[s]}
 
         for d in kundi:
-            for s in family.sessions_for(d):
-                try:
-                    ndani = quotes(frame, s.entry_at, family.WINDOW_SECONDS)
-                    nje = quotes(frame, s.exit_at, family.WINDOW_SECONDS)
-                except Exception as exc:                       # noqa: BLE001
-                    out.missing.append((d, s.leg, str(exc)[:80]))
+            stops, mwendo_leo, kwa_dirisha = {}, {}, {}
+            for m in family.measurements(d):
+                frame = frames.get(m.symbol)
+                if frame is None:
+                    out.missing.append((d, m.key, "hakuna frame"))
                     continue
-
+                try:
+                    ndani = quotes(frame, m.entry_at, family.WINDOW_SECONDS)
+                    nje = quotes(frame, m.exit_at, family.WINDOW_SECONDS)
+                except Exception as exc:                       # noqa: BLE001
+                    out.missing.append((d, m.key, str(exc)[:80]))
+                    continue
                 # Stop ya leo inatoka kwenye historia ya JANA. Inasomwa kabla
                 # ya mwendo wa leo kuongezwa — hapo ndipo lookahead ingeingia.
-                nyuma = historia.setdefault(s.leg, [])
-                m = family.stop_from_history(nyuma)
-                if m is not None:
-                    vikapu = family.baskets([d], move_pips={(d, s.leg): m})
-                    for k in vikapu:
-                        soko = {family.SYMBOL: market(
-                            family, spec,
-                            spread_pips=ndani.spread_pips(family.PIP),
-                            mid=ndani.mid)}
-                        jibu = execute(k, cfg=cfg,
-                                       ticks_by_symbol={family.SYMBOL: frame},
-                                       market=soko,
-                                       window_seconds=family.WINDOW_SECONDS,
-                                       path_ticks={family.SYMBOL: frame})
-                        if jibu.executed:
-                            out.trades.extend(jibu.trades)
-                        else:
-                            out.rejected.append((d, s.leg, jibu.reason))
+                nyuma = historia.setdefault(m.key, [])
+                stop = family.stop_from_history(nyuma)
+                if stop is not None:
+                    stops[(d, m.key)] = stop
+                mwendo_leo[m.key] = (
+                    family.session_move_pips(ndani, nje,
+                                             pip=_pip(family, m.symbol)),
+                    ndani, m)
+                # Ufunguo unatafutwa kwa DIRISHA, si kwa symbol: F0 ina legs
+                # mbili za symbol ILE ILE kwa madirisha tofauti, na kutafuta
+                # kwa symbol kungechagua leg A kwa vikapu vyote viwili.
+                kwa_dirisha[(m.symbol, m.entry_at, m.exit_at)] = (m.key, ndani)
 
-                kiasi = family.session_move_pips(ndani, nje, pip=family.PIP)
-                out.moves[(d, s.leg)] = kiasi
-                nyuma.append(kiasi)
+            if stops:
+                vikapu = family.baskets([d], move_pips=stops, **basket_kwargs)
+                for k in vikapu:
+                    soko, ticks = {}, {}
+                    for leg in k.legs:
+                        pata = kwa_dirisha.get(
+                            (leg.symbol, k.entry_at, k.planned_exit_at))
+                        if pata is None:
+                            continue
+                        key, rejea = pata
+                        soko[leg.symbol] = market(
+                            family, spec, symbol=leg.symbol,
+                            spread_pips=rejea.spread_pips(_pip(family, leg.symbol)),
+                            mid=rejea.mid)
+                        ticks[leg.symbol] = frames[leg.symbol]
+                        out.key_of[(k.basket_id, leg.symbol)] = key
+                    if len(soko) != len(k.legs):
+                        out.rejected.append((d, k.basket_id, "quotes hazipo"))
+                        continue
+                    jibu = execute(k, cfg=cfg, ticks_by_symbol=ticks,
+                                   market=soko,
+                                   window_seconds=family.WINDOW_SECONDS,
+                                   path_ticks=ticks)
+                    if jibu.executed:
+                        out.trades.extend(jibu.trades)
+                    else:
+                        out.rejected.append((d, k.basket_id, jibu.reason))
+
+            for key, (kiasi, _, _) in mwendo_leo.items():
+                out.moves[(d, key)] = kiasi
+                historia.setdefault(key, []).append(kiasi)
 
         if progress:
             progress(f"   {kundi[0]:%Y-%m-%d}  siku {len(kundi):>2}  "
@@ -210,7 +276,8 @@ def measure(family, sw: Sweep, days: Sequence[date]) -> Measured:
     kwa_leg: dict[str, dict] = {}
     for leg in sorted({l for (_, l) in sw.moves}):
         m = [v for (_, l), v in sw.moves.items() if l == leg]
-        t_leg = [t for t in sw.finished if t.basket_id.endswith(f":{leg}")]
+        t_leg = [t for t in sw.finished
+                 if sw.key_of.get((t.basket_id, t.symbol)) == leg]
         if not m or not t_leg:
             continue
         wastani = st.fmean(m)
@@ -252,7 +319,7 @@ def gate(family, mz: Measured, *, edge_pips: float, n_legs: int
     """Lango la §6, likiwa limepimwa kwa leg mbaya kabisa."""
     s = sharpe_per_day(family, mz, edge_pips=edge_pips, n_legs=n_legs)
     q = qualify(
-        family.FAMILY, family.SYMBOL,
+        family.FAMILY, mz.worst_leg,
         mechanism_ok=True, mechanism_note=family.DECLARATION.source,
         cost_pips=mz.cost_pips, sigma_pips=mz.sigma_pips,
         n_events=mz.curve.n_active, sharpe_per_event=s,
@@ -261,4 +328,5 @@ def gate(family, mz: Measured, *, edge_pips: float, n_legs: int
 
 
 __all__ = ["DAYS_PER_CHUNK", "RunSpec", "Sweep", "Measured", "chunks",
+           "symbols_of",
            "market", "sweep", "measure", "sharpe_per_day", "gate"]

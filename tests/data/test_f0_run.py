@@ -169,3 +169,34 @@ def test_pengo_la_spread_ni_karibu_SIFURI_kwa_spread_thabiti(sweep):
     """Kwenye ticks zenye spread isiyobadilika, kadirio la RCE ni sahihi kabisa.
     Kwenye data ya PD ndipo namba hii itakuwa na maana (Lango 3)."""
     assert max(abs(t.spread_gap_pips) for t in sweep["trades"]) < 0.05
+
+
+# ===========================================================================
+# Driver ya symbols nyingi
+# ===========================================================================
+
+
+def test_symbols_zinatoka_kwenye_TANGAZO_si_kwenye_moduli():
+    """F1 ina `SYMBOLS` sita (mekanizimu §6.1) lakini inatradia nne
+    (`QUALIFIED` §6.2). Tangazo ndilo lenye mamlaka — ndilo lililo-hash.
+    Kusoma `SYMBOLS` kungejaribu kusoma ticks za symbols zilizokataliwa."""
+    from src.families import f1, gotobi
+
+    assert D.symbols_of(f0) == ("EURUSD",)
+    assert D.symbols_of(gotobi) == ("USDJPY",)
+    assert D.symbols_of(f1) == f1.QUALIFIED
+    assert len(f1.SYMBOLS) == 6 and len(D.symbols_of(f1)) == 4
+
+
+def test_legs_za_symbol_MOJA_hazichanganyiki(sweep):
+    """F0 ina legs mbili za EURUSD kwa madirisha tofauti. Ufunguo unatafutwa
+    kwa DIRISHA, si kwa symbol; kutafuta kwa symbol kungechagua leg A kwa
+    vikapu vyote viwili, na leg B ingetoweka kwenye vipimo."""
+    sw = sweep["sw"]
+    funguo = {sw.key_of[(t.basket_id, t.symbol)] for t in sw.trades}
+    assert funguo == {f0.LEG_A, f0.LEG_B}
+    kwa_funguo = {}
+    for t in sw.trades:
+        kwa_funguo.setdefault(sw.key_of[(t.basket_id, t.symbol)], 0)
+        kwa_funguo[sw.key_of[(t.basket_id, t.symbol)]] += 1
+    assert kwa_funguo[f0.LEG_A] == kwa_funguo[f0.LEG_B]

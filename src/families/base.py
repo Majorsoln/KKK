@@ -28,6 +28,7 @@ from __future__ import annotations
 import hashlib
 import json
 from dataclasses import dataclass, field
+from datetime import datetime
 from typing import Any
 
 from src.portfolio.regime import REGIMES
@@ -119,4 +120,24 @@ class Declaration:
         }
 
 
-__all__ = ["FIELDS", "FamilyError", "Declaration"]
+@dataclass(frozen=True)
+class Measurement:
+    """Kitu KIMOJA kinachopimwa: ncha mbili za symbol moja, siku moja.
+
+    Familia zina maumbo tofauti — F0 ina legs mbili za symbol moja kwa
+    madirisha tofauti; F1 ina symbols nne kwenye dirisha moja. Driver
+    haipaswi kujua tofauti hiyo, kwa hiyo kila familia inaitafsiri kuwa
+    orodha ya `Measurement`, na `key` ndiyo inayohifadhi historia ya stop.
+    """
+
+    key: str
+    symbol: str
+    entry_at: "datetime"
+    exit_at: "datetime"
+
+    @property
+    def hours(self) -> float:
+        return (self.exit_at - self.entry_at).total_seconds() / 3600.0
+
+
+__all__ = ["FIELDS", "FamilyError", "Declaration", "Measurement"]

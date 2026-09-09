@@ -64,7 +64,7 @@ from typing import Any, Callable, Iterable, Mapping, Sequence
 
 from src.events.clock import LONDON_FIX, Anchor, siku_ya_mwisho_ya_mwezi
 from src.families import stops as STOPS
-from src.families.base import Declaration, FamilyError
+from src.families.base import Declaration, FamilyError, Measurement
 from src.portfolio.basket import BUY, SELL, Basket, Leg
 from src.portfolio.regime import MONTH_END_FIX, TURN_OF_YEAR, regime_of
 
@@ -300,6 +300,15 @@ def sessions_for(day: date) -> tuple[Session, ...]:
     return (Session(day, LEG, "", ndani, nje),)
 
 
+def measurements(day: date) -> tuple[Measurement, ...]:
+    """Symbols NNE kwenye dirisha MOJA. `key` ni symbol yenyewe, kwa sababu
+    kila moja ina volatility yake na kwa hiyo stop yake."""
+    s, = sessions_for(day)
+    return tuple(Measurement(key=symbol, symbol=symbol,
+                             entry_at=s.entry_at, exit_at=s.exit_at)
+                 for symbol in QUALIFIED)
+
+
 def eligible_days(
     days: Iterable[date],
     *,
@@ -399,5 +408,5 @@ __all__ = [
     "PRIORITY", "DECLARED_EDGE_PIPS", "MECHANISM", "DECLARATION",
     "Signal", "PLACEHOLDER", "side_for", "Session", "LEG", "sessions_for",
     "session_move_pips", "stop_from_history", "stop_from_moves",
-    "eligible_days", "baskets", "windows_to_read",
+    "measurements", "eligible_days", "baskets", "windows_to_read",
 ]
