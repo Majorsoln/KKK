@@ -411,6 +411,59 @@ marekebisho ni sawia na ya 2021, wastani wa miaka nane utakuwa takribani
 chini ya kizingiti cha pips 3.4. **Ubashiri wangu: F0 bado haitanusurika.**
 Ikinusurika, ni jibu — na nitasema hivyo.
 
+---
+
+#### JIBU LA MWISHO (2026-09-09, injini iliyorekebishwa)
+
+```
+trades 3,825 · zilizogongwa stop 70 (1.83%) · siku hai 1,913/1,924
+wastani  −0.02255 R/siku   ·   p 0.9710   ·   CI95 [−0.04388, −0.00104]
+kizingiti: p ≤ 0.0025
+```
+
+**F0 HAIJANUSURIKA.** Familia imefungwa. Jaribio 1 kati ya 8 limetumika.
+
+**Ubashiri wangu ulikuwa mbaya kwa `0.0100`** — nilibashiri `−0.0125`,
+halisi ni `−0.02255`. Nilipanua marekebisho ya 2021 (`+0.0107`) kwa miaka
+nane; halisi ilikuwa **`+0.00068` pekee, 3.0% ya jumla**. Sababu: athari
+mbili za stop zinafutana kwa muda mrefu, ingawa hazikufutana mwaka 2021.
+
+```
+stops (70 × −1R)         −0.03638 R/siku
+zilizomaliza kwa saa     +0.01383 R/siku
+                         ─────────
+                         −0.02255
+```
+
+Gharama kwa trades **zote** (iliyomo ndani ya −1R ya zilizogongwa pia):
+`54.21 R` = `0.02817 R/siku`. Kwa hiyo:
+
+```
+gross bila masharti   +0.00562 R/siku   =  pips 0.29 – 0.70 kwa siku
+CI ya gross           [−0.0157, +0.0271] =  ncha ya juu pips 1.4 – 3.4
+gharama                                     pips 2.05 kwa siku
+```
+
+Sifuri iko ndani ya CI. Ncha ya juu kabisa inayoruhusiwa na data ni **pips
+3.4** — hasa kizingiti tulichotangaza kwamba tunaweza kuona (§7.1b).
+Hitimisho la §9.2 halijabadilika hata kidogo (`gross +0.00511 → +0.00562`).
+
+**Kugongwa kwa stop, kwa mwaka:**
+
+```
+2018  7 · 2019  7 · 2020  8 · 2021 12
+2022  7 · 2023  6 · 2024  8 · 2025 15
+leg A 26/1,912 (1.36%)   ·   leg B 44/1,913 (2.30%)
+MAE p50 14.3p · p95 69.3p · kubwa 250.7p
+```
+
+Kiwango ni thabiti kwa miaka minane, na ni mara **sita** ya 0.3% ya kanuni
+ya normal. Leg B inagongwa mara mbili zaidi ya leg A: stop yake ni pips 51
+dhidi ya 125, na gharama ya pip 1.05 ni sehemu kubwa zaidi yake.
+
+**Lango 3 limethibitishwa tena** kwenye trades 3,755 zilizomaliza kwa saa:
+pengo la spread wastani **+0.022p**, p95 **+0.096p**. RCE inabaki kama ilivyo.
+
 ### 9.1 · Zilizosimamishwa, kwa hesabu
 
 | | sababu |
