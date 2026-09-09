@@ -77,6 +77,31 @@ SYMBOLS = ("EURUSD", "GBPUSD", "AUDUSD", "USDJPY", "USDCHF", "USDCAD")
 # Pairs ambazo dola iko UPANDE WA NUKUU. Kuuza dola = KUNUNUA pair.
 USD_QUOTED = frozenset({"EURUSD", "GBPUSD", "AUDUSD"})
 
+# ---------------------------------------------------------------------------
+# §6.2 — symbols ZILIZOPITA lango la gharama (`scripts/gate_probe.py`,
+# 2026-09-09, matukio 96, commission $7/lot):
+#
+#     EURUSD  3.89%   PITA        AUDUSD  9.92%   KATAA
+#     GBPUSD  4.82%   PITA        USDCHF  8.03%   KATAA
+#     USDJPY  5.35%   PITA
+#     USDCAD  7.23%   PITA
+#
+# `SYMBOLS` ni seti ya **mekanizimu** (§6.1): nchi zenye masoko ya hisa
+# yanayoweza kuhitaji hedge. `QUALIFIED` ni seti ya **gharama** (§6.2).
+# Kuchuja hapa si marekebisho ya baada ya kuona matokeo — ndiyo utaratibu
+# wa §6 wenyewe: "Symbol iliyokataliwa haiingii kwenye hesabu ya majaribio
+# wala kwenye pooling."
+#
+# Ulinzi unaofanya hili liwe salama: lango linatumia **σ na gharama pekee**,
+# halijui faida hata kidogo. Haliwezi kuchagua symbol kwa sababu ilifanya
+# vizuri, kwa sababu haioni ilivyofanya.
+#
+# USDCHF imekataliwa kwa **pips 0.006** — 8.03% dhidi ya 8.00%. Iko ndani ya
+# kelele ya kipimo. Sheria iliyotangazwa ndiyo inayoamua, si hukumu yangu;
+# na kwa vyovyote jibu la F1 halitegemei leg moja ya mpakani.
+# ---------------------------------------------------------------------------
+QUALIFIED = ("EURUSD", "GBPUSD", "USDJPY", "USDCAD")
+
 PIPS: dict[str, float] = {s: (0.01 if s.endswith("JPY") else 0.0001)
                           for s in SYMBOLS}
 POINTS: dict[str, float] = {s: p / 10.0 for s, p in PIPS.items()}
@@ -139,7 +164,7 @@ MECHANISM = (
 
 DECLARATION = Declaration(
     family=FAMILY,
-    symbols=SYMBOLS,
+    symbols=QUALIFIED,
     nanga=("16:00 Europe/London, siku ya mwisho ya kazi ya mwezi; "
            "kuingia dakika 60 kabla, kutoka dakika 15 baada"),
     mwelekeo=("kwa kila pair, kwa ishara ya hisa: kuuza dola → KUNUNUA pair "
@@ -166,7 +191,9 @@ DECLARATION = Declaration(
         "sl_lookback_sessions": SL_LOOKBACK_SESSIONS,
         "sl_min_sessions": SL_MIN_SESSIONS,
         "priority": PRIORITY,
-        "symbols": list(SYMBOLS),
+        "symbols_mechanism": list(SYMBOLS),
+        "symbols_qualified": list(QUALIFIED),
+        "gate_probe": "2026-09-09; AUDUSD 9.92% na USDCHF 8.03% zimekataliwa",
     },
 )
 
@@ -198,7 +225,12 @@ class Signal:
             raise FamilyError(f"symbols hazijulikani: {sorted(mbaya)}")
         if not self.weights:
             raise FamilyError("ishara haina uzito hata mmoja")
-        jumla = sum(self.weights.values())
+        pungufu = set(QUALIFIED) - set(self.weights)
+        if pungufu:
+            raise FamilyError(
+                f"ishara haina uzito kwa symbols zilizopita lango: "
+                f"{sorted(pungufu)} — kikapu ni cha YOTE-AU-HAKUNA")
+        jumla = sum(self.weights[s] for s in QUALIFIED)
         if abs(jumla) > max(self.TOLERANCE, 1e-3 * self.gross):
             raise FamilyError(
                 f"uzito haujasawazishwa: Σw = {jumla:+.6f}. F1 ni bet ya "
@@ -216,7 +248,7 @@ class Signal:
 # uwezekano wa kupimika unajulikana kabla ya data ya hisa. Vikapu vyake
 # vinabeba alama, na `p` inakataliwa kwa run inayoibeba.
 PLACEHOLDER = Signal(
-    weights={s: (1.0 if s in USD_QUOTED else -1.0) for s in SYMBOLS},
+    weights={s: (1.0 if s in USD_QUOTED else -1.0) for s in QUALIFIED},
     placeholder=True,
     meta={"kusudi": "lango la §6 pekee; si mekanizimu"},
 )
@@ -319,7 +351,7 @@ def baskets(
         s, = sessions_for(d)
 
         legs, pungufu = [], []
-        for symbol in SYMBOLS:
+        for symbol in QUALIFIED:
             w = ishara.weights.get(symbol)
             if not w:
                 pungufu.append(symbol)
@@ -335,7 +367,8 @@ def baskets(
             # `net_weight` ya kikapu inakuwa mfiduo wa dola uliobaki: sifuri
             # kwa kikapu kilichosawazishwa. Utekelezaji unatumia `side` na
             # `strength` (ukubwa), kwa hiyo hakuna kuhesabu mara mbili.
-            kubwa = max(abs(x) for x in ishara.weights.values())
+            kubwa = max(abs(ishara.weights[x]) for x in QUALIFIED
+                        if ishara.weights.get(x))
             legs.append(Leg(symbol=symbol, side=side_for(symbol, w),
                             sl_pips=SL_MOVE_MULT * mwendo,
                             weight=w / kubwa,
@@ -360,7 +393,7 @@ def windows_to_read(baskets_: Sequence[Basket]) -> list[tuple[datetime, int]]:
 
 
 __all__ = [
-    "FAMILY", "SYMBOLS", "USD_QUOTED", "PIPS", "POINTS", "CONTRACT_SIZE",
+    "FAMILY", "SYMBOLS", "QUALIFIED", "USD_QUOTED", "PIPS", "POINTS", "CONTRACT_SIZE",
     "pip_value", "FIX", "WINDOW_SECONDS", "ENTRY_OFFSET", "EXIT_OFFSET",
     "SL_MOVE_MULT", "SL_LOOKBACK_SESSIONS", "SL_MIN_SESSIONS", "MOVE_TO_SIGMA",
     "PRIORITY", "DECLARED_EDGE_PIPS", "MECHANISM", "DECLARATION",

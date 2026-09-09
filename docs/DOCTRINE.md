@@ -286,7 +286,7 @@ hiyo hatujui itafanya kazi — lakini tutajua **jibu**.
 |---|---|---|---|---|---|
 | **F0** | Mtiririko wa saa za nchi | 08:00 · 17:00 London · 16:30 NY | **1,924** siku (legs 3,848) | 3.4 bps | 1 |
 | **Gotobi** | Malipo ya waagizaji wa Japani | 08:30 → 09:50 JST, siku ÷ 5 | **500** | 2.8 bps (pips 3.9) | **1** |
-| **F1** | Hedge ya hisa → fix ya mwisho wa mwezi | 16:00 London ±(60, 15) dk | **96** | 5.2 bps (pips 5.7) | **1** |
+| **F1** | Hedge ya hisa → fix ya mwisho wa mwezi | 16:00 London ±(60, 15) dk | **96** · legs **4** | 5.2 bps (pips 5.7) | **1** |
 
 **9.0 · F0 imetangazwa** (`src/families/f0.py`, fingerprint kwenye ledger).
 Legs mbili kwa siku, mielekeo tofauti: `A` kufunguka→kufunga London **SELL**
@@ -486,6 +486,50 @@ mwanzo: flow ya nakane haipo kabla ya soko kufunguka, na feed inathibitisha.
 Haibadilishi jibu (lango limekataa kwa sababu nyingine), lakini inaandikwa:
 **familia yoyote ya baadaye yenye nanga kabla ya 09:00 JST lazima ithibitishe
 ukwasi kwanza.**
+
+### 9.5 · F1 — lango la §6.2 limefunguka kwa NNE kati ya sita
+
+`scripts/gate_probe.py`, 2026-09-09, matukio 96, dirisha saa 1.25,
+commission $7/lot. **Hakuna strategy iliyoendeshwa; hakuna α iliyotumika.**
+
+```
+symbol         σ   gharama   uwiano   jibu    pengo hadi 8%
+EURUSD     26.25      1.02    3.89%   PITA    +1.080 pips
+GBPUSD     32.16      1.55    4.82%   PITA    +1.023 pips
+USDJPY     25.22      1.35    5.35%   PITA    +0.668 pips
+USDCAD     29.03      2.10    7.23%   PITA    +0.222 pips
+USDCHF     20.68      1.66    8.03%   KATAA   −0.006 pips
+AUDUSD     17.34      1.72    9.92%   KATAA   −0.333 pips
+```
+
+**Ubashiri wangu ulikuwa mbaya kwa mara 3.1.** Nilibashiri EURUSD `σ = 8.45`
+kwa kupanua `√muda` kutoka F0 leg B; halisi ni **26.25**. Ni ubashiri wangu
+wa **nne** uliokosea kwenye mradi huu, na sababu ni ile ile kila mara:
+
+> **Dirisha la TUKIO si upanuzi wa `√muda` wa saa ya kawaida.** Fix ya mwisho
+> wa mwezi ina volatility mara **3.1** ya saa ya kawaida kwa EURUSD na mara
+> **1.7** kwa USDJPY. Mtiririko wa mamlaka unaleta mwendo, si tu bei.
+> Kuanzia sasa, `σ` ya dirisha la tukio **inapimwa**, haipanuliwi.
+
+**Kuchuja symbols ni utaratibu wa §6, si marekebisho.** `SYMBOLS` (sita) ni
+seti ya **mekanizimu** (§6.1); `QUALIFIED` (nne) ni ya **gharama** (§6.2).
+Doctrine inasema waziwazi: *"Symbol iliyokataliwa haiingii kwenye hesabu ya
+majaribio wala kwenye pooling."*
+
+Ulinzi unaofanya hili liwe salama: lango linatumia **σ na gharama pekee**,
+halioni faida hata kidogo. **Haliwezi kuchagua symbol kwa sababu ilifanya
+vizuri, kwa sababu halijui ilivyofanya.** Ndiyo maana §6.2 iliandikwa kwa
+`σ` na gharama tangu mwanzo.
+
+USDCHF imekataliwa kwa **pips 0.006** — ndani ya kelele ya kipimo. Sheria
+iliyotangazwa ndiyo inayoamua, si hukumu yangu.
+
+Gharama: kikapu kina legs **nne**, si sita. `N_eff` inapungua, na `Σw = 0`
+sasa inasawazisha nne. Mekanizimu unabaki: EUR, GBP, JPY, CAD zote zina
+masoko makubwa ya hisa yanayohitaji hedge.
+
+**Kinachohitajika kabla ya `p`:** ishara ya hisa. Sasa inastahili
+kutafutwa — lango limefunguka.
 
 ### 9.3 · F0 inapimwa upya MARA MOJA, kwenye injini iliyorekebishwa
 

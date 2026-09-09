@@ -44,7 +44,10 @@ def test_sehemu_zote_SITA_zimeandikwa():
     d = f1.DECLARATION
     for sehemu in ("nanga", "mwelekeo", "kuingia", "stop", "kutoka", "ukubwa"):
         assert getattr(d, sehemu).strip(), sehemu
-    assert d.symbols == f1.SYMBOLS and len(d.symbols) == 6
+    # §6.1 inatoa symbols sita (mekanizimu); §6.2 inachuja hadi nne.
+    assert len(f1.SYMBOLS) == 6
+    assert d.symbols == f1.QUALIFIED and len(d.symbols) == 4
+    assert set(f1.QUALIFIED) < set(f1.SYMBOLS)
 
 
 def test_regimes_ni_MBILI_ili_31_Desemba_iingie():
@@ -89,13 +92,16 @@ def test_ishara_isiyosawazishwa_INALIPUKA():
 
 
 def test_ishara_iliyosawazishwa_INAKUBALIKA():
-    w = {"EURUSD": 1.0, "GBPUSD": 0.5, "AUDUSD": -0.5,
-         "USDJPY": -1.0, "USDCHF": 0.3, "USDCHF2": None}
-    w.pop("USDCHF2")
-    w["USDCAD"] = -0.3
-    s = f1.Signal(weights=w)
+    s = f1.Signal(weights={"EURUSD": 1.0, "GBPUSD": 0.5,
+                           "USDJPY": -1.0, "USDCAD": -0.5})
     assert sum(s.weights.values()) == pytest.approx(0.0)
-    assert s.gross == pytest.approx(3.6)
+    assert s.gross == pytest.approx(3.0)
+
+
+def test_ishara_isiyo_na_symbol_ILIYOPITA_lango_INALIPUKA():
+    """Kikapu ni cha YOTE-AU-HAKUNA: uzito lazima uwepo kwa zote nne."""
+    with pytest.raises(FamilyError, match="zilizopita lango"):
+        f1.Signal(weights={"EURUSD": 1.0, "USDJPY": -1.0})
 
 
 def test_kikapu_kilichosawazishwa_kina_net_weight_SIFURI():
@@ -103,12 +109,13 @@ def test_kikapu_kilichosawazishwa_kina_net_weight_SIFURI():
     k, = f1.baskets([date(2021, 6, 30)], move_pips=MWENDO,
                     signal=f1.PLACEHOLDER)
     assert k.net_weight == pytest.approx(0.0)
-    assert k.gross_weight == pytest.approx(6.0)
+    assert k.gross_weight == pytest.approx(4.0)
 
 
 def test_symbol_isiyojulikana_INALIPUKA():
     with pytest.raises(FamilyError, match="hazijulikani"):
-        f1.Signal(weights={"EURGBP": 1.0, "EURUSD": -1.0})
+        f1.Signal(weights={"EURGBP": 1.0, "EURUSD": -1.0,
+                           "GBPUSD": 0.0, "USDJPY": 0.0, "USDCAD": 0.0})
 
 
 # ===========================================================================
@@ -119,6 +126,7 @@ def test_symbol_isiyojulikana_INALIPUKA():
 @pytest.mark.parametrize("symbol,upande", [
     ("EURUSD", BUY), ("GBPUSD", BUY), ("AUDUSD", BUY),
     ("USDJPY", SELL), ("USDCHF", SELL), ("USDCAD", SELL)])
+# Zote sita zinapimwa: sheria ya upande ni ya mekanizimu, si ya lango.
 def test_kuuza_dola_kunatoa_upande_sahihi(symbol, upande):
     """Dola ikiwa NUKUU (EURUSD), kuuza dola ni KUNUNUA pair; ikiwa MSINGI
     (USDJPY), ni KUUZA. Kuchanganya kungegeuza nusu ya kikapu."""
@@ -183,8 +191,11 @@ def test_PLACEHOLDER_inajitangaza():
     """Ipo kwa lango pekee. `σ` na gharama hazitegemei ishara, kwa hiyo
     uwezekano wa kupimika unajulikana kabla ya data ya hisa."""
     assert f1.PLACEHOLDER.placeholder is True
+    assert set(f1.PLACEHOLDER.weights) == set(f1.QUALIFIED)
     assert sum(f1.PLACEHOLDER.weights.values()) == pytest.approx(0.0)
-    assert f1.Signal(weights={"EURUSD": 1.0, "USDJPY": -1.0}).placeholder is False
+    halisi = f1.Signal(weights={"EURUSD": 1.0, "GBPUSD": 0.0,
+                                "USDJPY": -1.0, "USDCAD": 0.0})
+    assert halisi.placeholder is False
 
 
 def test_siku_isiyo_na_ishara_HAIZALISHI_kikapu():
@@ -201,7 +212,7 @@ def test_leg_MOJA_ikikosa_mwendo_kikapu_KIZIMA_kinasimama():
     """Legs tano si F1 iliyopunguzwa — ni strategy nyingine yenye mwelekeo
     wa dola usiokusudiwa (kipimo cha 2026-09-07: leg dhaifu ilikataliwa
     99/99, ikijilimbikizia kikapu)."""
-    bila_moja = lambda d, s: None if s == "USDCHF" else 10.0   # noqa: E731
+    bila_moja = lambda d, s: None if s == "USDCAD" else 10.0   # noqa: E731
     assert f1.baskets([date(2021, 6, 30)], move_pips=bila_moja,
                       signal=f1.PLACEHOLDER) == []
 
@@ -219,15 +230,15 @@ def test_vikapu_ni_ATOMIKI_na_vina_kipaumbele_cha_JUU():
 
 def test_kila_symbol_ina_STOP_yake():
     """Volatility inatofautiana kati ya symbols, kwa hiyo stop inatofautiana."""
-    kwa_symbol = {"EURUSD": 8.0, "GBPUSD": 12.0, "AUDUSD": 9.0,
-                  "USDJPY": 15.0, "USDCHF": 7.0, "USDCAD": 10.0}
+    kwa_symbol = {"EURUSD": 8.0, "GBPUSD": 12.0, "USDJPY": 15.0,
+                  "USDCAD": 10.0}
     k, = f1.baskets([date(2021, 6, 30)],
                     move_pips=lambda d, s: kwa_symbol[s],
                     signal=f1.PLACEHOLDER)
     for leg in k.legs:
         assert leg.sl_pips == pytest.approx(
             f1.SL_MOVE_MULT * kwa_symbol[leg.symbol])
-    assert len({l.sl_pips for l in k.legs}) == 6
+    assert len({l.sl_pips for l in k.legs}) == 4
 
 
 def test_madirisha_ya_kusoma_ni_MAWILI_kwa_tukio():
