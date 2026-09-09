@@ -62,21 +62,16 @@ si alama yake wala mpangilio wa siku.
 
 ---
 
-**Dhana inayotangazwa: stop haigongwi.** `runner.execute` inachukua bei ya
-kuingia na ya kutoka; **haiangalii njia kati yao**. Kwa hiyo `k` lazima iwe
-kubwa vya kutosha kwamba kugongwa ni nadra kweli, si tu kwa matumaini:
+**Stop inagongwa, na kugongwa kunapimwa.** Nilikadiria `P(kuvuka) ≈ 0.3%`
+kwa `k = 4` kutoka kanuni ya normal (`E|X| = 0.798σ` → stop = `3.19σ`).
+Kipimo cha vikao 200 vya F0 kilitoa **3.0%** — mara kumi zaidi, kwa sababu
+ya mikia minene ya FX na kwa sababu SELL inaingia kwa `bid` na kufungwa kwa
+`ask`, kwa hiyo spread NZIMA imo ndani ya kila mwendo.
 
-```
-mwendo wa wastani  = σ·√(2/π) = 0.798 σ
-k = 4              → stop = 3.19 σ
-P(kuvuka)          ≈ 4·P(Z > 3.19) ≈ 0.3%   (vikao ~5 kati ya 1,924)
-```
-
-Namba hiyo ni ya kinadharia, kwa hiyo **inapimwa** badala ya kuaminiwa:
-`scripts/f0_run.py --angalia-stop` inasoma dirisha ZIMA kwa sampuli ya vikao
-na kuripoti mwendo mbaya kabisa uliofikiwa. Ikizidi 0.3% kwa kiasi kikubwa,
-`k` inahitaji kupanda au njia inahitaji kuigwa — na hilo ni **uamuzi**
-utakaoandikwa, si marekebisho ya kimya.
+Kwa hiyo `runner.execute` sasa **inapima njia** (uamuzi wa PD 2026-09-09):
+MAE ndani ya `[kuingia + dirisha, kutoka)` ikivuka stop, trade inakufa hapo
+kwa `R = −1.0` hasa. `k` inabaki **4.0** — kugongwa si kasoro tena, ni tabia
+inayoigwa na kuripotiwa.
 
 **Hakuna ishara.** Uzito ni 1.0 kila siku. F0 ni ya kalenda tupu — ndiyo maana
 inaendeshwa kwanza, na ndiyo maana ina **jaribio moja**.
@@ -155,7 +150,7 @@ DECLARATION = Declaration(
              f"{WINDOW_SECONDS} kutoka nanga (ask kununua, bid kuuza)"),
     stop=(f"{SL_MOVE_MULT} × wastani wa |kutoka − kuingia| kwa vikao "
           f"{SL_LOOKBACK_SESSIONS} VILIVYOPITA (chini kabisa "
-          f"{SL_MIN_SESSIONS}); bima pekee, si mkakati; njia haiigwi"),
+          f"{SL_MIN_SESSIONS}); bima pekee, si mkakati; ikigongwa, R = −1.0"),
     kutoka="kwa SAA, kwenye nanga ya kutoka; stop haitumiki kama lengo",
     ukubwa="uzito 1.0 — hakuna ishara; hatari inatoka RCE, lots ∝ 1/mwendo",
     mechanism=MECHANISM,

@@ -341,6 +341,14 @@ kizingiti: p ≤ 0.0025
 
 **F0 HAIJANUSURIKA.** Jaribio **1 kati ya 8** limetumika; yaliyobaki 7.
 
+> Run hii ilifanywa chini ya fingerprint **`d510f52d40922d45af3099b64ea8cfe6`**,
+> ambapo tangazo lilisema *"njia haiigwi"*. Tangazo la sasa
+> (**`2929bc0cdfd04487fea3f5fc32814686`**) linasema *"ikigongwa, R = −1.0"*.
+> Ni familia mbili tofauti kwa mkataba wa §8.1 — na ndiyo maana zote mbili
+> zimeandikwa. Ya kwanza ndiyo iliyotoa namba zilizo hapo juu. **Ya pili
+> haitaendeshwa**: F0 imefungwa, na mwelekeo wa marekebisho unajulikana
+> (kuiga stop kunaweza tu kufanya matokeo hasi yawe mabaya zaidi).
+
 **Kuvunja namba.** Gharama pekee, bila edge yoyote, ingetoa:
 
 ```
@@ -422,28 +430,35 @@ Zote zinatokea **kwa mifumo**, si kwa nasibu, kwa hiyo hazionekani kama kelele.
 - **RCE inategemea mpangilio wa kuwasili.** `max_open_trades` inaangusha trade
   zipi ikitegemea nani amefika kwanza. Jaribio linalochanganya mpangilio na
   kudai P&L ile ile lazima liandikwe.
-- **Njia kati ya kuingia na kutoka HAIIGWI.** `backtest/runner.execute`
-  inachukua bei mbili; haijui kama stop iligongwa katikati. Ni dhana
-  **iliyotangazwa**, si iliyosahaulika, na inapimwa kwa
-  `scripts/f0_run.py --angalia-stop` (inasoma dirisha zima kwa sampuli ya
-  vikao na kuripoti mwendo mbaya kabisa).
+- **Njia kati ya kuingia na kutoka — IMETATULIWA (2026-09-09).**
 
-  **IMEPIMWA (2026-09-08, vikao 200 vya F0): 3.0%, si 0.3%.** Kanuni ya
-  normal inakadiria chini kwa **mara 10**. Sababu ni mikia minene ya FX:
-  `k = 4` inatoa stop ya `3.19σ` chini ya normal, lakini kwenye mfululizo
-  halisi wa ndani ya siku, kuvuka `3σ` kunatokea mara kadhaa zaidi. Zaidi ya
-  hapo, toleo la kwanza la kipimo lilitumia upande wa **kufungua** badala ya
-  wa **kufunga** (bid kwa SELL, si ask), kwa hiyo 3.0% ni **kikomo cha
-  chini**.
+  Toleo la kwanza lilichukua bei mbili na kudhania stop haigongwi.
+  **Kipimo: 3.0%** ya vikao 200 vya F0, si 0.3% niliyokadiria kwa kanuni ya
+  normal. Sababu mbili: mikia minene ya FX, na kwamba SELL inaingia kwa
+  `bid` na kufungwa kwa `ask`, kwa hiyo **spread nzima imo ndani ya kila
+  mwendo** — stop ya pips 25 iko karibu na soko kuliko namba 25 inavyoonyesha.
 
-  Athari kwa F0: **hakuna** — matokeo yake ni hasi tayari, na kuiga stop
+  Upendeleo uliokuwa ukitokana nayo: **+0.036 R/siku**, wakati athari nzima
+  ya F0 ilikuwa 0.023. **Kasoro kubwa kuliko kitu chenyewe.**
+
+  `runner.execute` sasa **inapima njia** kwa kila trade (uamuzi wa PD).
+  MAE ndani ya `[kuingia + dirisha, kutoka)` ikivuka stop, trade inakufa
+  hapo kwa `R = −1.0` **hasa** — usawa ni wa RCE (`risk_at_stop = lots ×
+  (sl + cost) × pip_value`), si wa kwetu.
+
+  Chaguo mbadala — kupandisha `k` mpaka kugongwa kuwe nadra — lilikataliwa:
+  linaacha upendeleo wa mabaki, na stop isiyogongwa kamwe si bima (§4.2),
+  ni kipimo cha lots tu. `k` inabaki **4.0**; kugongwa kunaigwa, si
+  kuepukwa.
+
+  Kilichoachwa kwa makusudi: dakika tano za kujaza na tano za kutoka
+  hazihesabiwi (dakika 10 kati ya masaa 9), na fill inadhaniwa kutokea hasa
+  kwenye kiwango cha stop. Vyote vinaelekea upande wa **matumaini**, kwa
+  kiasi kinachojulikana, na `mae_pips` inarekodiwa ili kiweze kuonekana.
+
+  Athari kwa §9.2: **hakuna** — matokeo ya F0 ni hasi tayari, na kuiga stop
   kunaweza tu kufanya iwe mbaya zaidi (stop inakata trade iliyokuwa
-  itapona, haiongezi faida kamwe). Kwa hiyo hitimisho la §9.2 linasimama
-  kwa nguvu zaidi, si kidogo.
-
-  **Athari kwa familia zinazofuata: kubwa.** Familia yoyote inayoonekana
-  **chanya** lazima iige njia kabla ya kuaminiwa, au `k` ipande hadi
-  kugongwa kupimwe chini ya 0.5%. Uamuzi huu unaandikwa kabla ya Gotobi.
+  itapona, haiongezi faida kamwe). Hitimisho linasimama kwa nguvu zaidi.
 
 ---
 

@@ -12,21 +12,24 @@ lilivyoshindwa.
 
 ---
 
-**Kusoma.** Kila mwezi unasomwa peke yake na kutupwa. F0 inasoma sekunde 300
-kwenye ncha nne za siku — dakika 20 kati ya 1,440 — kwa hiyo kumbukumbu
-inabaki ya mwezi mmoja hata kwa miaka minane ya ticks.
+**Kusoma.** Dirisha ZIMA la kushikilia linasomwa (§11, uamuzi wa PD
+2026-09-09): `runner.execute` inahitaji njia ili kujua kama stop iligongwa.
+Kipande cha siku tano kinasomwa, kinatumika, kinatupwa — kwa hiyo kumbukumbu
+inabaki chini ya rows milioni 2.5 hata kwa miaka minane.
 
 **Stop haina lookahead.** Mwendo wa siku unaingia kwenye historia **baada**
-ya kikapu cha siku hiyo kujengwa. `--angalia-stop` inapima dhana kwamba stop
-haigongwi: inasoma dirisha ZIMA kwa sampuli ya vikao na kuripoti mwendo mbaya
-kabisa uliofikiwa.
+ya kikapu cha siku hiyo kujengwa.
+
+**Kugongwa kwa stop kunaripotiwa kwa kila trade**, si kwa sampuli. Toleo la
+kwanza lilikuwa na `--angalia-stop` iliyopima sampuli kwa code yake yenyewe —
+na code hiyo ndiyo iliyokuwa na kasoro ya upande (bid kwa SELL badala ya ask).
+Sasa kuna njia MOJA: `runner.excursion`, inayotumiwa na kila trade.
 """
 
 from __future__ import annotations
 
 import argparse
 import json
-import random
 import sys
 import time
 from datetime import date, datetime, timedelta
@@ -76,12 +79,17 @@ def market(args, spread_pips: float) -> dict:
     }
 
 
-def miezi(siku):
-    """Siku zilizopangwa kwa mwezi, kwa mpangilio."""
-    out: dict[tuple[int, int], list[date]] = {}
-    for d in siku:
-        out.setdefault((d.year, d.month), []).append(d)
-    return [out[k] for k in sorted(out)]
+def vipande(siku, *, kwa_kipande: int = 5):
+    """Siku zilizopangwa kwa vipande vidogo, kwa mpangilio.
+
+    Toleo la kwanza lilipanga kwa MWEZI. Sasa tunasoma **dirisha zima** la
+    kushikilia (masaa 13.4 kwa siku badala ya dakika 20), kwa hiyo mwezi
+    mmoja ungekuwa rows milioni 10+. Kipande cha siku tano kinabaki chini
+    ya milioni 2.5, na **hakuna faili inayosomwa mara mbili** — kila siku iko
+    kwenye kipande kimoja tu.
+    """
+    return [list(siku[i:i + kwa_kipande])
+            for i in range(0, len(siku), kwa_kipande)]
 
 
 # ===========================================================================
@@ -90,7 +98,12 @@ def miezi(siku):
 
 
 def sweep(inv, siku, args, *, cfg, verbose=False):
-    """Pita miezi yote: quotes → mwendo → stop → kikapu → trade.
+    """Pita vipande vyote: quotes → mwendo → stop → kikapu → trade.
+
+    **Dirisha zima linasomwa**, si ncha pekee: `runner.execute` inahitaji njia
+    ili kujua kama stop iligongwa (§11, uamuzi wa PD 2026-09-09). Bila hiyo,
+    trade iliyogusa stop kisha ikapona inarekodiwa kama iliyomalizika kwa saa,
+    na upendeleo unaotokana nayo ni mkubwa kuliko athari tunayoipima.
 
     Inarudisha `(trades, mwendo, zilizokosekana, zilizokataliwa)`.
     """
@@ -99,12 +112,13 @@ def sweep(inv, siku, args, *, cfg, verbose=False):
     historia: dict[str, list[float]] = {}
     kukosekana, kukataliwa = [], []
 
-    for kundi in miezi(siku):
+    for kundi in vipande(siku):
         maombi = []
         for d in kundi:
             for s in f0.sessions_for(d):
-                maombi.append((s.entry_at, f0.WINDOW_SECONDS))
-                maombi.append((s.exit_at, f0.WINDOW_SECONDS))
+                # Kuingia → kutoka + dirisha la kutoka, ikiwa ombi MOJA.
+                urefu = int((s.exit_at - s.entry_at).total_seconds())
+                maombi.append((s.entry_at, urefu + f0.WINDOW_SECONDS))
         frame = TK.read_windows(inv, f0.SYMBOL, maombi, partitions=partitions)
 
         for d in kundi:
@@ -127,7 +141,8 @@ def sweep(inv, siku, args, *, cfg, verbose=False):
                         out = execute(kikapu[0], cfg=cfg,
                                       ticks_by_symbol={f0.SYMBOL: frame},
                                       market=soko,
-                                      window_seconds=f0.WINDOW_SECONDS)
+                                      window_seconds=f0.WINDOW_SECONDS,
+                                      path_ticks={f0.SYMBOL: frame})
                         if out.executed:
                             trades.extend(out.trades)
                         else:
@@ -138,44 +153,10 @@ def sweep(inv, siku, args, *, cfg, verbose=False):
                 nyuma.append(kiasi)
 
         if verbose:
-            print(f"   {kundi[0]:%Y-%m}  siku {len(kundi):>2}  "
-                  f"trades {len(trades):>5,}", flush=True)
+            kufa = sum(1 for t in trades if t.stopped)
+            print(f"   {kundi[0]:%Y-%m-%d}  siku {len(kundi):>2}  "
+                  f"trades {len(trades):>5,}  stop {kufa:>4,}", flush=True)
     return trades, mwendo, kukosekana, kukataliwa
-
-
-def angalia_stop(inv, siku, args, mwendo, *, n=100, seed=0):
-    """Je stop ingegongwa? Inasoma dirisha ZIMA kwa sampuli ya vikao.
-
-    `runner.execute` haiigi njia kati ya kuingia na kutoka, kwa hiyo dhana
-    kwamba stop haigongwi ni **dhana**. Hapa inapimwa: mwendo mbaya kabisa
-    (MAE) unalinganishwa na stop iliyokuwa imewekwa siku hiyo.
-    """
-    stop = f0.stop_from_moves(mwendo)
-    zinazowezekana = [(d, leg) for (d, leg) in stop]
-    if not zinazowezekana:
-        return []
-    rng = random.Random(seed)
-    sampuli = rng.sample(zinazowezekana, min(n, len(zinazowezekana)))
-
-    out = []
-    for d, leg in sorted(sampuli):
-        s = next(x for x in f0.sessions_for(d) if x.leg == leg)
-        urefu = int((s.exit_at - s.entry_at).total_seconds())
-        frame = TK.read_windows(inv, f0.SYMBOL, [(s.entry_at, urefu)])
-        if frame.empty:
-            continue
-        ndani = quotes(frame, s.entry_at, f0.WINDOW_SECONDS)
-        # Stop inagongwa kwa bei ya KUFUNGA, si ya kufungua. SELL inafungwa
-        # kwa `ask`; BUY inafungwa kwa `bid`. Kutumia upande wa kufungua
-        # kungepunguza mwendo mbaya kwa spread nzima na kuripoti kugongwa
-        # kuchache kuliko halisi.
-        bei = frame["ask"] if s.side == "SELL" else frame["bid"]
-        ishara = -1.0 if s.side == "SELL" else 1.0
-        mae = float((ishara * (bei - ndani.executable(s.side)) / PIP).min())
-        sl = f0.SL_MOVE_MULT * stop[(d, leg)]
-        out.append({"day": d.isoformat(), "leg": leg, "mae_pips": -mae,
-                    "sl_pips": sl, "hit": (-mae) >= sl})
-    return out
 
 
 # ===========================================================================
@@ -198,8 +179,6 @@ def main() -> int:
                     help="edge iliyotangazwa kwa leg (§9) — kwa lango la 6.3")
     ap.add_argument("--B", type=int, default=BS.B_DEVELOPMENT)
     ap.add_argument("--seed", type=int, default=1)
-    ap.add_argument("--angalia-stop", type=int, default=0,
-                    help="sampuli ya vikao vya kupima dhana ya stop")
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--out", default=None)
     ap.add_argument("--verbose", action="store_true")
@@ -254,7 +233,12 @@ def main() -> int:
     # ---- vipimo ----
     import statistics as st
 
-    pengo = sorted(t.spread_gap_pips for t in trades)
+    # Trade iliyogongwa stop haikutumia dirisha la kutoka, kwa hiyo haina
+    # spread ya kwenda-na-kurudi. Vipimo vya gharama vinapimwa kwa
+    # zilizomaliza kwa saa PEKEE; kugongwa kunaripotiwa kando.
+    zilizomaliza = [t for t in trades if not t.stopped]
+    zilizogongwa = [t for t in trades if t.stopped]
+    pengo = sorted(t.spread_gap_pips for t in zilizomaliza)
     curve = daily_r(trades, days=siku)
 
     # Kwa KILA leg peke yake. Leg A ni masaa 9, leg B ni 4.4 — `σ` yao si moja,
@@ -264,7 +248,7 @@ def main() -> int:
     kwa_leg = {}
     for leg in (f0.LEG_A, f0.LEG_B):
         m = [v for (_, l), v in mwendo.items() if l == leg]
-        t_leg = [t for t in trades if t.basket_id.endswith(f":{leg}")]
+        t_leg = [t for t in zilizomaliza if t.basket_id.endswith(f":{leg}")]
         if not m or not t_leg:
             continue
         wastani = st.fmean(m)
@@ -303,11 +287,28 @@ def main() -> int:
               f"{v['sigma_pips']:>8.2f} {v['cost_pips']:>8.2f} "
               f"{v['ratio']:>9.1%}{alama}")
     print(f"   stop (× {f0.SL_MOVE_MULT}) kwa leg mbaya          {sl:>8.2f} pips")
-    print(f"   pengo la spread (RCE dhidi ya ticks): "
+    print(f"   pengo la spread (RCE dhidi ya ticks, zilizomaliza kwa saa): "
           f"wastani {st.fmean(pengo):+.3f}p · "
           f"p50 {pengo[len(pengo) // 2]:+.3f}p · "
           f"p95 {pengo[int(0.95 * len(pengo))]:+.3f}p")
     print(f"   siku hai {curve.n_active:,}/{curve.n:,}")
+
+    # Kugongwa kwa stop — dhana iliyokuwa ikidhaniwa, sasa inapimwa kwa KILA
+    # trade. Kila moja ni −1R hasa (§11).
+    kiwango = len(zilizogongwa) / len(trades)
+    print(f"\n   STOP ILIGONGWA: {len(zilizogongwa):,}/{len(trades):,} "
+          f"({kiwango:.2%})")
+    if zilizogongwa:
+        mae = sorted(t.mae_pips for t in trades)
+        print(f"      MAE p50 {mae[len(mae) // 2]:.1f}p · "
+              f"p95 {mae[int(0.95 * len(mae))]:.1f}p · "
+              f"kubwa {mae[-1]:.1f}p")
+        kwa_mwaka = {}
+        for t in zilizogongwa:
+            kwa_mwaka[t.entry_at.year] = kwa_mwaka.get(t.entry_at.year, 0) + 1
+        print("      kwa mwaka: " + " · ".join(
+            f"{y} {n}" for y, n in sorted(kwa_mwaka.items())))
+    assert all(t.path_modelled for t in trades), "njia haikupimwa!"
 
     # ---- LANGO LA §6, kabla ya `p` ----
     q = qualify(
@@ -332,22 +333,11 @@ def main() -> int:
                      "spread_gap_mean": st.fmean(pengo),
                      "spread_gap_p95": pengo[int(0.95 * len(pengo))],
                      "n_days": curve.n, "n_active": curve.n_active,
-                     "sharpe_per_day_declared": s_siku},
+                     "sharpe_per_day_declared": s_siku,
+                     "stopped": len(zilizogongwa), "stop_rate": kiwango,
+                     "path_modelled": True},
         "qualification": q.to_json(),
     }
-
-    if args.angalia_stop:
-        print("\n   kuangalia dhana ya stop (dirisha ZIMA, sampuli "
-              f"{args.angalia_stop})…", flush=True)
-        sampuli = angalia_stop(inv, siku, args, mwendo,
-                               n=args.angalia_stop, seed=args.seed)
-        if sampuli:
-            kugongwa = sum(1 for x in sampuli if x["hit"])
-            print(f"   vikao {len(sampuli)} · stop ingegongwa "
-                  f"{kugongwa} ({kugongwa / len(sampuli):.1%}) "
-                  f"· kinadharia ~0.3%")
-            matokeo["stop_check"] = {"n": len(sampuli), "hits": kugongwa,
-                                     "rate": kugongwa / len(sampuli)}
 
     if not q.passed:
         print("\nF0 × EURUSD HAIINGII. `p` haihesabiwi — symbol iliyokataliwa\n"
