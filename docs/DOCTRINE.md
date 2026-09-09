@@ -341,6 +341,9 @@ kizingiti: p ≤ 0.0025
 
 **F0 HAIJANUSURIKA.** Jaribio **1 kati ya 8** limetumika; yaliyobaki 7.
 
+> **Namba hizi zilitolewa na injini yenye kasoro** (stop haikuigwa — §11).
+> Zinabaki hapa kama rekodi. Jibu linalotumika ni la §9.3.
+
 > Run hii ilifanywa chini ya fingerprint **`d510f52d40922d45af3099b64ea8cfe6`**,
 > ambapo tangazo lilisema *"njia haiigwi"*. Tangazo la sasa
 > (**`2929bc0cdfd04487fea3f5fc32814686`**) linasema *"ikigongwa, R = −1.0"*.
@@ -382,6 +385,31 @@ F0 haielezwi, hairekebishwi, haiendeshwi upya kwa vigezo vipya (§8).
 2. **Gharama halisi ni nusu ya iliyodhaniwa:** round-turn **1.00–1.05 pips**,
    si 2.3. Namba hii inaingia kwenye malango ya familia zinazofuata.
 3. **Kanuni ya normal inakadiria stop chini kwa mara ~10.** Ona §11.
+
+### 9.3 · F0 inapimwa upya MARA MOJA, kwenye injini iliyorekebishwa
+
+Namba za §9.2 zilitolewa na injini yenye kasoro inayojulikana (§11): stop
+haikuigwa. Nilidhani mwelekeo wa marekebisho unajulikana; **haukujulikana**,
+na kipimo cha 2021 kimeonyesha kinaboresha kwa `+0.011 R/siku`.
+
+**Hii si kuendesha upya baada ya kufeli** (§8). Tofauti ni ya msingi na
+inaandikwa hapa ili isije ikadaiwa vinginevyo:
+
+1. Kasoro ilipatikana na **kipimo kilichotangazwa** (`--angalia-stop`), si
+   kwa kutafuta sababu ya kufeli. Ingerekebishwa hata kama F0 ingenusurika.
+2. **Tangazo halibadiliki** — mekanizimu, nanga, mwelekeo, `k`, kila kitu ni
+   kile kile. Ni injini iliyorekebishwa, si dhana mpya.
+3. **Sheria ya uamuzi imeandikwa kabla:** `p ≤ 0.0025`. Ile ile.
+4. Namba mpya **inachukua nafasi** ya ya zamani kama jibu; ya zamani inabaki
+   kwenye rekodi kama historia. **Hatuchagui iliyo bora kati ya mbili.**
+
+Jaribio ni **lile lile**, si la pili. F0 imeshatumia moja kati ya nane.
+
+**Ubashiri kabla ya run** (ili usomaji usije ukaathiriwa na matokeo): ikiwa
+marekebisho ni sawia na ya 2021, wastani wa miaka nane utakuwa takribani
+`−0.0125 R/siku`, gross takribani `+0.016 R/siku` = **pips 0.8–2.0 kwa siku**,
+chini ya kizingiti cha pips 3.4. **Ubashiri wangu: F0 bado haitanusurika.**
+Ikinusurika, ni jibu — na nitasema hivyo.
 
 ### 9.1 · Zilizosimamishwa, kwa hesabu
 
@@ -456,9 +484,32 @@ Zote zinatokea **kwa mifumo**, si kwa nasibu, kwa hiyo hazionekani kama kelele.
   kwenye kiwango cha stop. Vyote vinaelekea upande wa **matumaini**, kwa
   kiasi kinachojulikana, na `mae_pips` inarekodiwa ili kiweze kuonekana.
 
-  Athari kwa §9.2: **hakuna** — matokeo ya F0 ni hasi tayari, na kuiga stop
-  kunaweza tu kufanya iwe mbaya zaidi (stop inakata trade iliyokuwa
-  itapona, haiongezi faida kamwe). Hitimisho linasimama kwa nguvu zaidi.
+  **MAREKEBISHO (2026-09-09).** Niliandika hapa kwamba kuiga stop *"kunaweza
+  tu kufanya matokeo hasi yawe mabaya zaidi"*. **Si kweli, na kipimo
+  kimeonyesha.** Kuiga stop kuna athari mbili zinazopingana:
+
+  ```
+  trade iliyogusa stop kisha ikapona   →  ilirekodiwa > −1R, sasa −1R   MBAYA
+  trade iliyovuka stop na ikabaki nje  →  ilirekodiwa < −1R, sasa −1R   NZURI
+  ```
+
+  Ya pili ni **kukata hasara**: stop inazuia kupoteza zaidi ya 1R. Ndiyo kazi
+  yake. Nilisahau upande huo kabisa.
+
+  Kipimo (F0, 2021, tangazo lile lile, injini mbili):
+
+  ```
+  bila kuiga stop   −0.03944 R/siku   CI [−0.0767, −0.0010]
+  kwa kuiga stop    −0.02875 R/siku   CI [−0.0619, +0.0047]
+                    ─────────
+  tofauti           +0.01069            ← IMEBORESHA
+  ```
+
+  Kugongwa: **2.38%** (leg A 0.9%, leg B 3.9%) — inakubaliana na 3.0% ya
+  sampuli. MAE p50 11.0p · p95 51.0p · kubwa 121.1p.
+
+  Kwa hiyo **§9.2 inahitaji kupimwa upya**, na mwelekeo wa marekebisho
+  haukujulikana kabla. Ona §9.3.
 
 ---
 
