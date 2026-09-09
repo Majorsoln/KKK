@@ -286,7 +286,7 @@ hiyo hatujui itafanya kazi — lakini tutajua **jibu**.
 |---|---|---|---|---|---|
 | **F0** | Mtiririko wa saa za nchi | 08:00 · 17:00 London · 16:30 NY | **1,924** siku (legs 3,848) | 3.4 bps | 1 |
 | **Gotobi** | Malipo ya waagizaji wa Japani | 08:30 → 09:50 JST, siku ÷ 5 | **500** | 2.8 bps (pips 3.9) | **1** |
-| **F1** | Hedge ya hisa → fix ya mwisho wa mwezi | 16:00 London | **99** | 5.2 bps | 5 |
+| **F1** | Hedge ya hisa → fix ya mwisho wa mwezi | 16:00 London ±(60, 15) dk | **96** | 5.2 bps (pips 5.7) | **1** |
 
 **9.0 · F0 imetangazwa** (`src/families/f0.py`, fingerprint kwenye ledger).
 Legs mbili kwa siku, mielekeo tofauti: `A` kufunguka→kufunga London **SELL**

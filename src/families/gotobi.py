@@ -86,6 +86,12 @@ PIP = 0.01
 POINT = 0.001
 CONTRACT_SIZE = 100_000.0
 
+# Familia hii ina symbol MOJA. `SYMBOLS`/`PIPS` zipo ili chombo cha
+# jumla (`gate_probe`) kisihitaji kujua ni familia ipi.
+SYMBOLS = (SYMBOL,)
+PIPS = {SYMBOL: PIP}
+POINTS = {SYMBOL: POINT}
+
 
 def pip_value(mid: float) -> float:
     """Thamani ya pip kwa lot moja, kwa akaunti ya USD.
