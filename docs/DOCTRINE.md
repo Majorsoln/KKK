@@ -1144,26 +1144,37 @@ kujitegemea (`symbol_info.trade_tick_value`, njia tofauti kabisa na hesabu
 yetu):
 
 ```
-                yetu     MT5     symbol
-EURUSD         10.00   10.00     dola ni nukuu   → contract × pip
-USDJPY          6.49    6.48     dola ni msingi  → contract × pip ÷ bei
-USDCHF         12.29   12.29     dola ni msingi
-EURJPY          6.49    6.48     cross           → ÷ USDJPY
-GBPJPY          6.49    6.48     cross
-EURCHF         12.29   12.29     cross
-XAUUSD          1.00    1.00     contract 100
-AUDUSD/NZDUSD/GBPUSD  10.00   10.00
+                 MT5    yetu   tofauti   sheria
+EURUSD        10.000  10.000    +0.00%   dola ni nukuu  → contract × pip
+GBPUSD        10.000  10.000    +0.00%
+AUDUSD        10.000  10.000    +0.00%
+NZDUSD        10.000  10.000    +0.00%
+USDJPY         6.473   6.473    +0.00%   dola ni msingi → contract × pip ÷ bei
+USDCHF        12.296  12.296    +0.01%
+USDCAD         7.228   7.228    +0.01%
+EURJPY         6.473   6.473    +0.00%   cross          → ÷ USDJPY
+GBPJPY         6.473   6.473    +0.00%
+EURCHF        12.296  12.296    +0.01%
+EURGBP        13.511  13.511    +0.00%   cross          → × GBPUSD
+XAUUSD         1.000   1.000    +0.00%   contract 100
+                                ──────
+                                12/12 ndani ya 1%
 ```
 
 Kama tungeweka `$10` kwa zote — jaribu la kawaida — USDJPY ingekosewa kwa
-**35%** na USDCHF kwa **19%**, na kosa hilo lingeingia kwenye
-`commission_pips` ya kila familia.
+**35%**, USDCAD kwa **38%**, USDCHF kwa **19%**, na kosa hilo lingeingia
+kwenye `commission_pips` ya kila familia.
 
-USDCAD na EURGBP zilirudisha `0.00` kwenye run ya kwanza. **Si sifuri ya
-soko** — ni symbol iliyoongezwa Market Watch bila quote kufika bado, na
-`trade_tick_value` inabaki `0.0` mpaka quote ya kwanza. `mt5_specs.py`
-sasa inasubiri quote (`subiri_tick`) na inaandika `BILA QUOTE` badala ya
-kuandika sifuri kwenye ripoti kana kwamba ni kipimo.
+**Kasoro iliyopatikana njiani.** Kwenye run ya kwanza USDCAD na EURGBP
+zilirudisha `pip_value 0.00`. **Si sifuri ya soko** — ni symbol
+iliyoongezwa Market Watch dakika hiyo hiyo, na `trade_tick_value` inabaki
+`0.0` mpaka quote ya kwanza ifike (kwa cross, MT5 inahitaji bei ya
+kubadilisha sarafu ya nukuu). Bila kurekebisha, sifuri hiyo ingeandikwa
+kwenye ripoti kana kwamba ni kipimo. `mt5_specs.py` sasa inasubiri quote
+(`subiri_tick`) na inaandika `BILA QUOTE` pale isipofika.
+
+Ni mfano mdogo wa kanuni ya §2 ikijirudia: **thamani inayorudishwa si
+kipimo mpaka ijulikane kwamba chombo kilikuwa tayari kupima.**
 
 **`commission`: bado ni dhana, na sasa imeandikwa hivyo.** Akaunti ni demo
 isiyowahi kutrade, kwa hiyo `history_deals_get` ni tupu.
@@ -1187,9 +1198,15 @@ moja, na hakuna order bila `--nakubali`.
 
 Lakini kipimo hicho kina kikomo cha lazima kuandikwa: **broker wengi
 wanaweka commission ya demo kuwa sifuri hata pale live inatoza.** Kwa hiyo
-jibu la `0.00` kwenye demo **si uthibitisho kwamba commission ni sifuri** —
-hasa kwa akaunti hii, ambayo spread yake ya EURUSD ni **pips 0.40**, ya
-aina ya raw/ECN, na aina hizo karibu daima zinatoza commission.
+jibu la `0.00` kwenye demo **si uthibitisho kwamba commission ni sifuri**.
+
+*(Marekebisho: niliandika kwamba spread ya EURUSD ya **pips 0.40**
+inaonyesha akaunti ya raw/ECN, na kwamba aina hizo karibu daima zinatoza
+commission. Run ya pili ilitoa **0.70** kwa symbol ile ile. Ni picha ya
+dakika moja, na picha mbili zimetofautiana kwa 75% — kwa hiyo hoja hiyo ni
+dhaifu kuliko nilivyoiandika, na haipaswi kubeba uzito. Sheria hapa chini
+haitegemei: `0.00` kwenye demo haibadilishi chochote kwa sababu
+haijapima live, si kwa sababu ya spread.)*
 
 Kwa hiyo:
 
