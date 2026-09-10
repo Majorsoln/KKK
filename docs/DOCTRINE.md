@@ -531,6 +531,81 @@ masoko makubwa ya hisa yanayohitaji hedge.
 **Kinachohitajika kabla ya `p`:** ishara ya hisa. Sasa inastahili
 kutafutwa — lango limefunguka.
 
+#### JIBU (2026-09-10) — F1 HAIJANUSURIKA
+
+Ishara kamili **96/96**. Malango yote matatu yamepita kwa trades halisi
+(gharama 7.3% kwa USDCAD, leg mbaya kabisa). Kisha:
+
+```
+trades 344 · siku hai 86/96 · zilizogongwa stop 5 (1.45%)
+wastani  −0.00716 R/siku   ·   p 0.6673   ·   CI95 [−0.04858, +0.02956]
+```
+
+**Jaribio la PILI kati ya 7 limetumika.** Yaliyobaki: **5**.
+
+**Si "hakuna nguvu" — ni jibu.** Lango la 6.3 lilidai matukio **52** ili
+kuona edge iliyotangazwa; tulikuwa na **86**. Kwa hiyo:
+
+```
+Sharpe kwa siku    iliyotangazwa  +0.3927      (edge 5.7 pips)
+                   iliyopimwa     −0.0387      mara 10 ndogo, ishara imegeuka
+t inayotarajiwa    +3.64   (kizingiti 2.81)
+t iliyopimwa       −0.36
+```
+
+Kwa vipimo vya pips:
+
+```
+edge iliyopimwa    −0.56 pips
+CI 95%             [−3.63, +2.51] pips
+iliyotangazwa      +5.70 pips        ← NJE ya CI
+```
+
+Edge iliyotangazwa **imekataliwa kwa uhakika**. Kinachobaki kinaweza kuwa
+chochote kati ya `−3.6` na `+2.5` pips — na sifuri iko katikati kabisa.
+
+**Tofauti na F0.** F0 ilikuwa hasi **kwa uhakika** (CI ilitenga sifuri) kwa
+sababu gharama ilizidi edge. F1 ni **isiyotofautishika na sifuri**: gharama
+ni ndogo (3.9%–7.3% ya σ) na dirisha la fix lina volatility kubwa, kwa hiyo
+gharama haitawali. Ni edge yenyewe isiyoonekana.
+
+**Vitu vitatu vya ziada:**
+
+1. **LANGO 3 kwa mara ya tatu.** Pengo la spread: wastani **−0.005p**,
+   p95 **+0.076p** kwa trades 339 kwenye symbols nne, ikiwemo dirisha la fix
+   ambapo spread inapanuka. **RCE inabaki kama ilivyo, bila shaka yoyote.**
+2. **Kugongwa kwa stop: 1.45%** (F0 ilikuwa 1.83%), yote 2020–2021 — COVID na
+   mfumuko uliofuata. Thabiti kati ya familia, thabiti kwa `k = 4`.
+3. **Siku 10 zilipotea** kwa kuanzisha historia ya stop (`SL_MIN_SESSIONS`).
+   Kwa familia ya kila mwezi hiyo ni **miezi 10**, si siku 10 — gharama kubwa
+   kuliko ilivyoonekana wakati sheria iliandikwa kwa familia ya kila siku.
+   Imeandikwa kwa familia zijazo za matukio machache.
+
+---
+
+### 9.6 · MZUNGUKO WA KWANZA UMEKAMILIKA
+
+```
+familia    jibu                                       α
+F0         p 0.9710 · gross 0.29–0.70 pips            jaribio 1
+Gotobi     lango la gharama 9.3% > 8%                 hakuna
+F1         p 0.6673 · edge CI [−3.6, +2.5] pips       jaribio 2
+                                                      ─────────
+                                            zilizotumika 2 kati ya 7
+```
+
+**Hakuna familia iliyonusurika. Zote tatu zimejibiwa.**
+
+Ndicho §12 kilichoahidi: *"Njia hii inatoa jibu la kuthibitika-au-kukataliwa.
+Haiahidi strategy."* Toleo la kwanza lilitumia miezi sita na mamia ya
+majaribio bila jibu hata moja. Hili limetoa matatu kwa siku tatu, likitumia
+majaribio mawili.
+
+**Kilichojengwa kinabaki:** udhibiti chanya uliokalibrishwa (§7.1), block
+bootstrap yenye ukubwa uliopimwa, kuiga njia ya stop (§11), kalenda ya benki
+za Japani, msomaji wa madirisha, chombo cha kupima lango bila kugharimu α,
+na **RCE iliyothibitishwa mara tatu**.
+
 ### 9.3 · F0 inapimwa upya MARA MOJA, kwenye injini iliyorekebishwa
 
 Namba za §9.2 zilitolewa na injini yenye kasoro inayojulikana (§11): stop
