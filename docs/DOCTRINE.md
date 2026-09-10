@@ -1123,3 +1123,84 @@ familia yoyote inayokufa kwa gharama inapata **`UNCERTAIN`**, si
 
 Utambulisho wa akaunti (login, server, jina la broker) **hauchapishwi wala
 hauandikwi kwenye faili**. Sifa za symbols ndizo zinazohitajika.
+
+#### JIBU (2026-09-10, MT5, akaunti ya demo, USD, 1:100)
+
+```
+contract_size          IMEPIMWA    FX 100,000 · XAUUSD 100
+pip_value              IMETHIBITISHWA (sheria zetu dhidi ya broker)
+commission             HAIJAPIMWA  hakuna deal hata moja
+```
+
+**`contract_size`: dhana ilikuwa sahihi.** Symbols 12 zote zinasoma
+`100,000` (XAUUSD `100`) — sawa kabisa na kilichokuwa kwenye
+`broker_costs.yaml`. `contract_size_confirmed` sasa ni **`true`**, na si
+kwa sababu tuliamini, ni kwa sababu tumesoma.
+
+**`pip_value`: sheria zetu zinakubaliana na broker kwa kila symbol yenye
+quote.** Hii ndiyo tofauti kubwa kati ya "dhana iliyokuwa sahihi" na "dhana
+tuliyoendelea nayo" — kipimo hakikuwa cha kuridhisha tu, kilikuwa cha
+kujitegemea (`symbol_info.trade_tick_value`, njia tofauti kabisa na hesabu
+yetu):
+
+```
+                yetu     MT5     symbol
+EURUSD         10.00   10.00     dola ni nukuu   → contract × pip
+USDJPY          6.49    6.48     dola ni msingi  → contract × pip ÷ bei
+USDCHF         12.29   12.29     dola ni msingi
+EURJPY          6.49    6.48     cross           → ÷ USDJPY
+GBPJPY          6.49    6.48     cross
+EURCHF         12.29   12.29     cross
+XAUUSD          1.00    1.00     contract 100
+AUDUSD/NZDUSD/GBPUSD  10.00   10.00
+```
+
+Kama tungeweka `$10` kwa zote — jaribu la kawaida — USDJPY ingekosewa kwa
+**35%** na USDCHF kwa **19%**, na kosa hilo lingeingia kwenye
+`commission_pips` ya kila familia.
+
+USDCAD na EURGBP zilirudisha `0.00` kwenye run ya kwanza. **Si sifuri ya
+soko** — ni symbol iliyoongezwa Market Watch bila quote kufika bado, na
+`trade_tick_value` inabaki `0.0` mpaka quote ya kwanza. `mt5_specs.py`
+sasa inasubiri quote (`subiri_tick`) na inaandika `BILA QUOTE` badala ya
+kuandika sifuri kwenye ripoti kana kwamba ni kipimo.
+
+**`commission`: bado ni dhana, na sasa imeandikwa hivyo.** Akaunti ni demo
+isiyowahi kutrade, kwa hiyo `history_deals_get` ni tupu.
+`config/broker_costs.yaml` sasa ina kichwa kinachosema `HALI: HAIJAPIMWA`
+na kinachotaja maamuzi iliyoyaingia.
+
+Kwa hiyo, kwa sheria iliyoandikwa hapo juu (nambari 2 — *"lango linapimwa
+mara moja, kwa namba zote zilizorekebishwa pamoja"*), **Gotobi haiwezi
+kupimwa bado.** `σ` imerekebishwa; commission haijapimwa. Kupima nusu na
+kutangaza jibu ni kosa lile lile tulilokuwa tunalirekebisha.
+
+Hali ya Gotobi kwa sasa: **`UNCERTAIN`**, si `COST-FAILED` (§13.2).
+Hatuwezi kusema ilikufa kwa gharama wakati hatujui gharama.
+
+#### Onyo kuhusu kupima commission kwenye demo
+
+`scripts/mt5_commission.py` inaweza kuizalisha (BUY 0.01, funga papo hapo,
+soma `deal.commission`), na ina kinga zisizo na swichi: **demo pekee**
+(`trade_mode != 0` inakataliwa), volume `0.01` isiyobadilika, kufunga mara
+moja, na hakuna order bila `--nakubali`.
+
+Lakini kipimo hicho kina kikomo cha lazima kuandikwa: **broker wengi
+wanaweka commission ya demo kuwa sifuri hata pale live inatoza.** Kwa hiyo
+jibu la `0.00` kwenye demo **si uthibitisho kwamba commission ni sifuri** —
+hasa kwa akaunti hii, ambayo spread yake ya EURUSD ni **pips 0.40**, ya
+aina ya raw/ECN, na aina hizo karibu daima zinatoza commission.
+
+Kwa hiyo:
+
+```
+demo inatoa namba > 0   →  ni kipimo cha AINA HII ya akaunti; inatumika,
+                           ikiwa imeandikwa kama "demo", na inahitaji
+                           kuthibitishwa live kabla ya §10 hatua ya 5
+demo inatoa 0.00        →  HAKUNA kinachobadilika. `7.0` inabaki dhana,
+                           Gotobi inabaki `UNCERTAIN`
+```
+
+Hii imeandikwa **kabla** ya kuendesha, kwa sababu ya kwanza ni ya kuridhisha
+na ya pili ni ya kukatisha tamaa, na sheria iliyoandikwa baada ya kuona jibu
+si sheria.

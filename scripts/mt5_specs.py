@@ -57,6 +57,56 @@ def pip_from_point(point: float, digits: int) -> float:
     return point * 10.0 if digits in (3, 5) else point
 
 
+def pip_value_yetu(symbol: str, *, contract: float, pip: float,
+                   mid: float, bei: dict[str, float]) -> float | None:
+    """`pip_value` kwa akaunti ya USD kwa sheria ZETU (`f1.pip_value`).
+
+    Ipo hapa ili ilinganishwe na `trade_tick_value` ya broker. Ikiwa
+    zinatofautiana, mojawapo ni kosa — na `pip_value` isiyo sahihi inatoa
+    `commission_pips` isiyo sahihi, kosa linaloonekana kama EV badala ya
+    kama kasoro (§13.10).
+
+    ```
+    ...USD  (dola ni nukuu)   →  contract × pip
+    USD...  (dola ni msingi)  →  contract × pip ÷ bei
+    cross   (hakuna dola)     →  contract × pip ÷ bei_ya_kubadilisha
+    ```
+    """
+    if mid <= 0 or contract <= 0:
+        return None
+    if symbol.endswith("USD"):
+        return contract * pip
+    if symbol.startswith("USD"):
+        return contract * pip / mid
+    # Cross: nukuu si USD, kwa hiyo inahitaji bei ya kubadilisha nukuu → USD.
+    nukuu = symbol[3:]
+    moja_kwa_moja = f"{nukuu}USD"       # GBP → GBPUSD, thamani × bei
+    kinyume = f"USD{nukuu}"             # JPY → USDJPY, thamani ÷ bei
+    if moja_kwa_moja in bei and bei[moja_kwa_moja] > 0:
+        return contract * pip * bei[moja_kwa_moja]
+    if kinyume in bei and bei[kinyume] > 0:
+        return contract * pip / bei[kinyume]
+    return None
+
+
+def subiri_tick(mt5, jina: str, *, majaribio: int = 25, pumzika: float = 0.2):
+    """`symbol_info_tick` baada ya `symbol_select`, ikisubiri quote ifike.
+
+    Symbol iliyoongezwa Market Watch sasa hivi haina quote kwa mara ya
+    kwanza, na `trade_tick_value` yake ni **0.0** mpaka ifike — ndiyo maana
+    run ya kwanza ilitoa `pip_value 0.00` kwa USDCAD na EURGBP wakati
+    EURUSD na USDJPY zilifanya kazi. Kutorudia kungeandika sifuri kwenye
+    ripoti kana kwamba ni kipimo.
+    """
+    import time as _t
+    for _ in range(majaribio):
+        tick = mt5.symbol_info_tick(jina)
+        if tick and tick.bid > 0 and tick.ask > 0:
+            return tick
+        _t.sleep(pumzika)
+    return None
+
+
 def tafuta_terminal() -> list[Path]:
     """`terminal64.exe` zote zilizosakinishwa kwenye mashine hii.
 
@@ -221,27 +271,42 @@ def main() -> int:
           f"margin_mode {acc.margin_mode} · trade_mode {acc.trade_mode}")
     print("   (0 = demo, 1 = contest, 2 = real)")
 
-    print("\n" + "=" * 78)
-    print("SYMBOLS")
-    print("=" * 78)
-    print(f"   {'msingi':<8} {'jina la broker':<16} {'contract':>10} "
-          f"{'point':>9} {'dig':>4} {'pip_value':>10} {'spread':>7}")
-
-    jedwali, hakuna = {}, []
+    # ---- pita 1: chagua zote, subiri quotes ----
+    # Symbols zote zinachaguliwa KABLA ya kusomwa. `symbol_select` peke yake
+    # hairudishi quote papo hapo, na `trade_tick_value` inabaki 0.0 mpaka
+    # quote ifike — ndiyo sababu ya `pip_value 0.00` ya run ya kwanza.
+    print("\n   inachagua symbols na kusubiri quotes…", flush=True)
+    majina, hakuna = {}, []
     for msingi in SYMBOLS:
         jina = tafuta_symbol(mt5, msingi)
         if jina is None:
             hakuna.append(msingi)
             continue
         mt5.symbol_select(jina, True)
-        si = mt5.symbol_info(jina)
-        tick = mt5.symbol_info_tick(jina)
+        majina[msingi] = jina
+    ticks = {m: subiri_tick(mt5, j) for m, j in majina.items()}
+    bei = {m: (t.bid + t.ask) / 2 for m, t in ticks.items() if t}
+
+    print("\n" + "=" * 78)
+    print("SYMBOLS")
+    print("=" * 78)
+    print(f"   {'msingi':<8} {'contract':>10} {'point':>9} {'dig':>4} "
+          f"{'pip_val MT5':>12} {'pip_val yetu':>13} {'tofauti':>9} "
+          f"{'spread':>7}")
+
+    jedwali = {}
+    for msingi, jina in majina.items():
+        si = mt5.symbol_info(jina)          # baada ya quote — tick_value hai
+        tick = ticks[msingi]
         pip = pip_from_point(si.point, si.digits)
         # `trade_tick_value` ni thamani ya tick MOJA kwa lot 1 kwa sarafu ya
-        # akaunti. pip_value = tick_value × (pip ÷ tick_size). Hii ndiyo namba
-        # ambayo `family.pip_value()` yetu inapaswa kuilinganisha.
-        pip_value = (si.trade_tick_value * (pip / si.trade_tick_size)
-                     if si.trade_tick_size else float("nan"))
+        # akaunti. pip_value = tick_value × (pip ÷ tick_size).
+        pv_mt5 = (si.trade_tick_value * (pip / si.trade_tick_size)
+                  if si.trade_tick_size else float("nan"))
+        pv_yetu = pip_value_yetu(msingi, contract=si.trade_contract_size,
+                                 pip=pip, mid=bei.get(msingi, 0.0), bei=bei)
+        tofauti = ((pv_yetu - pv_mt5) / pv_mt5
+                   if pv_yetu is not None and pv_mt5 else None)
         spread_pips = ((tick.ask - tick.bid) / pip) if tick else float("nan")
         jedwali[msingi] = {
             "broker_name": jina,
@@ -249,16 +314,38 @@ def main() -> int:
             "point": si.point, "digits": si.digits, "pip": pip,
             "tick_size": si.trade_tick_size,
             "tick_value": si.trade_tick_value,
-            "pip_value_acct": pip_value,
+            "pip_value_mt5": pv_mt5, "pip_value_yetu": pv_yetu,
+            "pip_value_diff": tofauti,
+            "mid": bei.get(msingi),
             "volume_min": si.volume_min, "volume_step": si.volume_step,
             "volume_max": si.volume_max,
             "swap_long": si.swap_long, "swap_short": si.swap_short,
             "swap_mode": si.swap_mode,
             "spread_now_pips": spread_pips,
+            "quote": tick is not None,
         }
-        print(f"   {msingi:<8} {jina:<16} {si.trade_contract_size:>10,.0f} "
-              f"{si.point:>9.5f} {si.digits:>4} {pip_value:>10.2f} "
+        print(f"   {msingi:<8} {si.trade_contract_size:>10,.0f} "
+              f"{si.point:>9.5f} {si.digits:>4} {pv_mt5:>12.3f} "
+              f"{(f'{pv_yetu:.3f}' if pv_yetu is not None else '—'):>13} "
+              f"{(f'{tofauti:+.2%}' if tofauti is not None else '—'):>9} "
               f"{spread_pips:>7.2f}")
+
+    bila_quote = [m for m, v in jedwali.items() if not v["quote"]]
+    if bila_quote:
+        print(f"\n   BILA QUOTE (pip_value HAIJATHIBITISHWA): "
+              f"{', '.join(bila_quote)}")
+        print("   Soko limefungwa, au symbol haipatikani kwa akaunti hii.")
+    mbaya = [(m, v["pip_value_diff"]) for m, v in jedwali.items()
+             if v["pip_value_diff"] is not None
+             and abs(v["pip_value_diff"]) > 0.01]
+    sawa = sum(1 for v in jedwali.values()
+               if v["pip_value_diff"] is not None
+               and abs(v["pip_value_diff"]) <= 0.01)
+    print(f"\n   pip_value: {sawa}/{len(jedwali)} zinakubaliana na sheria "
+          f"zetu ndani ya 1%")
+    if mbaya:
+        print("   HAZIKUBALIANI: " + " · ".join(
+            f"{m} {d:+.1%}" for m, d in mbaya))
 
     if hakuna:
         print(f"\n   HAZIPO kwa broker huyu: {', '.join(hakuna)}")

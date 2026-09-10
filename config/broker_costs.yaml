@@ -9,6 +9,20 @@
 
 # Thamani ni ya PANDE MBILI (round-turn) — spec §3.3: broker akitoa bei ya
 # upande mmoja, IONGEZWE MARADUFU kabla ya kuandikwa hapa.
+#
+# ---------------------------------------------------------------------------
+# HALI: HAIJAPIMWA (2026-09-10, DOCTRINE §13.10)
+#
+# `7.0` ni DHANA, si namba ya broker. `scripts/mt5_specs.py` ilitafuta
+# commission halisi kwenye `history_deals_get` na haikupata deal hata moja —
+# akaunti ni demo isiyowahi kutrade (`trade_mode 0`).
+#
+# Namba hii tayari imeingia kwenye maamuzi yaliyoandikwa: gharama ya kila
+# familia, na theluthi mbili ya gharama ya Gotobi iliyokataliwa kwa 9.3%.
+# Kwa hiyo Gotobi ina hali ya `UNCERTAIN`, si `COST-FAILED` (§13.2).
+#
+# Kuipima: `python scripts/mt5_commission.py --nakubali` (demo pekee).
+# ---------------------------------------------------------------------------
 commission_usd_round_turn:
   default:  7.0
   EURUSD:   7.0
@@ -32,17 +46,17 @@ expected_nights:
   swing_d1:     3.5
 
 # Ukubwa wa mkataba — unatoka MT5 (`symbol_info.trade_contract_size`).
-# Thamani hizi ni za KAWAIDA kwa FX na dhahabu; ZINAHITAJI kuthibitishwa kwa
-# broker wako. `pip_value` ya Calibration A inajengwa juu yake, na `pip_value`
-# isiyo sahihi inatoa `commission_pips` isiyo sahihi -- kosa linaloonekana kama
-# EV, si kama kosa.
+#
+# HALI: IMEPIMWA (2026-09-10, `scripts/mt5_specs.py`, DOCTRINE §13.10).
+# Symbols 12 zote zilisomwa kutoka MT5: FX zote 100,000 na XAUUSD 100 —
+# sawa kabisa na dhana iliyokuwa hapa. Dhana ilikuwa sahihi; sasa ni kipimo.
 contract_size:
   default:  100000
   XAUUSD:   100
 
 # Weka `true` baada ya kulinganisha na MT5. Ikiwa `false`, jedwali la
 # Calibration A linaandikwa likiwa na alama ya `contract_size_confirmed: false`.
-contract_size_confirmed: false
+contract_size_confirmed: true
 
 # Sehemu ya usiku hizo zinazoangukia rollover ya Jumatano->Alhamisi (swap x3).
 # 0.2 = mmoja kati ya watano; strategy inayoshikilia wiki nzima ni kubwa zaidi.
