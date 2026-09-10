@@ -35,6 +35,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
@@ -54,6 +55,60 @@ SYMBOLS = ("EURUSD", "GBPUSD", "USDJPY", "USDCHF", "USDCAD", "AUDUSD",
 # JPY ya digits 3 → × 10 pia. Digits 4/2 (broker za zamani) → pip = point.
 def pip_from_point(point: float, digits: int) -> float:
     return point * 10.0 if digits in (3, 5) else point
+
+
+def tafuta_terminal() -> list[Path]:
+    """`terminal64.exe` zote zilizosakinishwa kwenye mashine hii.
+
+    `mt5.initialize()` bila `path` inatafuta njia ya **chaguo-msingi pekee**
+    (`C:\\Program Files\\MetaTrader 5`). Broker wengi wanasakinisha kwa jina
+    lao — `IC Markets MT5`, `Exness MetaTrader 5` — na hapo initialize
+    inashindwa kwa `IPC initialize failed` ingawa terminal ipo na
+    imefunguliwa.
+
+    Inatafuta kwa **kina cha 3 pekee** kwenye folda za programu na
+    `%LOCALAPPDATA%`; kutafuta diski nzima kungechukua dakika.
+    """
+    mizizi = [
+        Path(os.environ.get("ProgramFiles", r"C:\Program Files")),
+        Path(os.environ.get("ProgramFiles(x86)", r"C:\Program Files (x86)")),
+        Path(os.environ.get("LOCALAPPDATA", "")) / "Programs",
+        Path.home() / "AppData" / "Roaming",
+    ]
+    zote: list[Path] = []
+    for mzizi in mizizi:
+        if not mzizi or not mzizi.is_dir():
+            continue
+        for kina in ("terminal64.exe", "*/terminal64.exe",
+                     "*/*/terminal64.exe"):
+            try:
+                zote += [p for p in mzizi.glob(kina) if p.is_file()]
+            except OSError:
+                continue
+    # `dict.fromkeys` inaondoa marudio ikihifadhi mpangilio.
+    return list(dict.fromkeys(zote))
+
+
+def anzisha(mt5, path: str | None) -> tuple[bool, str]:
+    """`mt5.initialize()`, ikijaribu njia zilizopatikana ikiwa lazima."""
+    if path:
+        ok = mt5.initialize(path=path)
+        return ok, (path if ok else f"{path} → {mt5.last_error()}")
+    if mt5.initialize():
+        return True, "njia ya chaguo-msingi"
+
+    kwanza = mt5.last_error()
+    zilizopatikana = tafuta_terminal()
+    if not zilizopatikana:
+        return False, (f"chaguo-msingi: {kwanza}\n"
+                       "   Hakuna `terminal64.exe` iliyopatikana kwenye "
+                       "folda za programu.")
+    for p in zilizopatikana:
+        if mt5.initialize(path=str(p)):
+            return True, str(p)
+    orodha = "\n".join(f"      {p}" for p in zilizopatikana)
+    return False, (f"chaguo-msingi: {kwanza}\n"
+                   f"   Zimepatikana lakini hazikufunguka:\n{orodha}")
 
 
 def tafuta_symbol(mt5, msingi: str) -> str | None:
@@ -113,7 +168,20 @@ def main() -> int:
     ap.add_argument("--deals-since", default=None,
                     help="YYYY-MM-DD; chaguo-msingi ni miaka 3 iliyopita")
     ap.add_argument("--out", default=str(RIPOTI / "mt5_specs.json"))
+    ap.add_argument("--terminal", default=None,
+                    help="njia kamili ya terminal64.exe")
+    ap.add_argument("--find", action="store_true",
+                    help="onyesha terminal zilizopatikana kisha simama")
     args = ap.parse_args()
+
+    if args.find:
+        zote = tafuta_terminal()
+        print(f"terminal64.exe zilizopatikana: {len(zote)}")
+        for p in zote:
+            print(f"   {p}")
+        if not zote:
+            print("   HAKUNA. MT5 haijasakinishwa kwenye njia za kawaida.")
+        return 0
 
     try:
         import MetaTrader5 as mt5                              # noqa: N813
@@ -121,10 +189,23 @@ def main() -> int:
         print("MetaTrader5 haijasakinishwa.  pip install MetaTrader5")
         return 2
 
-    if not mt5.initialize():
-        print(f"mt5.initialize() imeshindwa: {mt5.last_error()}")
-        print("Fungua terminal ya MT5 na uingie kwenye akaunti kwanza.")
+    ok, chanzo = anzisha(mt5, args.terminal)
+    if not ok:
+        print(f"mt5.initialize() imeshindwa.\n   {chanzo}")
+        print("\nSababu zinazowezekana, kwa mpangilio:")
+        print("   1. Terminal ya MT5 haijafunguliwa — ifungue na uingie.")
+        print("   2. Imesakinishwa kwa jina la broker — tumia --terminal:")
+        print("      python scripts\\mt5_specs.py --find")
+        print("      python scripts\\mt5_specs.py --terminal \"<njia>\"")
+        biti = 64 if sys.maxsize > 2 ** 32 else 32
+        print(f"   3. Python ni {biti}-bit "
+              f"({'sawa' if biti == 64 else 'MetaTrader5 INAHITAJI 64-bit'}).")
+        print("   4. MT5 haijasakinishwa kabisa kwenye mashine hii.")
+        print("\nKama ni (4): commission HAIWEZI kupimwa hapa. `7.0` inabaki")
+        print("   ikiwa imeandikwa kama DHANA, na Gotobi inapata `UNCERTAIN`")
+        print("   badala ya `COST-FAILED` (§13.2, §13.10).")
         return 2
+    print(f"MT5 imefunguliwa kupitia: {chanzo}")
 
     acc = mt5.account_info()
     if acc is None:
