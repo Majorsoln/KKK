@@ -50,6 +50,28 @@ from scripts.mt5_specs import (RIPOTI, SYMBOLS, anzisha,   # noqa: E402
 VOLUME = 0.01          # haibadiliki
 DEVIATION = 20         # points; kujaza kwenye demo, si utafiti
 
+# Retcodes zinazorudi mara nyingi. MT5 inarudisha namba pekee, na namba
+# peke yake haisemi la kufanya — ndiyo maana jedwali hili lipo.
+RETCODE = {
+    10004: "REQUOTE — bei imebadilika; jaribu tena",
+    10006: "REJECT — broker amekataa ombi",
+    10013: "INVALID — ombi lina kigezo kisicho sahihi",
+    10014: "INVALID_VOLUME — 0.01 haikubaliki kwa symbol hii",
+    10015: "INVALID_PRICE",
+    10016: "INVALID_STOPS",
+    10018: "MARKET_CLOSED — soko limefungwa kwa symbol hii",
+    10019: "NO_MONEY — salio halitoshi",
+    10026: "SERVER_DISABLES_AT — AlgoTrading imezimwa na SERVER",
+    10027: "CLIENT_DISABLES_AT — AlgoTrading imezimwa kwenye TERMINAL "
+           "(kitufe cha toolbar, si Options)",
+    10030: "INVALID_FILL — hakuna aina ya kujaza inayokubalika",
+    10031: "CONNECTION — hakuna muunganisho na server",
+}
+
+
+def eleza(kod) -> str:
+    return RETCODE.get(kod, str(kod))
+
 
 def fungua_na_funga(mt5, jina: str, *, magic: int) -> dict:
     """Buy 0.01, kisha funga papo hapo. Inarudisha deals mbili."""
@@ -68,13 +90,18 @@ def fungua_na_funga(mt5, jina: str, *, magic: int) -> dict:
     r = mt5.order_send(ombi)
     if r is None or r.retcode != mt5.TRADE_RETCODE_DONE:
         kod = r.retcode if r else mt5.last_error()
-        # IOC haikubaliki kwa broker wote; FOK ndiyo mbadala wa kawaida.
-        ombi["type_filling"] = mt5.ORDER_FILLING_FOK
-        r = mt5.order_send(ombi)
-        if r is None or r.retcode != mt5.TRADE_RETCODE_DONE:
-            return {"ok": False,
-                    "sababu": f"kufungua kumeshindwa: {kod} / "
-                              f"{r.retcode if r else mt5.last_error()}"}
+        # IOC haikubaliki kwa broker wote; FOK na RETURN ndio mbadala.
+        for mbadala in (mt5.ORDER_FILLING_FOK, mt5.ORDER_FILLING_RETURN):
+            ombi["type_filling"] = mbadala
+            r = mt5.order_send(ombi)
+            if r is not None and r.retcode == mt5.TRADE_RETCODE_DONE:
+                break
+        else:
+            kod2 = r.retcode if r else mt5.last_error()
+            return {"ok": False, "retcode": kod2,
+                    "sababu": f"kufungua kumeshindwa: {eleza(kod)}"
+                              + (f" · kisha {eleza(kod2)}"
+                                 if kod2 != kod else "")}
 
     ticket_in = r.order
     time.sleep(0.5)
@@ -99,8 +126,8 @@ def fungua_na_funga(mt5, jina: str, *, magic: int) -> dict:
     if r2 is None or r2.retcode != mt5.TRADE_RETCODE_DONE:
         return {"ok": False, "ticket": p.ticket,
                 "sababu": f"KUFUNGA KUMESHINDWA: "
-                          f"{r2.retcode if r2 else mt5.last_error()} — "
-                          f"funga kwa mkono kwenye MT5!"}
+                          f"{eleza(r2.retcode if r2 else mt5.last_error())} — "
+                          f"funga ticket {p.ticket} kwa mkono kwenye MT5!"}
     return {"ok": True, "ticket_in": ticket_in, "position": p.ticket}
 
 
@@ -141,10 +168,25 @@ def main() -> int:
         print("KAWAIDA: `python scripts/mt5_specs.py --deals-since <tarehe>`.")
         mt5.shutdown()
         return 3
+    # Ruhusa MBILI tofauti, na moja ilitosha kupitisha orders 12 zilizokufa:
+    #   account_info.trade_allowed   — ruhusa ya SERVER kwa akaunti hii
+    #   terminal_info.trade_allowed  — kitufe cha "Algo Trading" cha TOOLBAR
+    # Ya pili ndiyo iliyorudisha 10027 kwenye run ya kwanza. Zinaangaliwa
+    # KABLA ya order yoyote: kutuma 12 zinazojulikana zitakataliwa si kipimo,
+    # ni kelele.
+    term = mt5.terminal_info()
+    if term is not None and not term.trade_allowed:
+        print("\nALGO TRADING IMEZIMWA KWENYE TERMINAL (retcode 10027).")
+        print("Bonyeza kitufe cha **Algo Trading** kwenye toolbar ya MT5")
+        print("(au Ctrl+E). Kikiwa kimewashwa ni cha kijani, kikiwa kimezimwa")
+        print("kina duara jekundu. Si kisanduku cha Tools → Options —")
+        print("hicho ni kingine, na kinaweza kuwa kimewashwa tayari.")
+        mt5.shutdown()
+        return 2
     if not acc.trade_allowed:
-        print("\nAkaunti haina ruhusa ya kutrade (`trade_allowed` ni False).")
-        print("MT5 → Tools → Options → Expert Advisors → "
-              "Allow algorithmic trading.")
+        print("\nAkaunti haina ruhusa ya kutrade kutoka kwa SERVER")
+        print("(`account_info.trade_allowed` ni False). Akaunti ya kusoma")
+        print("pekee, au investor password badala ya ya kawaida.")
         mt5.shutdown()
         return 2
 
@@ -183,6 +225,12 @@ def main() -> int:
 
     if not zilizofanyika:
         print("\nHAKUNA DEAL. Commission haijapimwa.")
+        # Symbols zote zikishindwa kwa sababu ile ile, tatizo ni la mfumo
+        # (ruhusa, muunganisho, soko), si la symbol.
+        sababu = {s for _, s in zilizoshindwa}
+        if len(sababu) == 1:
+            print(f"   Zote 12 kwa sababu ile ile: {sababu.pop()}")
+            print("   Tatizo ni la mfumo, si la symbol.")
         mt5.shutdown()
         return 2
 
