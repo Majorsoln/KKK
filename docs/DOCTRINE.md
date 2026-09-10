@@ -1176,18 +1176,74 @@ kwenye ripoti kana kwamba ni kipimo. `mt5_specs.py` sasa inasubiri quote
 Ni mfano mdogo wa kanuni ya §2 ikijirudia: **thamani inayorudishwa si
 kipimo mpaka ijulikane kwamba chombo kilikuwa tayari kupima.**
 
-**`commission`: bado ni dhana, na sasa imeandikwa hivyo.** Akaunti ni demo
-isiyowahi kutrade, kwa hiyo `history_deals_get` ni tupu.
-`config/broker_costs.yaml` sasa ina kichwa kinachosema `HALI: HAIJAPIMWA`
-na kinachotaja maamuzi iliyoyaingia.
+#### `commission` — imepimwa, na dhana ilikuwa mbaya
 
-Kwa hiyo, kwa sheria iliyoandikwa hapo juu (nambari 2 — *"lango linapimwa
-mara moja, kwa namba zote zilizorekebishwa pamoja"*), **Gotobi haiwezi
-kupimwa bado.** `σ` imerekebishwa; commission haijapimwa. Kupima nusu na
-kutangaza jibu ni kosa lile lile tulilokuwa tunalirekebisha.
+Akaunti haikuwa na deal hata moja, kwa hiyo commission ilizalishwa:
+`scripts/mt5_commission.py`, BUY inayofungwa papo hapo, symbols 11 kati ya
+12 (XAUUSD `MARKET_CLOSED`), deals 22.
 
-Hali ya Gotobi kwa sasa: **`UNCERTAIN`**, si `COST-FAILED` (§13.2).
-Hatuwezi kusema ilikufa kwa gharama wakati hatujui gharama.
+```
+AUDUSD  NZDUSD                      $4
+USDJPY  USDCHF  USDCAD              $6
+EURUSD  EURCHF  EURGBP  EURJPY      $8
+GBPUSD  GBPJPY                     $10
+```
+
+**Dhana ya `$7.0 kwa kila symbol` ilikuwa mbaya kwa pande zote mbili** —
+chini kwa GBP kwa 43%, juu kwa AUD kwa 75%. Na si namba moja: ni
+mgawanyo wa mara 2.5 kati ya nafuu na ghali. `broker_costs.yaml`
+ilikuwa na safu kumi na mbili za `7.0` zilizoonekana kama data.
+
+Kwa **USDJPY — symbol ya Gotobi — halisi ni `$6`, si `$7`.**
+
+#### Ukungu wa kipimo: namba zote ni shufwa
+
+`4, 6, 8, 10` si bahati. MT5 inaandika `deal.commission` kwa **senti**, na
+kipimo kilichukuliwa kwa lot `0.01`:
+
+```
+senti 0.02 kwa RT  ÷  0.01  =  $2.00 kwa lot
+```
+
+Kugawa kwa volume kunazidisha mviringo kwa `1/volume`. Kwa `0.01` ukungu
+ni **±$1.00 kwa lot** — na kwa USDJPY $1 ni takribani **pips 0.13**, wakati
+uamuzi wa Gotobi unategemea 9.3% kushuka hadi 8.0% (≈ pips 0.19).
+**Ukungu ni karibu sawa na tofauti inayoamuliwa.**
+
+Niliandika kwenye script *"volume ni 0.01 daima; hakuna hoja ya
+kuipandisha"*. Hoja ipo, na ni hii. `--volume` sasa ipo, chaguo-msingi
+`0.10` (ukungu $0.20), kikomo kigumu `1.00` (ukungu $0.02), na position
+moja kwa wakati ili margin isirundikane.
+
+#### Ubashiri kabla ya kipimo cha mwisho (§9.3, ili usomaji usiathiriwe)
+
+Gotobi ilikataliwa kwa **9.3%**, ikiwa na gharama ya pips 1.4 ambayo 65%
+yake ilikuwa commission (pips 0.91) kwa `$7`. Kwa `$6`:
+
+```
+commission  0.91 × 6/7  =  0.78 pips
+gharama     0.49 + 0.78 =  1.27 pips
+uwiano      9.3% × 1.27/1.40  ≈  8.4%
+```
+
+Kisha `σ` iliyopimwa inaingia. Ikiwa mikia minene ya USDJPY inatoa
+`kurtosis_hint` ya 1.05 au zaidi, uwiano unashuka chini ya 8.0%.
+
+**Ubashiri wangu: Gotobi itafungua lango, kwa kiasi kidogo (7.9%–8.4%).**
+Ikikataa, ni jibu, na nitasema hivyo. Ubashiri huu **haubadilishi sheria**:
+kizingiti kinabaki 8.0%, kipimo kinabaki kimoja, na jibu linalotoka ndilo
+linalotumika. Umeandikwa ili nisije nikadai baadaye kwamba nilijua.
+
+Ubashiri wangu wa mwisho wa aina hii (§9.3) ulikuwa mbaya kwa 0.0100 —
+mara nne ya kile nilichotabiri. Uzito wake ni mdogo.
+
+#### Hali ya Gotobi
+
+Bado **`UNCERTAIN`** mpaka kipimo cha `--volume 1.0` kifanyike na lango
+lipimwe mara moja. `σ` imerekebishwa, commission imepimwa lakini kwa
+ukungu mkubwa kuliko tofauti inayoamuliwa. **Kupima kwa chombo kisicho na
+usahihi wa kutosha kisha kutangaza jibu ni kosa lile lile la §2 kwa umbo
+jingine.**
 
 #### Onyo kuhusu kupima commission kwenye demo
 

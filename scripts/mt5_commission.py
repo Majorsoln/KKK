@@ -16,10 +16,17 @@ historia; ikiwa historia ni tupu, ni lazima kuizalisha.
 
 ```
 trade_mode lazima iwe 0 (DEMO). Akaunti halisi INAKATALIWA, siyo kuulizwa.
-volume ni 0.01 daima. Hakuna hoja ya kuipandisha.
-kila position inafungwa MARA MOJA baada ya kufunguliwa.
+volume ina kikomo kigumu cha 1.00 lot; chaguo-msingi 0.10.
+position moja kwa wakati — inafungwa KABLA ya inayofuata kufunguliwa.
 bila `--nakubali` hakuna order inayotumwa hata moja.
 ```
+
+**Kuhusu volume.** Toleo la kwanza lilikuwa `0.01` lisilobadilika, na
+niliandika *"hakuna hoja ya kuipandisha"*. **Hoja ipo.** MT5 inaandika
+`deal.commission` kwa senti, kwa hiyo kugawa kwa volume kunazidisha
+mviringo kwa `1/volume`: kwa `0.01` ukungu ni **$2.00 kwa lot**, na run
+ya kwanza ilitoa namba shufwa zote (4, 6, 8, 10) — saini ya ukungu, si
+bei ya broker. `0.10` inaupunguza hadi $0.20; `1.00` hadi $0.02.
 
 **Kinachopimwa ni akaunti HII.** Broker wengi wanaweka commission ya demo
 tofauti na ya live — mara nyingi sifuri. Kwa hiyo jibu la `0.00` hapa
@@ -28,8 +35,10 @@ Ripoti inaandika `trade_mode` pamoja na namba ili hilo lisisahaulike, na
 §10 hatua ya 5 inahitaji kupimwa upya kwenye akaunti halisi kabla ya lot
 yoyote ya kweli.
 
-**Gharama ya kipimo:** spread ya lot 0.01 kwa kila symbol — chini ya dola
-moja kwa jumla, na ni pesa ya demo.
+**Gharama ya kipimo:** spread ya volume iliyochaguliwa kwa kila symbol.
+Ni pesa ya demo. Endesha soko likiwa wazi: spread ya kufungwa/kufunguliwa
+ni pana mara nyingi, na ingawa **haiathiri commission hata kidogo**
+(commission ni bei ya broker, si ya soko), inapoteza pesa ya demo bure.
 """
 
 from __future__ import annotations
@@ -47,7 +56,21 @@ sys.path.insert(0, str(REPO))
 from scripts.mt5_specs import (RIPOTI, SYMBOLS, anzisha,   # noqa: E402
                                subiri_tick, tafuta_symbol)
 
-VOLUME = 0.01          # haibadiliki
+# Volume ya chaguo-msingi. **Si suala la usalama — ni la UKUBWA WA KIPIMO.**
+#
+# MT5 inaandika `deal.commission` kwa senti. Kugawa kwa volume kunazidisha
+# mviringo huo kwa `1/volume`:
+#
+#     volume 0.01  →  ukungu $2.00 kwa lot     (senti 0.01 × 2 ÷ 0.01)
+#     volume 0.10  →  ukungu $0.20 kwa lot
+#     volume 1.00  →  ukungu $0.02 kwa lot
+#
+# Run ya kwanza kwa 0.01 ilitoa namba SHUFWA zote — 4, 6, 8, 10 — ambayo
+# ndiyo saini ya ukungu huo, si ya bei ya broker. Kwa uamuzi wa Gotobi
+# unaotegemea 9.3% kushuka hadi 8.0%, $1 kwa lot ni ~0.13 pips kwenye
+# USDJPY: ukungu mkubwa kuliko tofauti inayoamuliwa.
+VOLUME_DEFAULT = 0.10
+VOLUME_MAX = 1.00      # kikomo kigumu; demo au la
 DEVIATION = 20         # points; kujaza kwenye demo, si utafiti
 
 # Retcodes zinazorudi mara nyingi. MT5 inarudisha namba pekee, na namba
@@ -73,14 +96,15 @@ def eleza(kod) -> str:
     return RETCODE.get(kod, str(kod))
 
 
-def fungua_na_funga(mt5, jina: str, *, magic: int) -> dict:
-    """Buy 0.01, kisha funga papo hapo. Inarudisha deals mbili."""
+def fungua_na_funga(mt5, jina: str, *, magic: int,
+                    volume: float) -> dict:
+    """Buy, kisha funga papo hapo. Inarudisha ticket ya position."""
     tick = subiri_tick(mt5, jina)
     if tick is None:
         return {"ok": False, "sababu": "hakuna quote"}
 
     ombi = {
-        "action": mt5.TRADE_ACTION_DEAL, "symbol": jina, "volume": VOLUME,
+        "action": mt5.TRADE_ACTION_DEAL, "symbol": jina, "volume": volume,
         "type": mt5.ORDER_TYPE_BUY, "price": tick.ask,
         "deviation": DEVIATION, "magic": magic,
         "comment": "elitefx cost probe",
@@ -149,6 +173,9 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--nakubali", action="store_true",
                     help="tuma orders kweli (DEMO pekee)")
+    ap.add_argument("--volume", type=float, default=VOLUME_DEFAULT,
+                    help=f"lots kwa kila symbol (kikomo {VOLUME_MAX}); "
+                         "kubwa = kipimo sahihi zaidi")
     ap.add_argument("--symbols", default=None,
                     help="orodha kwa koma; chaguo-msingi ni zote 12")
     ap.add_argument("--terminal", default=None)
@@ -204,16 +231,26 @@ def main() -> int:
         mt5.shutdown()
         return 2
 
+    vol = round(float(args.volume), 2)
+    if not 0 < vol <= VOLUME_MAX:
+        print(f"\nvolume {vol} iko nje ya (0, {VOLUME_MAX}]. Kikomo ni kigumu.")
+        mt5.shutdown()
+        return 2
+
     teule = ([s.strip().upper() for s in args.symbols.split(",")]
              if args.symbols else list(SYMBOLS))
     print(f"   demo · {acc.currency} · symbols {len(teule)} · "
-          f"volume {VOLUME} kwa kila moja")
+          f"volume {vol} kwa kila moja")
+    print(f"   ukungu wa kipimo: ${0.02 / vol:.2f} kwa lot "
+          f"(senti moja ÷ {vol})")
+    print(f"   salio la bure ${acc.margin_free:,.2f} · position MOJA kwa "
+          f"wakati (inafungwa kabla ya inayofuata)")
 
     if not args.nakubali:
         print("\n--nakubali HAIJATOLEWA: hakuna order itakayotumwa.")
-        print("Ikitolewa, script itafungua na kufunga BUY ya lot 0.01 kwa")
+        print(f"Ikitolewa, script itafungua na kufunga BUY ya lot {vol} kwa")
         print(f"kila symbol kati ya {len(teule)}, kisha itasoma commission")
-        print("kutoka kwenye deals zilizotokea. Ni pesa ya demo.")
+        print("kutoka kwenye deals zake kwa ticket. Ni pesa ya demo.")
         mt5.shutdown()
         return 0
 
@@ -228,7 +265,20 @@ def main() -> int:
             print(f"   {msingi:<8} haipo")
             continue
         mt5.symbol_select(jina, True)
-        r = fungua_na_funga(mt5, jina, magic=magic)
+        # Margin inaangaliwa KABLA ya kutuma: NO_MONEY baada ya order
+        # inachanganya "hatujui" na "haiwezekani".
+        tick = subiri_tick(mt5, jina)
+        if tick is not None:
+            lazima = mt5.order_calc_margin(mt5.ORDER_TYPE_BUY, jina, vol,
+                                           tick.ask)
+            hai = mt5.account_info().margin_free
+            if lazima is not None and lazima > hai:
+                zilizoshindwa.append(
+                    (msingi, f"margin ${lazima:,.0f} > bure ${hai:,.0f} — "
+                             f"punguza --volume"))
+                print(f"   {msingi:<8} margin haitoshi (${lazima:,.0f})")
+                continue
+        r = fungua_na_funga(mt5, jina, magic=magic, volume=vol)
         if r["ok"]:
             zilizofanyika.append((msingi, jina, r["position"]))
             print(f"   {msingi:<8} imefunguliwa na kufungwa "
@@ -297,8 +347,14 @@ def main() -> int:
               f"{j['profit']:>10.2f} {j['swap']:>8.2f}")
 
     jumla = sum(v["commission_usd_round_turn"] for v in matokeo.values())
+    hatua = 0.02 / vol
     print(f"\n   deals zilizosomwa {jumla_deals} · "
           f"symbols zenye kipimo {len(matokeo)}")
+    print(f"   ukungu wa kipimo ±${hatua / 2:.2f} kwa lot "
+          f"(hatua ${hatua:.2f})")
+    if hatua >= 0.5:
+        print("   ONYO: ukungu ni mkubwa. Endesha kwa --volume kubwa zaidi")
+        print("   kabla ya kutumia namba hizi kwenye uamuzi wowote.")
     if jumla == 0:
         print("\n   COMMISSION NI SIFURI KWENYE AKAUNTI HII YA DEMO.")
         print(f"   Ni kipimo halisi: deals {jumla_deals} zimesomwa na kila")
@@ -315,7 +371,8 @@ def main() -> int:
     matokeo_yote = {
         "measured_at": datetime.now(timezone.utc).isoformat(),
         "trade_mode": int(acc.trade_mode), "currency": acc.currency,
-        "volume": VOLUME, "magic": magic,
+        "volume": vol, "magic": magic,
+        "resolution_usd_per_lot": 0.02 / vol,
         "deals_read": jumla_deals,
         "per_symbol": matokeo,
         "failed": [{"symbol": s, "reason": r} for s, r in zilizoshindwa],
