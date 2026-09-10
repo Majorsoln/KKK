@@ -132,13 +132,19 @@ def main() -> int:
     print("\n" + "=" * 74)
     print("VIPIMO")
     print("=" * 74)
-    print(f"   {'leg':<5} {'trades':>7} {'mwendo':>8} {'σ':>8} {'gharama':>8} "
-          f"{'gharama/σ':>10}")
+    print(f"   {'leg':<5} {'trades':>7} {'mwendo':>8} {'σ':>8} {'σ norm':>8} "
+          f"{'gharama':>8} {'gh/σ':>7} {'gh/σn':>7}")
     for leg, v in sorted(mz.per_leg.items()):
-        alama = "  ← inayopimwa" if leg == mz.worst_leg else ""
+        alama = "  ←" if leg == mz.worst_leg else ""
         print(f"   {leg:<5} {v['n']:>7,} {v['move_pips']:>8.2f} "
-              f"{v['sigma_pips']:>8.2f} {v['cost_pips']:>8.2f} "
-              f"{v['ratio']:>9.1%}{alama}")
+              f"{v['sigma_pips']:>8.2f} {v['sigma_normal_pips']:>8.2f} "
+              f"{v['cost_pips']:>8.2f} {v['ratio']:>6.1%} "
+              f"{v['ratio_normal']:>6.1%}{alama}")
+    # §13.10: `σ` inapimwa. `σ norm` ni ile ya dhana ya normal, inachapishwa
+    # ili tofauti ionekane. Uwiano > 1.0 = mikia minene kuliko normal.
+    mbaya = mz.per_leg[mz.worst_leg]
+    print(f"   σ iliyopimwa ÷ σ ya normal = {mbaya['kurtosis_hint']:.3f} "
+          f"kwa leg mbaya · drift {mbaya['drift_pips']:+.2f}p")
     sl = fam.SL_MOVE_MULT * mz.move_pips
     print(f"   stop (× {fam.SL_MOVE_MULT}) kwa leg mbaya          {sl:>8.2f} pips")
     print(f"   pengo la spread (zilizomaliza kwa saa): "

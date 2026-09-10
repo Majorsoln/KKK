@@ -1032,3 +1032,94 @@ mekanizimu iliyothibitishwa**, na haikubaliki kama mtafutaji wa edge.
 Sharti la §2 halibadiliki: kila namba inayoingia kwenye uamuzi lazima
 ipimwe na injini hii, kwenye mchakato huu, kabla ya kutumika — ikiwa ni
 pamoja na kila namba inayotoka kwenye model.
+
+### 13.10 · Ukaguzi wa §2 — namba zinazoingia kwenye maamuzi bila kupimwa
+
+*(2026-09-10. Swali: **namba zipi zinazoingia kwenye maamuzi yetu ambazo
+injini hii haijazipima?**)*
+
+| namba | chanzo | imeingia kwenye | hali |
+|---|---|---|---|
+| `MOVE_TO_SIGMA = 1.2533` | nadharia ya normal | lango la §6.2 la **kila** familia → kukataliwa kwa Gotobi | **IMEREKEBISHWA** |
+| `commission = $7.0` RT | dhana ya chaguo-msingi | gharama ya kila familia; 65% ya gharama ya Gotobi | inapimwa — `scripts/mt5_specs.py` |
+| `contract_size = 100,000` | "kawaida", `confirmed: false` | `pip_value` → `commission_pips` → gharama zote | inapimwa — script ile ile |
+| slippage ya stop `= 0.3` | "HAIJAPIMWA" (imeandikwa) | **haitumiki**: stop 70 za F0 zinajaza kwa bei kamili | inabaki wazi (§11) |
+
+**`MOVE_TO_SIGMA` ndiyo kubwa kuliko zote.** Lango la §6.2 linadai
+`σ ya dirisha`. Hatukuipima. Tulipima `E|mwendo|` kisha tukazidisha kwa
+`1.2533` — kigezo cha `E|X| = σ√(2/π)`, **kweli kwa mgawanyo wa normal
+pekee**. Na injini hii hii ilikuwa **tayari imethibitisha** kwamba normal si
+kweli kwenye data hii: kugongwa kwa stop kulitabiriwa 0.3% kwa kanuni ya
+normal, halisi ni **1.83%** — mara sita.
+
+Kwa mikia minene `σ / E|X| > 1.2533`, kwa hiyo:
+
+```
+σ yetu ilikuwa NDOGO kuliko halisi
+  → uwiano gharama/σ ulikuwa MKUBWA kuliko halisi
+    → lango la §6.2 lilikuwa KALI kuliko lilivyotangazwa
+```
+
+**Marekebisho:** `driver.measure` na `gate_probe` sasa zinapima `σ` moja kwa
+moja — `stdev` ya mwendo wenye ishara (`stops.signed_move_pips`). Kigezo cha
+normal kinabaki kikichapishwa pembeni kama `σ norm`, pamoja na uwiano
+`kurtosis_hint = σ_iliyopimwa ÷ σ_ya_normal`, ili upotoshaji uonekane kwa
+namba badala ya kubishaniwa.
+
+Kwenye ticks za normal safi (fixture ya majaribio) `kurtosis_hint` ni
+**1.000 ± 0.12** — kimethibitishwa kwa jaribio. Kwa hiyo tofauti yoyote
+kwenye data halisi ni **tabia ya soko**, si kasoro ya hesabu.
+
+**Hakuna jibu la mzunguko wa kwanza linalobadilika kwa hili.** `σ` inaingia
+kwenye lango na kwenye Sharpe iliyotangazwa **pekee** — haiingii kwenye
+`curve`, wala kwenye `R`, wala kwenye bootstrap. F0 na F1 zilishapita lango;
+`σ` kubwa zaidi inalifanya jepesi tu. `p` zao ni zile zile.
+
+#### Sheria ya Gotobi — imeandikwa KABLA ya kupima
+
+Kilichoathirika ni **Gotobi pekee**, iliyokataliwa kwa **9.3% dhidi ya 8%**.
+Uamuzi wa PD (2026-09-10): **inaendeshwa ikiwa lango litafunguka.** Sheria
+imeandikwa hapa kabla namba mpya haijaonekana, ili isije ikaundwa
+kuizunguka:
+
+1. Kizingiti kinabaki **8.0%** — kilichotangazwa 2026-09-07, hakibadiliki.
+2. Lango linapimwa **MARA MOJA**, kwa namba **zote** zilizorekebishwa
+   pamoja: `σ` iliyopimwa **na** commission iliyopimwa kutoka MT5. Si
+   marekebisho moja, kisha kingine kikishindwa. **Kipimo kimoja, jibu moja.**
+3. `uwiano ≤ 8.0%` → Gotobi inaendeshwa. Tangazo ni lile lile
+   (`06a78b1b…`) — nanga, mwelekeo, `k`, kila kitu. Sheria ya uamuzi ni ile
+   ile: `p ≤ 0.0025`. Inagharimu **jaribio la tatu**.
+4. `uwiano > 8.0%` → Gotobi imefungwa kwa mzunguko huu, kabisa. Hakuna
+   marekebisho ya tatu.
+5. Kama nanga ya kuingia ingebadilishwa (08:30 JST ni kabla Tokyo
+   haijafunguka — 37% ya madirisha hayakuwa na tick), hiyo ni **familia
+   mpya** yenye tangazo jipya na hash mpya, si Gotobi. Sheria hii
+   hairuhusu hilo.
+
+Msingi wa kuruhusu (3): ni sawa kabisa na §9.3 — namba iliyopimwa vibaya
+ilirekebishwa, tangazo halikubadilika, sheria ya uamuzi iliandikwa kabla.
+Tofauti na §8.5 (*"kufeli hakuendeshwi upya kwa vigezo vipya"*) ni kwamba
+**hakuna kigezo kipya**: `1.2533` haikuwa kigezo cha strategy, ilikuwa kosa
+la kipimo.
+
+#### Commission — dhana yangu iliyoua familia
+
+`config/broker_costs.yaml` ilikuwa na `default: 7.0` kwa kila symbol.
+Namba hiyo haikutoka kwa broker; niliiweka kama chaguo-msingi. Iliingia
+kwenye gharama ya kila familia, na theluthi mbili ya gharama ya Gotobi
+ilikuwa commission. **Tuliandika "Gotobi IMEKATALIWA" kwa namba
+iliyobuniwa.**
+
+`scripts/mt5_specs.py` inaipima: `symbol_info` inatoa `contract_size`,
+`point`, `digits`, `tick_value` (→ `pip_value` halisi ya broker), na
+`volume_*`; `history_deals_get` inatoa **commission halisi kwa lot**
+iliyolipwa kwenye deals zilizotekelezwa — kipimo, si bei ya tangazo.
+
+Commission **haipo** kwenye `symbol_info`; njia pekee ni deals. Akaunti
+isiyo na historia haiwezi kuipima, na script inasema hivyo badala ya
+kukisia. Katika hali hiyo `7.0` inabaki **ikiwa imeandikwa kama DHANA**, na
+familia yoyote inayokufa kwa gharama inapata **`UNCERTAIN`**, si
+`COST-FAILED`.
+
+Utambulisho wa akaunti (login, server, jina la broker) **hauchapishwi wala
+hauandikwi kwenye faili**. Sifa za symbols ndizo zinazohitajika.

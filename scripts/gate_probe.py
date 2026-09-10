@@ -7,9 +7,13 @@ python scripts/gate_probe.py --family f1 --root <L0> --provenance aggregator
 Inasoma **ncha mbili pekee** za kila tukio na kupima vitu viwili:
 
 ```
-σ  =  wastani wa |kutoka − kuingia| × 1.2533      (volatility ya dirisha)
+σ  =  stdev ya (kutoka − kuingia)                 (volatility ya dirisha)
 gharama  =  nusu-spread ya kuingia + nusu ya kutoka + commission
 ```
+
+`σ` **inapimwa**, haigeuzwi kutoka `E|X|` kwa kigezo cha normal (§13.10).
+Namba ya normal (`1.2533 × E|X|`) inachapishwa pembeni kama rejea, ili
+kiasi cha mikia minene kionekane.
 
 Kisha `gharama / σ` dhidi ya bajeti ya **8%**.
 
@@ -26,7 +30,9 @@ lakini commission haipungui hata kidogo.
 
 **Kikomo kimoja kilichoandikwa.** Familia yenye legs za urefu TOFAUTI (F0:
 masaa 9 na 4.4) inapimwa hapa kwa **kuchanganya** — kipimo kinakuwa cha
-wastani, si cha leg mbaya. Kwa familia hizo, namba ya uamuzi ni ile ya
+wastani, si cha leg mbaya. Kwa `σ` ni mbaya zaidi: mchanganyiko wa madirisha
+mawili yenye `σ` tofauti una mtawanyiko mkubwa kuliko lolote kati yao, kwa
+hiyo `σ` inapanuka na lango linalegea. Kwa familia hizo, namba ya uamuzi ni ile ya
 `family_run.py`, inayoripoti kwa kila leg. Gotobi na F1 zina dirisha MOJA,
 kwa hiyo kwao chombo hiki ni sahihi kabisa.
 """
@@ -76,7 +82,7 @@ def probe(fam, inv, symbol: str, days, *, commission: float, verbose=False):
     """Mwendo na gharama kwa symbol moja, kwenye dirisha lililotangazwa."""
     pip = pip_of(fam, symbol)
     partitions = inv.of(symbol)
-    mwendo, gharama, kukosekana = [], [], 0
+    mwendo, ishara, gharama, kukosekana = [], [], [], 0
 
     for kundi in chunks(days, size=20):
         maombi = []
@@ -95,6 +101,7 @@ def probe(fam, inv, symbol: str, days, *, commission: float, verbose=False):
                     kukosekana += 1
                     continue
                 mwendo.append(abs(nje.mid - ndani.mid) / pip)
+                ishara.append((nje.mid - ndani.mid) / pip)
                 # Spread iliyolipwa kwenda-na-kurudi ni nusu kila ncha.
                 spread = (ndani.spread_pips(pip) + nje.spread_pips(pip)) / 2
                 comm = commission / pip_value_of(fam, symbol, ndani.mid)
@@ -107,10 +114,17 @@ def probe(fam, inv, symbol: str, days, *, commission: float, verbose=False):
         return None
     w = st.fmean(mwendo)
     g = st.fmean(gharama)
-    sigma = w * MOVE_TO_SIGMA
+    # §13.10: `σ` inapimwa kutoka mwendo wenye ishara. `MOVE_TO_SIGMA`
+    # inabaki kama rejea ya kulinganisha pekee, si kwa lango.
+    sigma = st.stdev(ishara) if len(ishara) > 1 else float("nan")
+    sigma_normal = w * MOVE_TO_SIGMA
     return {"symbol": symbol, "n": len(mwendo), "missing": kukosekana,
             "move_pips": w, "sigma_pips": sigma,
-            "cost_pips": g, "ratio": g / sigma}
+            "sigma_normal_pips": sigma_normal,
+            "kurtosis_hint": sigma / sigma_normal,
+            "drift_pips": st.fmean(ishara),
+            "cost_pips": g, "ratio": g / sigma,
+            "ratio_normal": g / sigma_normal}
 
 
 def main() -> int:
@@ -168,20 +182,22 @@ def main() -> int:
 
     print("=" * 74)
     print(f"   {'symbol':<9}{'n':>6}{'kukosa':>8}{'mwendo':>9}{'σ':>8}"
-          f"{'gharama':>9}{'gharama/σ':>11}  jibu")
+          f"{'σ norm':>8}{'gharama':>9}{'gh/σ':>8}{'gh/σn':>8}  jibu")
     print("=" * 74)
     for r in matokeo:
         jibu = "PITA" if r["ratio"] <= COST_BUDGET else "KATAA"
         print(f"   {r['symbol']:<9}{r['n']:>6,}{r['missing']:>8,}"
               f"{r['move_pips']:>9.2f}{r['sigma_pips']:>8.2f}"
-              f"{r['cost_pips']:>9.2f}{r['ratio']:>10.1%}  {jibu}")
+              f"{r['sigma_normal_pips']:>8.2f}{r['cost_pips']:>9.2f}"
+              f"{r['ratio']:>7.1%}{r['ratio_normal']:>8.1%}  {jibu}")
 
     if not matokeo:
         print("\nHAKUNA KIPIMO.")
         return 2
 
     mbaya = max(matokeo, key=lambda r: r["ratio"])
-    print(f"\n   leg mbaya kabisa: {mbaya['symbol']} kwa {mbaya['ratio']:.1%}")
+    print(f"\n   leg mbaya kabisa: {mbaya['symbol']} kwa {mbaya['ratio']:.1%}"
+          f"  (σ iliyopimwa ÷ σ ya normal = {mbaya['kurtosis_hint']:.3f})")
     if mbaya["ratio"] > COST_BUDGET:
         # Dirisha linalohitajika: σ ∝ √muda.
         inahitajika = mbaya["cost_pips"] / COST_BUDGET

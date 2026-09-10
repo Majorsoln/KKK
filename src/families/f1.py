@@ -144,6 +144,7 @@ SL_LOOKBACK_SESSIONS = STOPS.LOOKBACK_SESSIONS
 SL_MIN_SESSIONS = STOPS.MIN_SESSIONS
 MOVE_TO_SIGMA = STOPS.MOVE_TO_SIGMA
 session_move_pips = STOPS.session_move_pips
+signed_move_pips = STOPS.signed_move_pips
 stop_from_history = STOPS.stop_from_history
 stop_from_moves = STOPS.stop_from_moves
 
@@ -407,6 +408,6 @@ __all__ = [
     "SL_MOVE_MULT", "SL_LOOKBACK_SESSIONS", "SL_MIN_SESSIONS", "MOVE_TO_SIGMA",
     "PRIORITY", "DECLARED_EDGE_PIPS", "MECHANISM", "DECLARATION",
     "Signal", "PLACEHOLDER", "side_for", "Session", "LEG", "sessions_for",
-    "session_move_pips", "stop_from_history", "stop_from_moves",
+    "session_move_pips", "signed_move_pips", "stop_from_history", "stop_from_moves",
     "measurements", "eligible_days", "baskets", "windows_to_read",
 ]

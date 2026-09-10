@@ -23,8 +23,20 @@ from typing import Mapping, Sequence
 
 from src.families.base import FamilyError
 
-# `E|X| = σ√(2/π)` kwa mgawanyo wa normal. Inatumika kugeuza mwendo wa wastani
-# kuwa `σ` kwa lango la gharama la §6.2, ambalo linadai σ ya DIRISHA.
+# `E|X| = σ√(2/π)` kwa mgawanyo wa normal, kwa hiyo `σ = 1.2533 × E|X|`.
+#
+# **HII NI DHANA, SI KIPIMO** (DOCTRINE §13.10). Ilitumika kugeuza mwendo wa
+# wastani kuwa `σ` kwa lango la §6.2 — na lango hilo lilikataa Gotobi. Injini
+# hii hii tayari imeonyesha kwamba normal ni ya uongo kwenye data hii: stop
+# ilitabiriwa kugongwa 0.3% kwa kanuni ya normal, halisi ni 1.83%.
+#
+# Kwa mikia minene `σ / E|X| > 1.2533`, kwa hiyo namba hii **inapunguza σ**,
+# **inapandisha uwiano wa gharama**, na **inafanya lango kuwa kali kuliko
+# lilivyotangazwa**.
+#
+# Inabaki hapa kama **rejea ya kulinganisha pekee**. `driver.measure`
+# inapima `σ` moja kwa moja kutoka kwenye mwendo wenye ishara
+# (`signed_move_pips`), na ndiyo inayoingia kwenye lango.
 MOVE_TO_SIGMA = 1.2533141373155003
 
 # Vikao vya nyuma. Ni vya NYUMA pekee — ona `stop_from_moves`.
@@ -40,6 +52,19 @@ def session_move_pips(ndani, nje, *, pip: float) -> float:
     kila kipimo, na stop ingekua kwa gharama badala ya kwa mwendo.
     """
     return abs(nje.mid - ndani.mid) / pip
+
+
+def signed_move_pips(ndani, nje, *, pip: float) -> float:
+    """`kutoka − kuingia` kwa **mid**, katika pips, **ikiwa na ishara**.
+
+    Stop haihitaji ishara — bima ni ya pande zote mbili. Lango la §6.2
+    linaihitaji: linadai `σ ya dirisha`, na `σ` ni mtawanyiko kuzunguka
+    wastani, si wastani wa ukubwa. Kugeuza `E|X|` kuwa `σ` kunahitaji kujua
+    umbo la mgawanyo (§13.10); kupima moja kwa moja hakuhitaji.
+
+    Mid, si bei ya utekelezaji — kwa sababu ile ile ya `session_move_pips`.
+    """
+    return (nje.mid - ndani.mid) / pip
 
 
 def stop_from_history(
@@ -95,4 +120,5 @@ def stop_from_moves(
 
 
 __all__ = ["MOVE_TO_SIGMA", "LOOKBACK_SESSIONS", "MIN_SESSIONS",
-           "session_move_pips", "stop_from_history", "stop_from_moves"]
+           "session_move_pips", "signed_move_pips",
+           "stop_from_history", "stop_from_moves"]

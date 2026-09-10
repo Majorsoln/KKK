@@ -165,6 +165,49 @@ def test_leg_A_ina_sigma_KUBWA_kuliko_leg_B(sweep):
     assert b / a == pytest.approx((4.42 / 9.0) ** 0.5, rel=0.20)
 
 
+def test_sigma_INAPIMWA_na_kwenye_data_ya_normal_inakubaliana_na_1_2533(sweep):
+    """§13.10. Ticks za fixture hii ni **normal kwa ujenzi** (`rng.normal`),
+    kwa hiyo `σ` iliyopimwa na `1.2533 × E|X|` lazima zilingane.
+
+    Ndicho kinachofanya kipimo hiki kuwa na maana kwenye data halisi: kama
+    `kurtosis_hint` inatoka 1.0 huko, ni **tabia ya soko**, si kasoro ya
+    hesabu — kwa sababu hapa, kwenye normal safi, ni 1.0.
+    """
+    mz = D.measure(f0, sweep["sw"], sweep["siku"])
+    for leg, v in mz.per_leg.items():
+        assert v["kurtosis_hint"] == pytest.approx(1.0, abs=0.12), (leg, v)
+        assert v["n_moves"] == len(sweep["siku"])
+        # `drift` ni wastani wa mwendo wenye ishara; random walk isiyo na
+        # mwelekeo inaipeleka karibu na sifuri ikilinganishwa na `σ`.
+        assert abs(v["drift_pips"]) < 0.5 * v["sigma_pips"]
+
+
+def test_lango_linatumia_sigma_ILIYOPIMWA_si_ya_dhana(sweep):
+    """Uwiano unaoingia kwenye §6.2 ni `gharama ÷ σ iliyopimwa`.
+
+    Hadi 2026-09-10 ulikuwa `gharama ÷ (1.2533 × E|X|)`. Namba zote mbili
+    zinarudishwa, na `ratio` — inayoamua — ni ile ya kipimo.
+    """
+    mz = D.measure(f0, sweep["sw"], sweep["siku"])
+    for v in mz.per_leg.values():
+        assert v["ratio"] == pytest.approx(v["cost_pips"] / v["sigma_pips"])
+        assert v["ratio_normal"] == pytest.approx(
+            v["cost_pips"] / v["sigma_normal_pips"])
+    mbaya = mz.per_leg[mz.worst_leg]
+    assert mz.sigma_pips == mbaya["sigma_pips"]
+    assert mbaya["ratio"] == max(v["ratio"] for v in mz.per_leg.values())
+
+
+def test_mwendo_wenye_ISHARA_una_ukubwa_ULE_ULE_wa_usio_na_ishara(sweep):
+    """`|signed| == move` kwa kila kikao — ni kipimo kile kile, ishara pekee
+    ndiyo iliyoongezwa. Kama zingetofautiana, moja kati ya mbili ingekuwa
+    inasoma bei nyingine."""
+    sw = sweep["sw"]
+    assert set(sw.signed) == set(sw.moves)
+    for k, v in sw.moves.items():
+        assert abs(sw.signed[k]) == pytest.approx(v)
+
+
 def test_pengo_la_spread_ni_karibu_SIFURI_kwa_spread_thabiti(sweep):
     """Kwenye ticks zenye spread isiyobadilika, kadirio la RCE ni sahihi kabisa.
     Kwenye data ya PD ndipo namba hii itakuwa na maana (Lango 3)."""

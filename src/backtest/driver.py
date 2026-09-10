@@ -77,6 +77,7 @@ class Sweep:
 
     trades: list = field(default_factory=list)
     moves: dict = field(default_factory=dict)
+    signed: dict = field(default_factory=dict)
     missing: list = field(default_factory=list)
     rejected: list = field(default_factory=list)
     key_of: dict = field(default_factory=dict)
@@ -190,10 +191,10 @@ def sweep(family, inv, days: Sequence[date], spec: RunSpec, *, cfg,
                 stop = family.stop_from_history(nyuma)
                 if stop is not None:
                     stops[(d, m.key)] = stop
+                pip_hii = _pip(family, m.symbol)
                 mwendo_leo[m.key] = (
-                    family.session_move_pips(ndani, nje,
-                                             pip=_pip(family, m.symbol)),
-                    ndani, m)
+                    family.session_move_pips(ndani, nje, pip=pip_hii),
+                    family.signed_move_pips(ndani, nje, pip=pip_hii))
                 # Ufunguo unatafutwa kwa DIRISHA, si kwa symbol: F0 ina legs
                 # mbili za symbol ILE ILE kwa madirisha tofauti, na kutafuta
                 # kwa symbol kungechagua leg A kwa vikapu vyote viwili.
@@ -227,8 +228,9 @@ def sweep(family, inv, days: Sequence[date], spec: RunSpec, *, cfg,
                     else:
                         out.rejected.append((d, k.basket_id, jibu.reason))
 
-            for key, (kiasi, _, _) in mwendo_leo.items():
+            for key, (kiasi, ishara) in mwendo_leo.items():
                 out.moves[(d, key)] = kiasi
+                out.signed[(d, key)] = ishara
                 historia.setdefault(key, []).append(kiasi)
 
         if progress:
@@ -272,10 +274,17 @@ def measure(family, sw: Sweep, days: Sequence[date]) -> Measured:
     hiyo uwiano wa gharama si mmoja. Kuchanganya kungefanya leg fupi ijifiche
     nyuma ya ndefu, na §6.2 inasema *"σ ya dirisha la kushikilia"*, si *"σ ya
     wastani wa familia"*.
+
+    **`σ` inapimwa, haidhaniwi** (§13.10). Hadi 2026-09-10 ilihesabiwa kama
+    `1.2533 × E|mwendo|` — kweli kwa normal pekee. Kwa mikia minene kigezo
+    halisi ni kikubwa zaidi, kwa hiyo `σ` ilikuwa ndogo na lango la §6.2
+    lilikuwa **kali kuliko lilivyotangazwa**. Namba zote mbili zinarudishwa
+    ili tofauti ionekane; **iliyopimwa ndiyo inayoingia kwenye lango**.
     """
     kwa_leg: dict[str, dict] = {}
     for leg in sorted({l for (_, l) in sw.moves}):
         m = [v for (_, l), v in sw.moves.items() if l == leg]
+        ishara = [v for (_, l), v in sw.signed.items() if l == leg]
         t_leg = [t for t in sw.finished
                  if sw.key_of.get((t.basket_id, t.symbol)) == leg]
         if not m or not t_leg:
@@ -283,10 +292,21 @@ def measure(family, sw: Sweep, days: Sequence[date]) -> Measured:
         wastani = st.fmean(m)
         gharama = st.fmean(t.spread_realised_pips + t.commission_pips
                            for t in t_leg)
-        sigma = wastani * family.MOVE_TO_SIGMA
+        # `σ` INAPIMWA, haihesabiwi kutoka `E|X|` (§13.10). Kigezo cha normal
+        # `1.2533` kinabaki kama rejea pekee ili upotoshaji uonekane: uwiano
+        # `kurtosis_hint` chini ya 1.0 ungemaanisha data nyembamba kuliko
+        # normal, juu ya 1.0 ni mikia minene — na mikia minene ndiyo tuliyo
+        # nayo (kugongwa kwa stop 1.83% dhidi ya 0.3% ya normal).
+        sigma = st.stdev(ishara) if len(ishara) > 1 else float("nan")
+        sigma_normal = wastani * family.MOVE_TO_SIGMA
         kwa_leg[leg] = {"move_pips": wastani, "sigma_pips": sigma,
+                        "sigma_normal_pips": sigma_normal,
+                        "kurtosis_hint": sigma / sigma_normal,
+                        "drift_pips": st.fmean(ishara),
                         "cost_pips": gharama, "n": len(t_leg),
-                        "ratio": gharama / sigma}
+                        "n_moves": len(ishara),
+                        "ratio": gharama / sigma,
+                        "ratio_normal": gharama / sigma_normal}
     if not kwa_leg:
         raise RuntimeError("hakuna leg yenye trade — hakuna cha kupima")
 
