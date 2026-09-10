@@ -139,6 +139,35 @@ inaruhusu cap **ngumu zaidi** (fills bora). Soko likichafuka, cap **HAIZIDI** dh
 kwa hiyo dhamana ya "live ≤ backtest" **inabaki**. Cap ikiruhusiwa kulegea, namba zilizothibitishwa
 hazingekuwa halali tena.
 
+**Cap ya kila symbol (uamuzi wa PD 2026-08-23).** `slippage_cap_pips` inaweza kuwa namba moja
+au **jedwali la symbols lenye `default`**:
+
+```yaml
+slippage_cap_pips:            slippage_cap_pips:
+  market:  0.1                  market:
+  stop:    0.3                    default: 0.1
+                                  XAUUSD:  12.0
+```
+
+**Sababu, kwa hesabu:** `order.deviation = cap × (PipSize ÷ point)`. Kwa cap ya pips 0.1:
+
+| symbol | PipSize | point | deviation |
+|---|---|---|---|
+| EURUSD | 0.0001 | 0.00001 | **1 point** |
+| XAUUSD | 0.01 | 0.01 | **0 points** |
+
+Pips 0.1 ni $0.001 kwa dhahabu — chini ya tick moja. Deviation ya points 0 inamaanisha order
+inajaza kwa bei iliyoombwa **haswa**, au haijazi kabisa. Calibration A (§8.3 ya DOCTRINE)
+ilipima slippage ya XAUUSD kuwa pips 5.5 kwa wastani (p95 = 12.0) kwenye miaka 8: cap ya 0.1
+ingekataa karibu kila order ya dhahabu, na `fill_rate_min: 0.60` ingeripoti kufeli.
+
+Namba moja kwa vyombo vyenye `PipSize` inayotofautiana **mara 100** haiwezi kuwa sahihi kwa
+vyote. Kila thamani ya jedwali inatoka Calibration A, si kwa kudhania (DOCTRINE §2).
+
+**Muundo wa jedwali unapotumika, `symbol` ni ya lazima** kwenye `slippage_cap_pips()`. Kuiacha
+na kurudisha `default` kimya kungetoa cap ya EURUSD kwa dhahabu — kosa lisiloonekana hadi
+orders zianze kukataliwa live.
+
 **Kanuni ya dhahabu — cap = dhana ya utafiti:**
 `episodes()` ilihesabu kila trade ikitoza `SLIP_STOP = 0.3` (stop) / `SLIP_MARKET = 0.1` (market).
 Tukiweka **cap ILE ILE**, basi:

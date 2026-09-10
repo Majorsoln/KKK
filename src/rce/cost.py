@@ -89,11 +89,31 @@ def _percentile(values: Iterable[float], q: float) -> float:
 # --------------------------------------------------------------------------
 
 
-def slippage_cap_pips(order_type: str, cfg, dynamic_estimate: float | None = None) -> float:
+def slippage_cap_pips(order_type: str, cfg, dynamic_estimate: float | None = None,
+                      symbol: str | None = None) -> float:
     """`cap = min(dynamic(M5_vol), dhana ya backtest)` — INABANA TU (spec §3.2).
 
     Cap ikiruhusiwa **kulegea**, dhamana ya "live ≤ backtest" inavunjika na
     namba zilizothibitishwa hazingekuwa halali tena. Kwa hiyo `min`, si `max`.
+
+    **Cap inaweza kuwa ya kila symbol (PD 2026-08-23).** Pips 0.1 ni point 1 kwa
+    EURUSD na $0.001 kwa XAUUSD — chini ya tick moja ya dhahabu, kwa hiyo
+    `order.deviation` ingekuwa **points 0** na karibu kila order ya dhahabu
+    isingejaza. Namba moja kwa vyombo vyenye `pip` inayotofautiana mara 100
+    haiwezi kuwa sahihi kwa vyote.
+
+    Miundo miwili ya `risk.yaml` inakubalika:
+
+    ```yaml
+    slippage_cap_pips:            slippage_cap_pips:
+      market:  0.1                  market:
+      stop:    0.3                    default: 0.1
+                                      XAUUSD:  12.0
+    ```
+
+    Muundo wa pili unapotumika, `symbol` ni **ya lazima**. Kuiacha na kurudisha
+    `default` kimya kungetoa cap ya EURUSD kwa dhahabu — kosa ambalo halionekani
+    hadi orders zianze kukataliwa live.
     """
     caps = cfg.get("slippage_cap_pips")
     key = order_type.lower()
@@ -102,10 +122,30 @@ def slippage_cap_pips(order_type: str, cfg, dynamic_estimate: float | None = Non
             f"aina ya order {order_type!r} haipo kwenye `slippage_cap_pips` "
             f"({sorted(caps)}) — spec §3.2"
         )
-    backtest_assumption = float(caps[key])
+    backtest_assumption = _cap_ya_symbol(caps[key], symbol, key)
     if not bool(cfg.get("slippage_cap_dynamic", True)) or dynamic_estimate is None:
         return backtest_assumption
     return min(float(dynamic_estimate), backtest_assumption)
+
+
+def _cap_ya_symbol(entry, symbol: str | None, order_type: str) -> float:
+    """Namba moja, au jedwali la symbols lenye `default`."""
+    if not isinstance(entry, dict):
+        return float(entry)
+    if symbol is None:
+        raise ValueError(
+            f"`slippage_cap_pips.{order_type}` ni jedwali la symbols, kwa hiyo "
+            f"`symbol` inahitajika. Bila yake, `default` ingetumika kimya kwa "
+            f"symbol yenye cap yake — spec §3.2"
+        )
+    upper = symbol.upper()
+    if upper in entry:
+        return float(entry[upper])
+    if "default" not in entry:
+        raise ValueError(
+            f"`slippage_cap_pips.{order_type}` halina `{upper}` wala `default` — spec §3.2"
+        )
+    return float(entry["default"])
 
 
 def order_deviation_points(cap_pips: float, symbol: str, point: float) -> int:
