@@ -65,7 +65,9 @@ class RunSpec:
     """Vigezo vya akaunti na broker. Vinaingia kwenye ripoti kama vilivyo."""
 
     balance: float = 10_000.0
-    commission_round_turn: float = 7.0
+    # Commission ya broker kwa lot, round-turn, kwa sarafu ya **MSINGI**
+    # (§13.10). `commission_usd` inaibadilisha kuwa dola kwa bei ya trade.
+    commission_base_round_turn: float = 7.0
     volume_min: float = 0.01
     volume_step: float = 0.01
     volume_max: float = 50.0
@@ -125,6 +127,42 @@ def _pip_value(family, symbol: str, mid: float) -> float:
         return family.pip_value(mid)
 
 
+def commission_usd(symbol: str, mid: float, base_round_turn: float) -> float:
+    """Commission ya round-turn kwa lot, kwa **dola**, kwa bei ya sasa.
+
+    Broker anatoza kiasi kisichobadilika kwa sarafu ya **MSINGI**, si kwa
+    dola (kipimo 2026-09-10, §13.10):
+
+    ```
+    USDJPY · USDCHF · USDCAD   msingi ni USD  →  7.00 hasa
+    EURUSD                     msingi ni EUR  →  7.00 × EURUSD
+    GBPUSD                     msingi ni GBP  →  7.00 × GBPUSD
+    AUDUSD                     msingi ni AUD  →  7.00 × AUDUSD
+    ```
+
+    Kwa pairs zinazonukuliwa kwa dola, bei ya msingi **ni `mid` yenyewe** —
+    hakuna data ya ziada inayohitajika. Ndiyo maana sheria hii inaweza
+    kutumika ndani ya backtest bila kuongeza chanzo kipya.
+
+    Namba iliyogandishwa ingekuwa imepitwa na wakati mara moja: EURUSD
+    ilianzia 1.04 na kufika 1.25 kwenye sampuli yetu, tofauti ya **20%**
+    kwenye commission.
+
+    Cross (EURGBP, GBPJPY) inahitaji bei ya tatu ambayo backtest haisomi,
+    kwa hiyo inakataliwa waziwazi badala ya kukadiriwa kimya. Hakuna
+    familia inayoitrade.
+    """
+    if mid <= 0:
+        raise ValueError(f"{symbol}: bei si chanya ({mid})")
+    if symbol.startswith("USD"):
+        return base_round_turn
+    if symbol.endswith("USD"):
+        return base_round_turn * mid
+    raise ValueError(
+        f"{symbol}: cross — commission inahitaji bei ya kubadilisha "
+        f"{symbol[:3]} → USD, ambayo backtest haisomi")
+
+
 def market(family, spec: RunSpec, *, symbol: str, spread_pips: float,
            mid: float) -> dict:
     """Kila kitu RCE inachohitaji, kikiwa kimepimwa kwenye bei ya sasa."""
@@ -139,7 +177,11 @@ def market(family, spec: RunSpec, *, symbol: str, spread_pips: float,
         "h1_spreads": [spread_pips] * 120,
         "m5_spreads": [spread_pips] * 300,
         "pip_value_acct": _pip_value(family, symbol, mid),
-        "commission_round_turn": spec.commission_round_turn,
+        # Commission inahesabiwa HAPA, kabla ya RCE. RCE inapokea namba ya
+        # dola iliyokwisha kubadilishwa — haijui chochote kuhusu sarafu ya
+        # msingi, na haihitaji kujua.
+        "commission_round_turn": commission_usd(
+            symbol, mid, spec.commission_base_round_turn),
         "pip": _pip(family, symbol),
     }
 

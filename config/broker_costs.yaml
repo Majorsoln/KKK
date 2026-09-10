@@ -11,32 +11,55 @@
 # upande mmoja, IONGEZWE MARADUFU kabla ya kuandikwa hapa.
 #
 # ---------------------------------------------------------------------------
-# HALI: HAIJAPIMWA (2026-09-10, DOCTRINE §13.10)
+# HALI: IMEPIMWA (2026-09-10, DOCTRINE §13.10)
 #
-# `7.0` ni DHANA, si namba ya broker. `scripts/mt5_specs.py` ilitafuta
-# commission halisi kwenye `history_deals_get` na haikupata deal hata moja —
-# akaunti ni demo isiyowahi kutrade (`trade_mode 0`).
+# `scripts/mt5_commission.py --nakubali --volume 1.0`, demo, deals 22 kutoka
+# symbols 11 (XAUUSD ilikuwa MARKET_CLOSED). Ukungu wa kipimo ±$0.01/lot.
 #
-# Namba hii tayari imeingia kwenye maamuzi yaliyoandikwa: gharama ya kila
-# familia, na theluthi mbili ya gharama ya Gotobi iliyokataliwa kwa 9.3%.
-# Kwa hiyo Gotobi ina hali ya `UNCERTAIN`, si `COST-FAILED` (§13.2).
+# **Si jedwali la namba 12. Ni namba MOJA na sheria moja:**
 #
-# Kuipima: `python scripts/mt5_commission.py --nakubali` (demo pekee).
+#     commission_usd = 7.00 × (bei ya sarafu ya MSINGI kwa dola)
+#
+# Kipimo (÷ 7.00 kunatoa bei ya sarafu ya msingi, safu ya kulia):
+#
+#     USDJPY USDCHF USDCAD   7.00   →  1.0000   msingi ni USD
+#     EURUSD                 8.12   →  1.1600   = EURUSD
+#     EURCHF EURJPY          8.13   →  1.1614   = EURUSD
+#     EURGBP                 8.14   →  1.1629   = EURUSD
+#     GBPUSD                 9.46   →  1.3514   = GBPUSD
+#     GBPJPY                 9.47   →  1.3529   = GBPUSD
+#     AUDUSD                 5.02   →  0.7171   = AUDUSD
+#     NZDUSD                 4.06   →  0.5800   = NZDUSD
+#
+# Broker anatoza $3.50 kwa upande kwa lot, kwa sarafu ya msingi. Namba
+# zilizo hapa chini ni **rejea ya kipimo** kwa bei ya siku hiyo; hesabu
+# HAIZITUMII. `backtest.driver.commission_usd` inatumia sheria na bei ya
+# wakati wa trade, kwa sababu bei inabadilika na namba iliyogandishwa
+# ingekuwa imepitwa na wakati mara moja.
+#
+# `0.01` HAITOSHI kupima hii: MT5 inaandika commission kwa senti, kwa hiyo
+# kugawa kwa 0.01 kunatoa ukungu wa $2.00/lot na namba shufwa zote
+# (USDJPY ilisomeka `6.00` — mviringo, si bei).
+#
+# HAIJAPIMWA: XAUUSD (soko lilikuwa limefungwa).
+# DEMO: inahitaji kuthibitishwa kwenye akaunti halisi kabla ya §10 hatua 5.
 # ---------------------------------------------------------------------------
-commission_usd_round_turn:
-  default:  7.0
-  EURUSD:   7.0
-  GBPUSD:   7.0
-  USDJPY:   7.0
-  USDCHF:   7.0
-  USDCAD:   7.0
-  AUDUSD:   7.0
-  NZDUSD:   7.0
-  EURGBP:   7.0
-  EURJPY:   7.0
-  EURCHF:   7.0
-  GBPJPY:   7.0
-  XAUUSD:   7.0
+commission_base_round_turn: 7.00      # sarafu ya MSINGI, si USD daima
+
+commission_usd_round_turn:            # rejea ya kipimo 2026-09-10 pekee
+  default:  7.00
+  EURUSD:   8.12
+  GBPUSD:   9.46
+  USDJPY:   7.00
+  USDCHF:   7.00
+  USDCAD:   7.00
+  AUDUSD:   5.02
+  NZDUSD:   4.06
+  EURGBP:   8.14
+  EURJPY:   8.13
+  EURCHF:   8.13
+  GBPJPY:   9.47
+  XAUUSD:   7.00                      # HAIJAPIMWA — soko lilikuwa limefungwa
 
 # Usiku zinazotarajiwa kwa kila strategy (spec §3.4 hatua 4).
 # Takwimu za strategy, si kudhaniwa — H1 intraday = 0.

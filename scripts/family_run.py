@@ -45,7 +45,9 @@ def main() -> int:
     ap.add_argument("--end", default="2025-12-31")
     ap.add_argument("--provenance", default=None)
     ap.add_argument("--balance", type=float, default=10_000.0)
-    ap.add_argument("--commission", type=float, default=7.0)
+    ap.add_argument("--commission", type=float, default=7.0,
+                    help="round-turn kwa lot kwa sarafu ya MSINGI (§13.10); "
+                         "inabadilishwa kuwa dola kwa bei ya trade")
     ap.add_argument("--edge-pips", type=float, default=None,
                     help="edge iliyotangazwa (§9); chaguo-msingi ni ya familia")
     ap.add_argument("--B", type=int, default=BS.B_DEVELOPMENT)
@@ -108,7 +110,8 @@ def main() -> int:
             return 2
         ziada["signal"] = lambda d: ishara.get(d)
 
-    spec = D.RunSpec(balance=args.balance, commission_round_turn=args.commission)
+    spec = D.RunSpec(balance=args.balance,
+                     commission_base_round_turn=args.commission)
     print(f"\n   kusoma vipande {len(D.chunks(siku)):,}…\n", flush=True)
     sw = D.sweep(fam, inv, siku, spec,
                  cfg=load_config(REPO / "config" / "risk.yaml"),

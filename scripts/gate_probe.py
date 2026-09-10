@@ -52,6 +52,7 @@ REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO))
 
 from src.backtest.driver import chunks                         # noqa: E402
+from src.backtest.driver import commission_usd as D_commission  # noqa: E402
 from src.data import ticks as TK                               # noqa: E402
 from src.events.clock import quotes                            # noqa: E402
 from src.families import f0, f1, gotobi                        # noqa: E402
@@ -104,7 +105,9 @@ def probe(fam, inv, symbol: str, days, *, commission: float, verbose=False):
                 ishara.append((nje.mid - ndani.mid) / pip)
                 # Spread iliyolipwa kwenda-na-kurudi ni nusu kila ncha.
                 spread = (ndani.spread_pips(pip) + nje.spread_pips(pip)) / 2
-                comm = commission / pip_value_of(fam, symbol, ndani.mid)
+                # §13.10: commission ni ya sarafu ya MSINGI.
+                comm = (D_commission(symbol, ndani.mid, commission)
+                        / pip_value_of(fam, symbol, ndani.mid))
                 gharama.append(spread + comm)
         if verbose:
             print(f"      {symbol} {kundi[0]:%Y-%m}  n {len(mwendo):>5,}",
@@ -134,7 +137,8 @@ def main() -> int:
     ap.add_argument("--start", default="2018-01-01")
     ap.add_argument("--end", default="2025-12-31")
     ap.add_argument("--provenance", default=None)
-    ap.add_argument("--commission", type=float, default=7.0)
+    ap.add_argument("--commission", type=float, default=7.0,
+                    help="round-turn kwa lot kwa sarafu ya MSINGI")
     ap.add_argument("--out", default=None)
     ap.add_argument("--verbose", action="store_true")
     args = ap.parse_args()

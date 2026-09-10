@@ -165,6 +165,32 @@ def test_leg_A_ina_sigma_KUBWA_kuliko_leg_B(sweep):
     assert b / a == pytest.approx((4.42 / 9.0) ** 0.5, rel=0.20)
 
 
+def test_commission_ni_ya_sarafu_ya_MSINGI_si_dola(sweep):
+    """§13.10. Broker anatoza `$3.50` kwa upande kwa lot **kwa sarafu ya
+    msingi**. Namba zilizopimwa MT5 2026-09-10 zinarudishwa hapa kwa bei
+    zile zile, kwa hiyo jaribio linashindwa kama sheria itabadilishwa.
+    """
+    # (symbol, bei, dola zilizopimwa) — `mt5_commission.py --volume 1.0`
+    for symbol, bei, ilipimwa in (("USDJPY", 147.0, 7.00),
+                                  ("USDCHF", 0.7930, 7.00),
+                                  ("USDCAD", 1.3800, 7.00),
+                                  ("EURUSD", 1.1600, 8.12),
+                                  ("GBPUSD", 1.3514, 9.46),
+                                  ("AUDUSD", 0.7171, 5.02),
+                                  ("NZDUSD", 0.5800, 4.06)):
+        assert D.commission_usd(symbol, bei, 7.00) == pytest.approx(
+            ilipimwa, abs=0.01), symbol
+
+
+def test_cross_INAKATALIWA_badala_ya_kukadiriwa(sweep):
+    """EURGBP inahitaji bei ya EUR→USD, ambayo backtest haisomi. Kurudisha
+    `7.00` kimya kungekosea kwa 16%."""
+    with pytest.raises(ValueError, match="cross"):
+        D.commission_usd("EURGBP", 0.85, 7.00)
+    with pytest.raises(ValueError):
+        D.commission_usd("EURUSD", 0.0, 7.00)
+
+
 def test_sigma_INAPIMWA_na_kwenye_data_ya_normal_inakubaliana_na_1_2533(sweep):
     """§13.10. Ticks za fixture hii ni **normal kwa ujenzi** (`rng.normal`),
     kwa hiyo `σ` iliyopimwa na `1.2533 × E|X|` lazima zilingane.

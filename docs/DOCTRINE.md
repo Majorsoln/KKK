@@ -1215,35 +1215,91 @@ kuipandisha"*. Hoja ipo, na ni hii. `--volume` sasa ipo, chaguo-msingi
 `0.10` (ukungu $0.20), kikomo kigumu `1.00` (ukungu $0.02), na position
 moja kwa wakati ili margin isirundikane.
 
-#### Ubashiri kabla ya kipimo cha mwisho (§9.3, ili usomaji usiathiriwe)
-
-Gotobi ilikataliwa kwa **9.3%**, ikiwa na gharama ya pips 1.4 ambayo 65%
-yake ilikuwa commission (pips 0.91) kwa `$7`. Kwa `$6`:
+#### Kipimo kikali (`--volume 1.0`, ukungu ±$0.01/lot)
 
 ```
-commission  0.91 × 6/7  =  0.78 pips
-gharama     0.49 + 0.78 =  1.27 pips
-uwiano      9.3% × 1.27/1.40  ≈  8.4%
+symbol                    $/lot RT      ÷ 7.00
+USDJPY  USDCHF  USDCAD        7.00      1.0000
+EURUSD                        8.12      1.1600
+EURCHF  EURJPY                8.13      1.1614
+EURGBP                        8.14      1.1629
+GBPUSD                        9.46      1.3514
+GBPJPY                        9.47      1.3529
+AUDUSD                        5.02      0.7171
+NZDUSD                        4.06      0.5800
 ```
 
-Kisha `σ` iliyopimwa inaingia. Ikiwa mikia minene ya USDJPY inatoa
-`kurtosis_hint` ya 1.05 au zaidi, uwiano unashuka chini ya 8.0%.
+Safu ya kulia ni **bei ya sarafu ya msingi kwa dola**, kila moja. Si
+jedwali la namba 12 — ni namba moja na sheria moja:
 
-**Ubashiri wangu: Gotobi itafungua lango, kwa kiasi kidogo (7.9%–8.4%).**
-Ikikataa, ni jibu, na nitasema hivyo. Ubashiri huu **haubadilishi sheria**:
-kizingiti kinabaki 8.0%, kipimo kinabaki kimoja, na jibu linalotoka ndilo
-linalotumika. Umeandikwa ili nisije nikadai baadaye kwamba nilijua.
+> **commission = $7.00 round-turn kwa lot, inayotozwa kwa sarafu ya
+> MSINGI, ikibadilishwa kuwa dola kwa bei ya sasa.**
 
-Ubashiri wangu wa mwisho wa aina hii (§9.3) ulikuwa mbaya kwa 0.0100 —
-mara nne ya kile nilichotabiri. Uzito wake ni mdogo.
+Broker anatoza **$3.50 kwa upande kwa lot ya sarafu ya msingi**.
+
+Hii ni bora kuliko jedwali kwa sababu mbili. Ya kwanza: bei inabadilika.
+EURUSD ilianzia 1.04 na kufika 1.25 kwenye sampuli yetu, kwa hiyo namba
+iliyogandishwa ya `8.12` ingekuwa imekosea kwa **20%** kwenye ncha za
+dirisha. Ya pili: kwa pairs zinazonukuliwa kwa dola, bei ya sarafu ya
+msingi **ni `mid` yenyewe** — backtest tayari inayo, hakuna chanzo kipya.
+
+`backtest.driver.commission_usd` inatekeleza sheria. **RCE haijaguswa**:
+inapokea namba ya dola iliyokwisha kubadilishwa, kama ilivyokuwa.
+Crosses (EURGBP, GBPJPY) zinahitaji bei ya tatu ambayo backtest haisomi,
+kwa hiyo zinakataliwa waziwazi badala ya kukadiriwa kimya.
+
+#### Ubashiri wangu ulikuwa mbaya, na kipimo kikali kimeuonyesha
+
+Nilibashiri hapa kwamba Gotobi ingefungua lango (7.9%–8.4%), kwa msingi
+kwamba USDJPY ilikuwa **`$6`**, si `$7`.
+
+**`$6.00` ilikuwa mviringo, si kipimo.** Kwa lot `0.01`, `$7.00` RT ni
+senti 3.5 kwa upande; MT5 iliandika senti 3, na kugawa kwa 0.01 kukatoa
+`$6.00`. Kipimo cha `1.00` kinasema **`$7.00` hasa**.
+
+Kwa hiyo **dhana yangu ya asili ilikuwa sahihi kabisa kwa USDJPY**, na
+hoja nzima ya ubashiri wangu imekufa. Gotobi haina punguzo la commission.
+Kinachobaki ni marekebisho ya `σ` pekee:
+
+```
+9.3%  →  8.0%   kunahitaji  kurtosis_hint ≥ 1.16
+```
+
+Laplace inatoa 1.13; Student-t yenye ν=4 inazidi. Inawezekana, si hakika.
+
+**Ubashiri upya: sijui.** Uwiano utakuwa kati ya 8.0% na 9.3%, na 8.0%
+iko ncha ya kile kinachowezekana. Ubashiri wangu wa §9.3 ulikuwa mbaya kwa
+mara nne; huu wa kwanza ulikuwa mbaya kwa sababu nilijenga juu ya kipimo
+chenye ukungu. **Kanuni: kipimo chenye ukungu mkubwa kuliko tofauti
+inayoamuliwa si kipimo, ni pendekezo.**
+
+#### Athari kwa familia zilizopita
+
+**F0 (EURUSD).** Commission halisi ni `7.00 × EURUSD`, si `7.00` — juu kwa
+**16%** kwa bei ya leo, 4%–25% kwenye dirisha. `commission_pips` inapanda
+kutoka 0.70 hadi ~0.78. F0 ilikuwa na gross ya pips 0.29–0.70 dhidi ya
+gharama ya 2.05; kupanda kwa gharama hakuwezi kuibadilisha kuwa hai.
+Jibu la §9.3 linabaki. **Sitasema kwamba `p` yake ingekuwa mbaya zaidi** —
+gharama inaingia kwenye `lots` pia (`hatari ÷ (sl + gharama)`), kwa hiyo
+mwelekeo wake kwenye `R` hauko wazi, na nilishakosea mara moja kwa kudai
+mwelekeo bila kupima (§11).
+
+**F1 (EURUSD, GBPUSD, USDJPY, USDCAD).** GBPUSD inapanda kwa **35%**
+(`7.00 → 9.46`). Lango la F1 lilikuwa 3.9%–7.3% ya σ. Kupanda huko
+kunaweza kuvusha symbol moja kupita 8%, na symbol iliyokataliwa
+haipaswi kuwa ilitradiwa. **Hilo linahitaji kupimwa, si kudhaniwa** —
+`gate_probe` inalifanya bila kugharimu α.
+
+Ukubwa wa athari kwenye jibu la F1 ni mdogo: commission ya wastani
+inapanda kwa ~0.09 pips kwenye kikapu, wakati pengo kati ya edge
+iliyotangazwa (+5.70) na ncha ya juu ya CI (+2.51) ni **pips 3.2**.
+Hali ya `HYPOTHESIS REJECTED` haibadiliki.
 
 #### Hali ya Gotobi
 
-Bado **`UNCERTAIN`** mpaka kipimo cha `--volume 1.0` kifanyike na lango
-lipimwe mara moja. `σ` imerekebishwa, commission imepimwa lakini kwa
-ukungu mkubwa kuliko tofauti inayoamuliwa. **Kupima kwa chombo kisicho na
-usahihi wa kutosha kisha kutangaza jibu ni kosa lile lile la §2 kwa umbo
-jingine.**
+Bado **`UNCERTAIN`**. Namba zote mbili sasa zimepimwa; kinachobaki ni
+kuendesha lango **mara moja**, kwa `family_run.py` — chombo kile kile
+kilichotoa 9.3%.
 
 #### Onyo kuhusu kupima commission kwenye demo
 
