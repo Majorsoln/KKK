@@ -629,11 +629,15 @@ hazikufa kwa sababu moja, na "hakuna iliyonusurika" ni sentensi
 inayoficha tofauti hizo.** Uainishaji kwa hali umeandikwa §13:
 
 ```
-F0       COST-FAILED               athari ya gross ipo, ya net haipo
-Gotobi   IMPLEMENTATION-FAILED     mekanizimu haijakanushwa
+F0       COST-FAILED (baada)       gross imepimwa 0.29–0.70p, gharama 2.05p
+Gotobi   COST-FAILED (kabla)       lango 8.733% > 8.0%; gross haijapimwa
 F1       HYPOTHESIS REJECTED       +5.7 pips haijaonekana; edge halisi
          / NOT REPLICATED          haijulikani ndani ya [−3.6, +2.5]
 ```
+
+*(Namba za Gotobi ni za kipimo cha 2026-09-10, §13.10. Za mwanzo — 9.3% —
+zilitokana na `σ` ya dhana na commission ya dhana. Uamuzi haukubadilika,
+lakini namba zilizoandikwa sasa zimepimwa.)*
 
 Ndicho §12 kilichoahidi: *"Njia hii inatoa jibu la kuthibitika-au-kukataliwa.
 Haiahidi strategy."* Toleo la kwanza lilitumia miezi sita na mamia ya
@@ -866,7 +870,8 @@ Kuanzia sasa kila familia inapata **hali**, si alama.
 | **REJECTED** | edge iliyotangazwa iko nje ya CI, na CI ni ndogo ya kutosha kuwa na maana | familia inafungwa; mekanizimu inabaki na alama |
 | **NOT DETECTED** | hakuna athari iliyoonekana, CI inajumuisha sifuri **na** thamani zenye maana kibiashara | si "haipo"; inahitaji matukio zaidi au haijibiki |
 | **UNDERPOWERED** | `n` chini ya inayohitajika kabla ya kupima | haipaswi kuwa imepimwa; jaribio kurudishwa |
-| **COST-FAILED** | athari ya gross ipo, gharama inaila | mekanizimu ipo; inahitaji symbol/dirisha/broker tofauti |
+| **COST-FAILED (baada)** | athari ya gross **imepimwa**, gharama inaila | mekanizimu ipo; inahitaji symbol/dirisha/broker tofauti |
+| **COST-FAILED (kabla)** | lango la §6.2 limekataa; gross **haijapimwa kamwe** | hatujui kama athari ipo; α haijatumika |
 | **IMPLEMENTATION-FAILED** | mekanizimu haijafikiwa — nanga mbaya, data haipo, dirisha halipatikani | mekanizimu **haijakanushwa** |
 | **REGIME-FAILED** | ilikuwa hai kwenye sehemu ya sampuli, imekufa kwenye nyingine | inahitaji kigezo cha regime kilichotangazwa mapema |
 | **UNCERTAIN** | kipimo hakiaminiki (kasoro ya injini, data yenye mashaka) | inarekebishwa na kupimwa upya — si jaribio jipya |
@@ -907,13 +912,27 @@ ulikuwa kama ulivyotangazwa; ukubwa ulikuwa robo ya gharama. Mekanizimu
 kwa gharama ya retail kwenye EURUSD**. Ingeweza kuishi kwa gharama ya
 taasisi (pips 0.3–0.5), na hiyo ni taarifa, si strategy.
 
-**Gotobi — IMPLEMENTATION-FAILED / OPPORTUNITY-WINDOW FAILED.**
-Ilikataliwa na §6.2 (9.3% > 8%) bila kutumia α. Dirisha ni masaa 1.3 tu, na
-saa inayohitajika kimekanizimu (08:02 JST) ni kabla Tokyo haijafunguka —
-37% ya madirisha ya kuingia hayakuwa na tick hata moja. **Hatujajua kama
-mtiririko wa Gotobi upo.** Tumejua kwamba hatuwezi kuufikia kwa nanga
-tuliyotangaza, kwa broker huyu. Theluthi mbili ya gharama ni commission,
-si spread — broker tofauti ni jaribio tofauti, si uboreshaji.
+**Gotobi — COST-FAILED (kabla), pamoja na tatizo la utekelezaji.**
+*(Imeandikwa upya 2026-09-10 baada ya §13.10. Ilikuwa
+`IMPLEMENTATION-FAILED`, kisha `UNCERTAIN` wakati gharama haijulikani.)*
+
+Kipimo cha mwisho, kwa `σ` iliyopimwa na commission iliyopimwa:
+**8.733% dhidi ya 8.0%**. Malango mengine mawili yalipita — mekanizimu
+(§6.1) na mzunguko (§6.3, matukio 276 dhidi ya 136). **Gharama pekee
+ndiyo iliyoifunga.**
+
+Athari ya gross **haijapimwa kamwe** kwa maana ya §7 — hakuna `p`, hakuna
+α iliyotumika. Kinachojulikana ni `drift +1.79 pips` yenye `t = 1.84`
+dhidi ya `t* = 2.81`: haifiki hata bila gharama.
+
+Tatizo la utekelezaji halijatoweka: nanga ya 08:30 JST ni kabla Tokyo
+haijafunguka, na **37% ya madirisha ya kuingia hayakuwa na tick hata
+moja** (185 kati ya 500). Nanga tofauti ni **familia mpya** yenye tangazo
+jipya, si Gotobi.
+
+Theluthi mbili ya gharama ni commission, si spread. USDJPY ni USD-msingi,
+kwa hiyo commission yake ni `$7.00` **hasa** — haipungui kwa bei. Broker
+mwenye commission ndogo ni jaribio tofauti, si uboreshaji.
 
 **F1 — HYPOTHESIS REJECTED / NOT REPLICATED.**
 Edge iliyotangazwa +5.70 pips iko **nje** ya CI `[−3.63, +2.51]` — hiyo
@@ -1295,11 +1314,81 @@ inapanda kwa ~0.09 pips kwenye kikapu, wakati pengo kati ya edge
 iliyotangazwa (+5.70) na ncha ya juu ya CI (+2.51) ni **pips 3.2**.
 Hali ya `HYPOTHESIS REJECTED` haibadiliki.
 
-#### Hali ya Gotobi
+#### JIBU LA GOTOBI (2026-09-10, `family_run.py`, kipimo kimoja)
 
-Bado **`UNCERTAIN`**. Namba zote mbili sasa zimepimwa; kinachobaki ni
-kuendesha lango **mara moja**, kwa `family_run.py` — chombo kile kile
-kilichotoa 9.3%.
+```
+trades 273 · madirisha bila tick 185/500 (37.0%) · siku hai 276/500
+gharama    1.41 pips        (commission ilibaki $7.00 — msingi ni USD)
+σ         16.17 pips        iliyopimwa
+σ norm    15.17 pips        kurtosis_hint 1.066
+uwiano     8.733%           kizingiti 8.0%
+```
+
+Ilihitaji `kurtosis_hint ≥ 1.162`. Imepata **1.066**.
+
+**GOTOBI IMEFUNGWA.** Sheria ya §13.10 nambari 4 imetumika bila
+mabadiliko. **Jaribio halijatumika** — §6 inasema symbol iliyokataliwa
+haiingii kwenye hesabu ya majaribio. Bado 2 kati ya 7.
+
+Lango la mzunguko (§6.3) **lilipita**: matukio 276 dhidi ya 136
+yanayohitajika. Lango la mekanizimu (§6.1) lilipita. **Gharama pekee
+ndiyo iliyoifunga**, na sasa gharama imepimwa.
+
+#### Uchunguzi mmoja unaovuta jicho, na kwa nini hauvutwi
+
+Kipimo kinaonyesha **`drift +1.79 pips`** — USDJPY inapanda kwa wastani
+huo kutoka 08:30 hadi 09:50 JST siku za gotobi, **mwelekeo ule ule
+mekanizimu inaoutabiri**, na kubwa kuliko gharama ya 1.41.
+
+Ni mwaliko wa kubishana na lango. Kabla ya kubishana, hesabu:
+
+```
+kosa la kawaida  =  16.17 ÷ √276  =  0.973 pips
+gross   t = 1.79 ÷ 0.973 = 1.84       t* inayohitajika = 2.81
+net     t = 0.38 ÷ 0.973 = 0.39
+```
+
+**Haifiki, hata bila kuhesabu gharama.** Lango halikuwa likizuia kitu
+kilicho hai; lilikuwa likituokoa jaribio.
+
+Uchunguzi unabaki umeandikwa kama taarifa ya **kundi A** (§13.8):
+mtiririko wa fix ya Tokyo unaonekana kwenye mwelekeo sahihi, kwa ukubwa
+usio na maana kitakwimu na usiozidi gharama ya retail. Familia yoyote ya
+baadaye ikitaka kuutumia, inatangazwa upya na inalipa α yake.
+
+#### F1: lango limepimwa upya, na limefunguka zaidi
+
+`gate_probe --family f1` kwa namba zilizorekebishwa:
+
+```
+symbol   gh/σ   gh/σn   ilitradiwa?
+EURUSD   3.9%    4.2%    ndiyo
+GBPUSD   5.1%    5.5%    ndiyo
+USDJPY   5.1%    5.3%    ndiyo
+USDCAD   6.6%    7.2%    ndiyo
+AUDUSD   8.0%    8.7%    HAPANA — ilikataliwa (§9.5)
+USDCHF   7.3%    8.0%    HAPANA — ilikataliwa (§9.5)
+```
+
+**Symbols nne zilizotradiwa zote zinapita kwa upana.** Wasiwasi wangu
+kwamba GBPUSD (+35% commission) ingevuka 8% haukuwa na msingi — ilifika
+5.1%. **Jibu la F1 halina kasoro ya lango.**
+
+Lakini safu ya `gh/σn` inaonyesha jambo lingine: **AUDUSD na USDCHF
+zilikataliwa na §9.5 kwa namba mbili zilizokuwa mbaya** — `σ` ya dhana ya
+normal na commission ya `$7` badala ya `$5.02` halisi ya AUD. Kwa namba
+zilizopimwa zote mbili zinapita.
+
+**F1 ilitradia symbols nne wakati ingeweza kutradia sita.** Kikapu chenye
+legs sita kina ushahidi zaidi kuliko cha nne, na §13.3 swali (b) —
+*"tunaweza kukataa edge chanya yenye maana?"* — lilijibiwa `HAPANA` kwa
+sehemu kwa sababu ya upana wa CI.
+
+Hii **haifungui F1 tena** (§8.5, na jaribio limeshatumika). Inaandikwa kwa
+sababu tofauti: **lango la §6.2 lenyewe lilikuwa likikataa symbols kwa
+makosa ya kipimo, si kwa gharama.** Kwa mzunguko wa pili, kila familia
+inapima lango kwa namba zilizopimwa tangu mwanzo, na `gate_probe` sasa
+inaonyesha safu zote mbili ili tofauti isijifiche.
 
 #### Onyo kuhusu kupima commission kwenye demo
 
