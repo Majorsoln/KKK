@@ -274,6 +274,36 @@ ledger.
 **8.5 · Kila lango lina jibu la "hapana" lililoandikwa mapema.** Kufeli
 hakuelezwi, hakurekebishwi, hakuendeshwi upya kwa vigezo vipya.
 
+**8.6 · Swali la mlipaji.** (Imeongezwa 2026-09-10, baada ya ukosoaji wa nje.)
+
+Niliandika mahali pengine kwamba *"wazo linalojulikana na kila mtu, na
+linaloweza kuandikwa kwa sheria rahisi, halibaki likilipa kwa muda mrefu."*
+**Ile ilikuwa dhana, si nadharia, na niliiandika kama nadharia.** Ni ya uongo
+kwa mifano inayojulikana: carry inajulikana tangu 1980 na bado inalipa;
+month-end rebalancing imechapishwa tangu 2009 na bado ina athari kwenye baadhi
+ya matukio; risk premia nyingi zinajulikana **na** zinalipa kwa sababu mtu
+fulani analazimika kulipa.
+
+Inabadilishwa na swali linalojibika:
+
+> **Ni nani analipa kwa edge hii? Kwa nini analipa? Na kwa nini
+> hawajaweza — au hawataki — kuiondoa?**
+
+Kila familia lazima ijibu swali hili **kwa maandishi, kabla ya kupimwa**,
+pamoja na mekanizimu ya §6.1. Majibu halali ni ya aina tatu:
+
+```
+LAZIMA        mlipaji ana wajibu (mandate, hedge ratio, index tracking,
+              settlement) — analipa hata akijua gharama
+HAJALI        mlipaji ana lengo lingine (corporate flow, tourism,
+              remittance) — gharama ni ndogo kwake kuliko muda wake
+HAWEZI        edge ipo lakini uwezo wake ni mdogo, au gharama ya
+              kuivuna inazidi thamani kwa mchezaji mkubwa
+```
+
+Ikiwa hakuna jibu kati ya matatu, familia haitangazwi. Na **jibu hili si
+ushahidi kwamba edge ipo** — ni sharti la kuingia tu, si kipimo.
+
 ---
 
 ## 9 · Familia — mzunguko wa kwanza
@@ -594,7 +624,16 @@ F1         p 0.6673 · edge CI [−3.6, +2.5] pips       jaribio 2
                                             zilizotumika 2 kati ya 7
 ```
 
-**Hakuna familia iliyonusurika. Zote tatu zimejibiwa.**
+**Hakuna familia iliyopita kizingiti. Zote tatu zimejibiwa — lakini
+hazikufa kwa sababu moja, na "hakuna iliyonusurika" ni sentensi
+inayoficha tofauti hizo.** Uainishaji kwa hali umeandikwa §13:
+
+```
+F0       COST-FAILED               athari ya gross ipo, ya net haipo
+Gotobi   IMPLEMENTATION-FAILED     mekanizimu haijakanushwa
+F1       HYPOTHESIS REJECTED       +5.7 pips haijaonekana; edge halisi
+         / NOT REPLICATED          haijulikani ndani ya [−3.6, +2.5]
+```
 
 Ndicho §12 kilichoahidi: *"Njia hii inatoa jibu la kuthibitika-au-kukataliwa.
 Haiahidi strategy."* Toleo la kwanza lilitumia miezi sita na mamia ya
@@ -694,7 +733,7 @@ pengo la spread wastani **+0.022p**, p95 **+0.096p**. RCE inabaki kama ilivyo.
 | **R1 triangles** | Ufafanuzi haujakamilika. Triangle halisi ina residual sifuri. |
 | **Dhahabu** | Gharama/σ ni mara 3 nafuu, lakini hakuna familia ya mzunguko 1 inayoihitaji. Njia ya pili. |
 | **Historia 2003** | Baada ya mzunguko 1. Kwa F0 pekee, kwa uthibitisho, kwa gharama ya adhabu. F1 haiwezi — kabla ya 2015 ni soko lingine. |
-| **ML** | Baada ya familia mbili. Meta-labelling, utabiri wa volatility/gharama, regime discovery. **Kamwe kutabiri mwelekeo.** |
+| **ML** | Baada ya familia mbili. Meta-labelling, utabiri wa volatility/gharama, regime discovery. **Kamwe kutabiri mwelekeo.** Imefafanuliwa upya §13.9. |
 
 ---
 
@@ -793,3 +832,203 @@ Zote zinatokea **kwa mifumo**, si kwa nasibu, kwa hiyo hazionekani kama kelele.
 Jibu linalowezekana zaidi ni kwamba familia moja au mbili zitanusurika, au
 hakuna hata moja. F0 ikinusurika kwenye EURUSD pekee kwa Sharpe 0.4 — hiyo ni
 mafanikio.
+
+Baada ya mzunguko wa kwanza sentensi inayofaa si *"familia zimekufa"* bali:
+**dhana zilikufa; chombo cha kupima kilinusurika.**
+
+---
+
+## 13 · Taxonomia ya kufa kwa hypothesis
+
+*(Imeongezwa 2026-09-10, baada ya ukosoaji wa nje uliopokelewa na PD. Kabla
+ya kutangaza familia yoyote mpya.)*
+
+### 13.1 · Kwa nini PASS/FAIL haitoshi
+
+Injini ilitoa `p` na `p` ikatoa neno moja: **IMENUSURIKA** au
+**HAIJANUSURIKA**. Neno hilo ni sahihi kwa uamuzi wa kutrada, na **si sahihi
+kwa maarifa**. Familia tatu zilipata neno lile lile ingawa:
+
+- F0 **ilipimwa kikamilifu** na athari yake ya gross ilionekana — ikafa
+  kwa gharama;
+- Gotobi **haikupimwa kabisa** — ilikataliwa na lango kabla ya `p`;
+- F1 **ilipimwa** lakini kwa matukio 86 pekee, na CI yake bado inaruhusu
+  edge chanya ndogo.
+
+Kuita zote "zimekufa" ni kupoteza taarifa ambayo mzunguko wa pili unaihitaji.
+Kuanzia sasa kila familia inapata **hali**, si alama.
+
+### 13.2 · Hali nane
+
+| hali | maana | kinachofuata |
+|---|---|---|
+| **SURVIVES** | `p ≤ kizingiti` na malango yote yamepita | §10 (holdout, karatasi) |
+| **REJECTED** | edge iliyotangazwa iko nje ya CI, na CI ni ndogo ya kutosha kuwa na maana | familia inafungwa; mekanizimu inabaki na alama |
+| **NOT DETECTED** | hakuna athari iliyoonekana, CI inajumuisha sifuri **na** thamani zenye maana kibiashara | si "haipo"; inahitaji matukio zaidi au haijibiki |
+| **UNDERPOWERED** | `n` chini ya inayohitajika kabla ya kupima | haipaswi kuwa imepimwa; jaribio kurudishwa |
+| **COST-FAILED** | athari ya gross ipo, gharama inaila | mekanizimu ipo; inahitaji symbol/dirisha/broker tofauti |
+| **IMPLEMENTATION-FAILED** | mekanizimu haijafikiwa — nanga mbaya, data haipo, dirisha halipatikani | mekanizimu **haijakanushwa** |
+| **REGIME-FAILED** | ilikuwa hai kwenye sehemu ya sampuli, imekufa kwenye nyingine | inahitaji kigezo cha regime kilichotangazwa mapema |
+| **UNCERTAIN** | kipimo hakiaminiki (kasoro ya injini, data yenye mashaka) | inarekebishwa na kupimwa upya — si jaribio jipya |
+
+Hali inatangazwa **pamoja na jibu**, kwenye run ile ile, kwa sheria
+iliyoandikwa mapema. Haichaguliwi baada ya kuona `p`.
+
+### 13.3 · Maswali matatu ya ukubwa wa sampuli
+
+Kosa langu la pili la mzunguko huu: niliandika kwamba matukio 52 yanatosha,
+kisha nikatumia neno hilo kama kwamba F1 imethibitisha *"mekanizimu haipo."*
+**Hapana.** Hesabu ya nguvu inajibu **swali moja tu** kati ya matatu, na
+matatu haya lazima yatenganishwe kila mara:
+
+```
+(a) Je, tunaweza kuona edge tuliyotangaza (+5.7 pips)?
+    → hesabu ya nguvu. F1: NDIYO, matukio 86 > 52 yanayohitajika.
+
+(b) Je, tunaweza kukataa edge chanya yenye maana kibiashara?
+    → upana wa CI. F1: HAPANA. CI [−3.63, +2.51] bado inaruhusu
+      +2.5 pips, ambayo ingekuwa strategy nzuri.
+
+(c) Je, tunaweza kukadiria edge kwa usahihi wa kutosha kuitrada?
+    → upana wa CI dhidi ya ukubwa wa nafasi. F1: HAPANA, mbali.
+```
+
+Kwa hiyo kauli halali kuhusu F1 ni **moja**: *"edge ya +5.7 pips
+haikuonekana."* Si *"edge haipo."* Si *"mekanizimu imekufa."* Familia
+inafungwa kwa sababu ya nidhamu ya α (§8.4), si kwa sababu tumethibitisha
+sifuri.
+
+### 13.4 · Uainishaji wa mzunguko wa kwanza
+
+**F0 — COST-FAILED.**
+Gross `+0.00562 R/siku` = pips 0.29–0.70. Gharama pips 2.05. Mwelekeo
+ulikuwa kama ulivyotangazwa; ukubwa ulikuwa robo ya gharama. Mekanizimu
+(mtiririko wa fix ya London) haijakanushwa — imeonyeshwa kuwa **ndogo mno
+kwa gharama ya retail kwenye EURUSD**. Ingeweza kuishi kwa gharama ya
+taasisi (pips 0.3–0.5), na hiyo ni taarifa, si strategy.
+
+**Gotobi — IMPLEMENTATION-FAILED / OPPORTUNITY-WINDOW FAILED.**
+Ilikataliwa na §6.2 (9.3% > 8%) bila kutumia α. Dirisha ni masaa 1.3 tu, na
+saa inayohitajika kimekanizimu (08:02 JST) ni kabla Tokyo haijafunguka —
+37% ya madirisha ya kuingia hayakuwa na tick hata moja. **Hatujajua kama
+mtiririko wa Gotobi upo.** Tumejua kwamba hatuwezi kuufikia kwa nanga
+tuliyotangaza, kwa broker huyu. Theluthi mbili ya gharama ni commission,
+si spread — broker tofauti ni jaribio tofauti, si uboreshaji.
+
+**F1 — HYPOTHESIS REJECTED / NOT REPLICATED.**
+Edge iliyotangazwa +5.70 pips iko **nje** ya CI `[−3.63, +2.51]` — hiyo
+ndiyo REJECTED, na inatosha kufunga familia. Lakini edge halisi
+**haijulikani**: inaweza kuwa −3.6, sifuri, au +2.5. Lango la gharama
+lilikuwa jepesi (3.9–7.3% ya σ), matukio yalitosha kwa swali (a) pekee.
+
+### 13.5 · Kabla ya familia yoyote mpya: usajili wa H0
+
+Kila familia ya mzunguko wa pili itatangaza, kwenye faili ya familia yenyewe
+na kwenye hash ya tangazo, **kabla ya kusoma tick hata moja**:
+
+```
+H0                    kauli sahihi ya "hakuna kitu hapa"
+H1                    kauli sahihi ya "kuna kitu, cha ukubwa huu"
+mlipaji               jibu la §8.6 (LAZIMA / HAJALI / HAWEZI)
+gross ya chini        pips zinazohitajika kabla ya gharama
+net ya chini          pips zinazohitajika baada ya gharama
+gharama ya juu        kikomo cha cost_RT / σ (§6.2)
+ukubwa wa chini       athari ndogo kabisa yenye maana kibiashara
+kiwango cha imani     kizingiti cha p (§9)
+matukio yanayohitajika (t*/s)² (§6.3)
+itifaki ya uthibitisho holdout: lini, mara ngapi, sheria gani
+```
+
+Na sheria moja isiyo na ubaguzi:
+
+> **Hakuna kuboresha baada ya kuona holdout.** Ikionekana, imetumika.
+
+### 13.6 · Kilichopimwa dhidi ya kilichoripotiwa
+
+Mzunguko wa kwanza uliripoti **wastani na `p` pekee**. Hiyo inaficha
+mgawanyo, na mgawanyo ndiyo unaoamua kama strategy inaweza kutradiwa.
+Kuanzia mzunguko wa pili kila jibu litabeba:
+
+```
+wastani · katikati · std · P10 P25 P50 P75 P90
+kiwango cha kushinda · uwiano wa malipo
+MAE · MFE · matarajio kwa masharti
+```
+
+Data ya haya **tayari ipo** kwenye `Trade` (`mae_pips`, `net_pips`, `r`) —
+haikuchapishwa tu. Ni kazi ya kuripoti, si kipimo kipya, kwa hiyo
+haigharimu α.
+
+### 13.7 · Onyo: conditioning ni utafutaji
+
+Ukosoaji uliopokelewa unapendekeza mtihani wa *"je, mekanizimu inanusurika
+ikiwekewa masharti?"* — mwelekeo × regime ya volatility × mapato ya hisa ×
+trend ya FX × tofauti ya riba × hisia ya hatari.
+
+**Hii ndiyo hasa §8 iliandikwa kuizuia.** Vipimo sita vya masharti kwenye
+familia moja ni **majaribio sita**, na yakichaguliwa baada ya kuona matokeo,
+ni `2⁶ = 64` njia za kutafuta ushindi kwenye data ile ile — utafutaji wa
+K=12,000 uliorudi kwa jina jipya (§3).
+
+Inaruhusiwa kwa masharti matatu, na ukosoaji wenyewe unakubali la tatu:
+
+1. Kigezo cha masharti kinatangazwa **kabla** ya kuendesha, kikiwa na
+   mekanizimu ya kwa nini kinapaswa kutofautisha;
+2. Kila kigezo kinahesabiwa kama **jaribio** kwenye bajeti ya α (§9);
+3. Conditioning yoyote inayotokana na **kuangalia matokeo** inahitaji
+   **sampuli mpya kabisa**, si sehemu ya ile ile.
+
+Kwenye data yetu, sharti la (3) linamaanisha: hatuna sampuli mpya kwa F0/F1
+mpaka 2003–2017 ipakuliwe, na hiyo ina gharama yake (§9.1). Kwa hiyo
+conditioning inaingia mzunguko wa pili **kwa familia mpya pekee**, si kama
+uchunguzi wa maiti wa familia zilizokufa.
+
+### 13.8 · Familia za mzunguko wa pili zinapangwa kwa MEKANIZIMU
+
+F0, Gotobi na F1 zilichaguliwa kama **strategies** — kila moja ni sheria ya
+kuingia na kutoka. Matokeo yake: zilipokufa, hazikuacha maarifa
+yanayohamishika, kwa sababu hakuna kitu kilichokuwa cha pamoja kati yao.
+
+Mzunguko wa pili unapangwa kwa **chanzo cha mtiririko**. Familia ni
+mekanizimu; strategy ni utekelezaji mmoja wa mekanizimu hiyo.
+
+| | mekanizimu | mlipaji (§8.6) | zilizokwisha |
+|---|---|---|---|
+| **A** | mtiririko wa taasisi (rebalancing, fixes, settlement) | LAZIMA | F0, F1, Gotobi |
+| **B** | kuwasili kwa taarifa (data releases, benki kuu) | HAJALI/HAWEZI | F2 (imesimamishwa §9.1) |
+| **C** | muundo mdogo wa soko (msongamano wa stops, likidity gaps) | HAWEZI | F3 (imesimamishwa) |
+| **D** | volatility (clustering, term structure, event premia) | LAZIMA | — |
+| **E** | trend / momentum | HAJALI | F4 (imesimamishwa §9.1) |
+| **F** | uhamisho kati ya masoko (rates, commodities, hisa) | HAWEZI | ishara ya F1 |
+
+Kanuni: **familia moja kwa mekanizimu kwa mzunguko.** Familia tatu za
+kundi A kwenye mzunguko mmoja — ndicho tulichofanya — ni kuweka α yote
+kwenye dhana moja iliyoandikwa kwa maneno matatu tofauti. Ndiyo maana
+majibu matatu yalikuja pamoja: yote yalitegemea mtiririko wa fix.
+
+### 13.9 · Nafasi ya ML — imefafanuliwa upya
+
+§9.1 iliandika: *"ML baada ya familia mbili. Kamwe kutabiri mwelekeo."*
+Kikomo kinabaki. Kinachobadilika ni **swali** ML inaloulizwa.
+
+**Si:** *"tafuta strategy kwenye data."* Hiyo ni utafutaji wa K=12,000
+kwa jina jipya, na inaanguka kwenye §3.
+
+**Ni:** *"mekanizimu ninayoijua tayari — iko hai lini, ina nguvu kiasi
+gani, na inatradika sasa?"*
+
+```
+MEKANIZIMU  →  KICHUJIO CHA REGIME  →  MODEL YA EDGE  →  GHARAMA + RCE  →  TRADE / HAPANA
+(imeandikwa    (ML: iko hai?)          (ML: ukubwa?)     (isiyo ya ML,      (uamuzi)
+ na binadamu)                                             mamlaka)
+```
+
+ML inaingia kwenye **hatua mbili za kati pekee**. Hatua ya kwanza ni ya
+binadamu (§4.3: kutengeneza strategy ni kuandika, si kutafuta), na ya
+nne ni ya RCE (§5) — haihamishwi kwa model kamwe.
+
+Kwa hivyo RL/PPO inaruhusiwa **kwa usimamizi wa exposure ndani ya
+mekanizimu iliyothibitishwa**, na haikubaliki kama mtafutaji wa edge.
+Sharti la §2 halibadiliki: kila namba inayoingia kwenye uamuzi lazima
+ipimwe na injini hii, kwenye mchakato huu, kabla ya kutumika — ikiwa ni
+pamoja na kila namba inayotoka kwenye model.
