@@ -184,7 +184,13 @@ def commissions(mt5, tangu: datetime) -> dict[str, dict]:
     volume ya kufungua pekee — hiyo inatoa gharama ya **round-turn kwa lot**
     bila kujali broker anaitoza wapi.
     """
-    mwisho = datetime.now(timezone.utc) + timedelta(days=1)
+    # `history_deals_get` inachuja kwa saa ya SERVER, si UTC. Server ikiwa
+    # UTC+3, deal ya dakika hii ina alama ya saa iliyo masaa matatu mbele ya
+    # `datetime.now(timezone.utc)`, na dirisha linaloishia "sasa" linaikosa.
+    # Kwa hiyo mwisho ni **siku mbili mbele** — pana kuliko tofauti yoyote ya
+    # saa duniani. Dirisha pana halina hasara hapa: tunachambua kwa symbol,
+    # si kwa saa.
+    mwisho = datetime.now(timezone.utc) + timedelta(days=2)
     deals = mt5.history_deals_get(tangu, mwisho)
     if deals is None:
         return {}

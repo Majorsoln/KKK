@@ -131,6 +131,20 @@ def fungua_na_funga(mt5, jina: str, *, magic: int) -> dict:
     return {"ok": True, "ticket_in": ticket_in, "position": p.ticket}
 
 
+def deals_za_position(mt5, ticket: int):
+    """Deals za position moja, **bila kutegemea saa**.
+
+    `history_deals_get(from, to)` inachuja kwa saa ya SERVER. Kuuliza kwa
+    dirisha la UTC kunakosa deals zote pale server iko UTC+2/+3: alama ya
+    saa ya deal iko baada ya mwisho wa dirisha. Run ya kwanza ilipata deals
+    22 na kuripoti jedwali tupu kwa sababu hii, na ikaita utupu huo
+    "commission ni sifuri" — kutokupata data kukiripotiwa kama kipimo.
+
+    `position=` haichuji kwa saa hata kidogo.
+    """
+    return mt5.history_deals_get(position=ticket) or ()
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--nakubali", action="store_true",
@@ -204,7 +218,6 @@ def main() -> int:
         return 0
 
     magic = int(time.time()) % 1_000_000
-    tangu = datetime.now(timezone.utc) - timedelta(minutes=5)
     print(f"\n   magic {magic}\n")
 
     zilizofanyika, zilizoshindwa = [], []
@@ -217,8 +230,9 @@ def main() -> int:
         mt5.symbol_select(jina, True)
         r = fungua_na_funga(mt5, jina, magic=magic)
         if r["ok"]:
-            zilizofanyika.append((msingi, jina))
-            print(f"   {msingi:<8} imefunguliwa na kufungwa")
+            zilizofanyika.append((msingi, jina, r["position"]))
+            print(f"   {msingi:<8} imefunguliwa na kufungwa "
+                  f"(position {r['position']})")
         else:
             zilizoshindwa.append((msingi, r["sababu"]))
             print(f"   {msingi:<8} {r['sababu']}")
@@ -234,49 +248,75 @@ def main() -> int:
         mt5.shutdown()
         return 2
 
-    # ---- soma commission kutoka kwenye deals zilizotokea ----
+    # ---- soma commission kwa POSITION, si kwa saa ----
     time.sleep(1.0)
-    deals = mt5.history_deals_get(
-        tangu, datetime.now(timezone.utc) + timedelta(minutes=1)) or ()
-    zetu = [d for d in deals if d.magic == magic]
-
     kwa_symbol: dict[str, dict] = {}
-    for d in zetu:
-        j = kwa_symbol.setdefault(d.symbol, {"commission": 0.0, "vol_in": 0.0,
-                                             "n": 0, "profit": 0.0})
-        j["commission"] += float(d.commission)
-        j["profit"] += float(d.profit)
-        j["n"] += 1
-        if d.entry in (0, 2):
-            j["vol_in"] += float(d.volume)
+    jumla_deals = 0
+    for msingi, jina, ticket in zilizofanyika:
+        j = kwa_symbol.setdefault(msingi, {"commission": 0.0, "vol_in": 0.0,
+                                           "n": 0, "profit": 0.0,
+                                           "swap": 0.0, "position": ticket})
+        for d in deals_za_position(mt5, ticket):
+            jumla_deals += 1
+            j["commission"] += float(d.commission)
+            j["profit"] += float(d.profit)
+            j["swap"] += float(d.swap)
+            j["n"] += 1
+            if d.entry in (0, 2):
+                j["vol_in"] += float(d.volume)
+
+    # **Utupu si sifuri.** Hii ndiyo tofauti iliyokosekana kwenye run ya
+    # kwanza: jedwali tupu liliripotiwa kama "commission ni sifuri".
+    if jumla_deals == 0:
+        print("\n" + "=" * 74)
+        print("HAKUNA DEAL ILIYOSOMEKA")
+        print("=" * 74)
+        print(f"   Positions {len(zilizofanyika)} zilifunguliwa na kufungwa,")
+        print("   lakini `history_deals_get` haikurudisha deal hata moja.")
+        print("   HII SI KIPIMO CHA SIFURI — ni kushindwa kusoma historia.")
+        print("   Commission INABAKI HAIJAPIMWA.")
+        mt5.shutdown()
+        return 2
 
     print("\n" + "=" * 74)
     print("COMMISSION ILIYOPIMWA (round-turn kwa lot 1)")
     print("=" * 74)
-    print(f"   {'symbol':<16} {'$/lot RT':>10} {'deals':>7} {'spread $':>10}")
+    print(f"   {'symbol':<10} {'$/lot RT':>10} {'deals':>7} {'lots':>7} "
+          f"{'spread $':>10} {'swap $':>8}")
     matokeo = {}
     for sym, j in sorted(kwa_symbol.items()):
         if j["vol_in"] <= 0:
+            print(f"   {sym:<10} {'—':>10} {j['n']:>7} "
+                  f"{'hakuna deal ya kufungua':>26}")
             continue
         rt = abs(j["commission"]) / j["vol_in"]
         matokeo[sym] = {"commission_usd_round_turn": rt, "deals": j["n"],
-                        "spread_cost_usd": j["profit"]}
-        print(f"   {sym:<16} {rt:>10.2f} {j['n']:>7} {j['profit']:>10.2f}")
+                        "lots_in": j["vol_in"], "spread_cost_usd": j["profit"],
+                        "swap_usd": j["swap"], "position": j["position"]}
+        print(f"   {sym:<10} {rt:>10.2f} {j['n']:>7} {j['vol_in']:>7.2f} "
+              f"{j['profit']:>10.2f} {j['swap']:>8.2f}")
 
     jumla = sum(v["commission_usd_round_turn"] for v in matokeo.values())
+    print(f"\n   deals zilizosomwa {jumla_deals} · "
+          f"symbols zenye kipimo {len(matokeo)}")
     if jumla == 0:
-        print("\n   ZOTE NI SIFURI.")
-        print("   Hii ni akaunti ya DEMO. Broker wengi wanaweka commission ya")
-        print("   demo kuwa sifuri hata pale live inatoza. Spread ya EURUSD ya")
-        print("   pips 0.40 ni ya aina ya akaunti ya raw/ECN, na hizo karibu")
-        print("   daima zinatoza commission — kwa hiyo sifuri hapa ni ya")
-        print("   MASHAKA, si uthibitisho.")
-        print("   `broker_costs.yaml` HAIBADILIKI kwa jibu hili.")
+        print("\n   COMMISSION NI SIFURI KWENYE AKAUNTI HII YA DEMO.")
+        print(f"   Ni kipimo halisi: deals {jumla_deals} zimesomwa na kila")
+        print("   moja ina `commission` ya 0.00.")
+        print("\n   LAKINI HAITHIBITISHI LIVE. Broker wengi wanaweka")
+        print("   commission ya demo kuwa sifuri hata pale live inatoza.")
+        print("   Kwa sheria ya §13.10 iliyoandikwa kabla ya kuendesha:")
+        print("   `broker_costs.yaml` HAIBADILIKI, `7.0` inabaki DHANA, na")
+        print("   Gotobi inabaki `UNCERTAIN`.")
+    else:
+        print("\n   Ni kipimo cha AINA HII ya akaunti (demo). Inahitaji")
+        print("   kuthibitishwa kwenye akaunti halisi kabla ya §10 hatua 5.")
 
     matokeo_yote = {
         "measured_at": datetime.now(timezone.utc).isoformat(),
         "trade_mode": int(acc.trade_mode), "currency": acc.currency,
         "volume": VOLUME, "magic": magic,
+        "deals_read": jumla_deals,
         "per_symbol": matokeo,
         "failed": [{"symbol": s, "reason": r} for s, r in zilizoshindwa],
         "all_zero": jumla == 0,
